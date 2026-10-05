@@ -1,0 +1,586 @@
+// Spova clone - single schema (ARCHITECTURE.pdf §06).
+// Conventions: uuid ids, timestamptz, money Decimal(18,2), prices Decimal(18,6), lots Decimal(10,2).
+// Money changes ONLY through LedgerEntry inside the same transaction as the balance update.
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [citext, pgcrypto]
+}
+
+// ---------------------------------------------------------------- enums
+
+enum Role {
+  client
+  admin
+  superadmin
+}
+
+enum UserStatus {
+  active
+  frozen
+  closed
+}
+
+enum AccountType {
+  demo
+  live
+}
+
+enum AccountStatus {
+  enabled
+  disabled
+  readonly
+}
+
+enum Tier {
+  classic
+  silver
+  gold
+  platinum
+  vip
+}
+
+enum LedgerType {
+  deposit
+  withdraw
+  credit
+  debit
+  bonus
+  pnl
+  swap
+  fee
+  commission
+  adjustment
+}
+
+enum PaymentKind {
+  deposit
+  withdraw
+}
+
+enum PaymentStatus {
+  pending
+  approved
+  declined
+  cancelled
+}
+
+enum KycGroup {
+  poi
+  por
+  payment
+  other
+}
+
+enum KycStatus {
+  pending
+  approved
+  rejected
+}
+
+enum AssetClass {
+  forex
+  index
+  commodity
+  stock
+  crypto
+  metal
+}
+
+enum OrderSide {
+  buy
+  sell
+}
+
+enum OrderType {
+  market
+  limit
+  stop
+}
+
+enum OrderStatus {
+  pending
+  filled
+  cancelled
+  rejected
+  expired
+}
+
+enum PositionStatus {
+  open
+  closed
+}
+
+enum CloseReason {
+  user
+  sl
+  tp
+  stopout
+  admin
+  expiry
+}
+
+enum TicketStatus {
+  open
+  answered
+  closed
+}
+
+enum Timeframe {
+  m1
+  m5
+  m15
+  h1
+  h4
+  d1
+}
+
+// ---------------------------------------------------------------- identity
+
+model User {
+  id              String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email           String     @unique @db.Citext
+  passwordHash    String     @map("password_hash")
+  role            Role       @default(client)
+  status          UserStatus @default(active)
+  emailVerifiedAt DateTime?  @map("email_verified_at") @db.Timestamptz
+  kycPoi          Boolean    @default(false) @map("kyc_poi")
+  kycPor          Boolean    @default(false) @map("kyc_por")
+  kycPayment      Boolean    @default(false) @map("kyc_payment")
+  tcAcceptedAt    DateTime?  @map("tc_accepted_at") @db.Timestamptz
+  riskAcceptedAt  DateTime?  @map("risk_accepted_at") @db.Timestamptz
+  lastLoginAt     DateTime?  @map("last_login_at") @db.Timestamptz
+  lastLoginIp     String?    @map("last_login_ip")
+  referralCode    String?    @unique @map("referral_code")
+  referredBy      String?    @map("referred_by") @db.Uuid
+  totpSecret      String?    @map("totp_secret")
+  adminNotes      String?    @map("admin_notes")
+  createdAt       DateTime   @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime   @updatedAt @map("updated_at") @db.Timestamptz
+
+  profile         UserProfile?
+  sessions        Session[]
+  passwordResets  PasswordReset[]
+  accounts        TradingAccount[]
+  paymentRequests PaymentRequest[]
+  kycDocuments    KycDocument[]    @relation("KycOwner")
+  tickets         Ticket[]         @relation("TicketOwner")
+  notifications   Notification[]
+  auditActions    AdminAudit[]     @relation("AuditActor")
+
+  @@index([status])
+  @@index([createdAt])
+  @@map("users")
+}
+
+model UserProfile {
+  userId      String   @id @map("user_id") @db.Uuid
+  firstName   String   @map("first_name")
+  lastName    String   @map("last_name")
+  phone       String
+  dob         DateTime? @db.Date
+  countryCode String   @map("country_code") @db.Char(2)
+  city        String?
+  address     String?
+  zip         String?
+  language    String   @default("en")
+  notifEmail  Boolean  @default(true) @map("notif_email")
+  notifSms    Boolean  @default(false) @map("notif_sms")
+  notifPush   Boolean  @default(true) @map("notif_push")
+  notifCalls  Boolean  @default(false) @map("notif_calls")
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_profiles")
+}
+
+model Session {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @map("token_hash")
+  userAgent String?   @map("user_agent")
+  ip        String?
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz
+  revokedAt DateTime? @map("revoked_at") @db.Timestamptz
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+model PasswordReset {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz
+  usedAt    DateTime? @map("used_at") @db.Timestamptz
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_resets")
+}
+
+// ---------------------------------------------------------------- money
+
+model TradingAccount {
+  id             String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId         String        @map("user_id") @db.Uuid
+  type           AccountType
+  loginCode      Int           @unique @map("login_code")
+  tier           Tier          @default(classic)
+  currency       String        @default("USD") @db.Char(3)
+  leverage       Int           @default(100)
+  balance        Decimal       @default(0) @db.Decimal(18, 2)
+  credit         Decimal       @default(0) @db.Decimal(18, 2)
+  status         AccountStatus @default(enabled)
+  tradingBlocked Boolean       @default(false) @map("trading_blocked")
+  marginCallAt   DateTime?     @map("margin_call_at") @db.Timestamptz
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime      @updatedAt @map("updated_at") @db.Timestamptz
+
+  user             User             @relation(fields: [userId], references: [id])
+  ledgerEntries    LedgerEntry[]
+  paymentRequests  PaymentRequest[]
+  orders           Order[]
+  positions        Position[]
+  statementExports StatementExport[]
+
+  @@index([userId])
+  @@index([type, status])
+  @@map("trading_accounts")
+}
+
+/// Append-only. Application role has no UPDATE/DELETE on this table (see migration SQL).
+model LedgerEntry {
+  id           String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  accountId    String     @map("account_id") @db.Uuid
+  type         LedgerType
+  amount       Decimal    @db.Decimal(18, 2)
+  balanceAfter Decimal    @map("balance_after") @db.Decimal(18, 2)
+  creditAfter  Decimal    @map("credit_after") @db.Decimal(18, 2)
+  reason       String
+  refType      String?    @map("ref_type")
+  refId        String?    @map("ref_id") @db.Uuid
+  actorId      String?    @map("actor_id") @db.Uuid
+  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz
+
+  account TradingAccount @relation(fields: [accountId], references: [id])
+
+  @@index([accountId, createdAt(sort: Desc)])
+  @@index([createdAt])
+  @@map("ledger_entries")
+}
+
+model PaymentRequest {
+  id            String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  accountId     String        @map("account_id") @db.Uuid
+  userId        String        @map("user_id") @db.Uuid
+  kind          PaymentKind
+  amount        Decimal       @db.Decimal(18, 2)
+  currency      String        @default("USD") @db.Char(3)
+  method        String
+  destination   Json?
+  reference     String?
+  status        PaymentStatus @default(pending)
+  adminNote     String?       @map("admin_note")
+  decidedBy     String?       @map("decided_by") @db.Uuid
+  decidedAt     DateTime?     @map("decided_at") @db.Timestamptz
+  ledgerEntryId String?       @map("ledger_entry_id") @db.Uuid
+  createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz
+
+  account TradingAccount @relation(fields: [accountId], references: [id])
+  user    User           @relation(fields: [userId], references: [id])
+
+  @@index([status, createdAt])
+  @@index([userId])
+  @@map("payment_requests")
+}
+
+// ---------------------------------------------------------------- kyc
+
+model KycDocument {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId       String    @map("user_id") @db.Uuid
+  group        KycGroup
+  docType      String    @map("doc_type")
+  fileKey      String    @map("file_key")
+  originalName String    @map("original_name")
+  mime         String
+  size         Int
+  status       KycStatus @default(pending)
+  rejectReason String?   @map("reject_reason")
+  reviewedBy   String?   @map("reviewed_by") @db.Uuid
+  reviewedAt   DateTime? @map("reviewed_at") @db.Timestamptz
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  user User @relation("KycOwner", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status, createdAt])
+  @@map("kyc_documents")
+}
+
+// ---------------------------------------------------------------- market
+
+model Symbol {
+  id           String     @id
+  name         String
+  assetClass   AssetClass @map("asset_class")
+  digits       Int
+  contractSize Decimal    @map("contract_size") @db.Decimal(18, 4)
+  minLot       Decimal    @default(0.01) @map("min_lot") @db.Decimal(10, 2)
+  maxLot       Decimal    @default(50) @map("max_lot") @db.Decimal(10, 2)
+  lotStep      Decimal    @default(0.01) @map("lot_step") @db.Decimal(10, 2)
+  leverageMax  Int        @map("leverage_max")
+  spreadMarkup Decimal    @default(0) @map("spread_markup") @db.Decimal(18, 6)
+  swapLong     Decimal    @default(0) @map("swap_long") @db.Decimal(18, 6)
+  swapShort    Decimal    @default(0) @map("swap_short") @db.Decimal(18, 6)
+  feedSource   String     @map("feed_source")
+  feedSymbol   String     @map("feed_symbol")
+  enabled      Boolean    @default(true)
+  isOpen       Boolean    @default(true) @map("is_open")
+  sortOrder    Int        @default(100) @map("sort_order")
+  featured     Boolean    @default(false)
+  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime   @updatedAt @map("updated_at") @db.Timestamptz
+
+  sessions  SymbolSession[]
+  holidays  SymbolHoliday[]
+  candles   Candle[]
+  orders    Order[]
+  positions Position[]
+
+  @@index([assetClass, enabled])
+  @@map("symbols")
+}
+
+model SymbolSession {
+  id        Int    @id @default(autoincrement())
+  symbolId  String @map("symbol_id")
+  weekday   Int
+  openTime  String @map("open_time")
+  closeTime String @map("close_time")
+
+  symbol Symbol @relation(fields: [symbolId], references: [id], onDelete: Cascade)
+
+  @@index([symbolId, weekday])
+  @@map("symbol_sessions")
+}
+
+model SymbolHoliday {
+  symbolId String   @map("symbol_id")
+  date     DateTime @db.Date
+
+  symbol Symbol @relation(fields: [symbolId], references: [id], onDelete: Cascade)
+
+  @@id([symbolId, date])
+  @@map("symbol_holidays")
+}
+
+model Candle {
+  symbolId String    @map("symbol_id")
+  tf       Timeframe
+  t        DateTime  @db.Timestamptz
+  o        Decimal   @db.Decimal(18, 6)
+  h        Decimal   @db.Decimal(18, 6)
+  l        Decimal   @db.Decimal(18, 6)
+  c        Decimal   @db.Decimal(18, 6)
+  v        Int?
+
+  symbol Symbol @relation(fields: [symbolId], references: [id], onDelete: Cascade)
+
+  @@id([symbolId, tf, t])
+  @@map("candles")
+}
+
+// ---------------------------------------------------------------- trading
+
+model Order {
+  id           String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  accountId    String      @map("account_id") @db.Uuid
+  symbolId     String      @map("symbol_id")
+  side         OrderSide
+  type         OrderType
+  lots         Decimal     @db.Decimal(10, 2)
+  price        Decimal?    @db.Decimal(18, 6)
+  sl           Decimal?    @db.Decimal(18, 6)
+  tp           Decimal?    @db.Decimal(18, 6)
+  status       OrderStatus @default(pending)
+  filledPrice  Decimal?    @map("filled_price") @db.Decimal(18, 6)
+  filledAt     DateTime?   @map("filled_at") @db.Timestamptz
+  positionId   String?     @map("position_id") @db.Uuid
+  rejectReason String?     @map("reject_reason")
+  expiresAt    DateTime?   @map("expires_at") @db.Timestamptz
+  clientRef    String?     @map("client_ref")
+  createdAt    DateTime    @default(now()) @map("created_at") @db.Timestamptz
+
+  account TradingAccount @relation(fields: [accountId], references: [id])
+  symbol  Symbol         @relation(fields: [symbolId], references: [id])
+
+  @@unique([accountId, clientRef])
+  @@index([accountId, status])
+  @@index([symbolId, status])
+  @@map("orders")
+}
+
+model Position {
+  id          String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  accountId   String         @map("account_id") @db.Uuid
+  symbolId    String         @map("symbol_id")
+  side        OrderSide
+  lots        Decimal        @db.Decimal(10, 2)
+  openPrice   Decimal        @map("open_price") @db.Decimal(18, 6)
+  openAt      DateTime       @default(now()) @map("open_at") @db.Timestamptz
+  sl          Decimal?       @db.Decimal(18, 6)
+  tp          Decimal?       @db.Decimal(18, 6)
+  marginUsed  Decimal        @map("margin_used") @db.Decimal(18, 2)
+  swapAccrued Decimal        @default(0) @map("swap_accrued") @db.Decimal(18, 2)
+  commission  Decimal        @default(0) @db.Decimal(18, 2)
+  status      PositionStatus @default(open)
+  closePrice  Decimal?       @map("close_price") @db.Decimal(18, 6)
+  closeAt     DateTime?      @map("close_at") @db.Timestamptz
+  realizedPnl Decimal?       @map("realized_pnl") @db.Decimal(18, 2)
+  closeReason CloseReason?   @map("close_reason")
+  closedBy    String?        @map("closed_by") @db.Uuid
+
+  account TradingAccount  @relation(fields: [accountId], references: [id])
+  symbol  Symbol          @relation(fields: [symbolId], references: [id])
+  closes  PositionClose[]
+
+  @@index([accountId, status])
+  @@index([symbolId, status])
+  @@map("positions")
+}
+
+model PositionClose {
+  id            String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  positionId    String      @map("position_id") @db.Uuid
+  lots          Decimal     @db.Decimal(10, 2)
+  price         Decimal     @db.Decimal(18, 6)
+  pnl           Decimal     @db.Decimal(18, 2)
+  reason        CloseReason
+  ledgerEntryId String      @map("ledger_entry_id") @db.Uuid
+  createdAt     DateTime    @default(now()) @map("created_at") @db.Timestamptz
+
+  position Position @relation(fields: [positionId], references: [id])
+
+  @@index([positionId])
+  @@map("position_closes")
+}
+
+model RiskConfig {
+  tier              Tier    @id
+  marginCallPct     Decimal @default(100) @map("margin_call_pct") @db.Decimal(5, 2)
+  stopOutPct        Decimal @default(20) @map("stop_out_pct") @db.Decimal(5, 2)
+  defaultLeverage   Int     @default(100) @map("default_leverage")
+  maxLeverage       Int     @default(400) @map("max_leverage")
+  minDeposit        Decimal @default(150) @map("min_deposit") @db.Decimal(18, 2)
+  spreadDiscountPct Decimal @default(0) @map("spread_discount_pct") @db.Decimal(5, 2)
+
+  @@map("risk_configs")
+}
+
+// ---------------------------------------------------------------- support / ops
+
+model Ticket {
+  id         String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId     String       @map("user_id") @db.Uuid
+  subject    String
+  status     TicketStatus @default(open)
+  assignedTo String?      @map("assigned_to") @db.Uuid
+  createdAt  DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt  DateTime     @updatedAt @map("updated_at") @db.Timestamptz
+
+  user     User            @relation("TicketOwner", fields: [userId], references: [id])
+  messages TicketMessage[]
+
+  @@index([status, updatedAt])
+  @@index([userId])
+  @@map("tickets")
+}
+
+model TicketMessage {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ticketId  String   @map("ticket_id") @db.Uuid
+  authorId  String   @map("author_id") @db.Uuid
+  body      String
+  isStaff   Boolean  @default(false) @map("is_staff")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+  @@map("ticket_messages")
+}
+
+/// Append-only.
+model AdminAudit {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  actorId    String   @map("actor_id") @db.Uuid
+  action     String
+  targetType String   @map("target_type")
+  targetId   String?  @map("target_id") @db.Uuid
+  before     Json?
+  after      Json?
+  ip         String?
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  actor User @relation("AuditActor", fields: [actorId], references: [id])
+
+  @@index([createdAt])
+  @@index([targetType, targetId])
+  @@index([actorId])
+  @@map("admin_audit")
+}
+
+model Notification {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  type      String
+  title     String
+  body      String
+  readAt    DateTime? @map("read_at") @db.Timestamptz
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
+  @@map("notifications")
+}
+
+model StatementExport {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  accountId String   @map("account_id") @db.Uuid
+  from      DateTime @db.Date
+  to        DateTime @db.Date
+  fileKey   String?  @map("file_key")
+  status    String   @default("queued")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  account TradingAccount @relation(fields: [accountId], references: [id])
+
+  @@index([accountId])
+  @@map("statement_exports")
+}
+
+model IdempotencyKey {
+  key       String   @id
+  userId    String   @map("user_id") @db.Uuid
+  response  Json
+  expiresAt DateTime @map("expires_at") @db.Timestamptz
+
+  @@index([expiresAt])
+  @@map("idempotency_keys")
+}

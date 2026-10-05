@@ -1,0 +1,34 @@
+---
+description: Spova clone platform stack, ERD, and build order. Always follow docs/PLATFORM_PLAN.md.
+alwaysApply: true
+---
+
+# Spova platform (agent)
+
+Source of truth: `docs/PLATFORM_PLAN.md` (PDF copy: `docs/PLATFORM_PLAN.pdf`).
+Implementation spec: `docs/ARCHITECTURE.pdf` — routes, every REST endpoint, WS events, full schema (tables/columns/enums), core flows, risk engine, jobs, env vars, milestone acceptance (9/13/16 Oct). Read it before adding any route, table, or job.
+
+We are cloning **product shape** of spova.com (marketing + client CRM + live trader + admin), **not** buying Fintech360/MatchTrader.
+
+## Stack (locked)
+
+- pnpm Turborepo, Next.js 15 + Tailwind + shadcn, NestJS + Prisma, PostgreSQL, Redis, BullMQ, R2 for KYC
+- Charts: TradingView Lightweight Charts
+- Auth: JWT httpOnly cookies
+- Money: `NUMERIC(18,2)` + `LEDGER_ENTRY` in the same transaction as balance change. No Mongo/Firebase for ledger.
+
+## Four apps, one API
+
+Marketing `/`, client `/app`, trader `/trade`, admin `/admin`.
+
+## Order of work
+
+Phase 0 skeleton → Phase 1 **ledger + admin credit/debit/freeze** → Phase 2 KYC + payment requests → Phase 3 demo trader WS → Phase 4 marketing pages → Phase 5 live + one PSP.
+
+Do not start K8s, matching engine, Praxis, or InvestiQ before Phase 1 is demoable.
+
+## Trading v1
+
+CFD on our books. Margin call 100%, stop-out 20%, configurable. Demo vs live = `trading_account.type`.
+
+When adding tables or endpoints, match the ERD in `docs/PLATFORM_PLAN.md`.

@@ -1,0 +1,28 @@
+# deps
+node_modules/
+.pnpm-store/
+
+# builds
+dist/
+.next/
+out/
+.turbo/
+*.tsbuildinfo
+
+# env / secrets (never commit)
+.env
+.env.*
+!.env.example
+
+# prisma
+apps/api/prisma/*.db
+
+# os / editor
+.DS_Store
+*.log
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# uploads (local dev only)
+infra/data/
