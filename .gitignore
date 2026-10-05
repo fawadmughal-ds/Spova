@@ -26,3 +26,4 @@ apps/api/prisma/*.db
 
 # uploads (local dev only)
 infra/data/
+.logs/
