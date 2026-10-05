@@ -32,3 +32,13 @@ Do not start K8s, matching engine, Praxis, or InvestiQ before Phase 1 is demoabl
 CFD on our books. Margin call 100%, stop-out 20%, configurable. Demo vs live = `trading_account.type`.
 
 When adding tables or endpoints, match the ERD in `docs/PLATFORM_PLAN.md`.
+
+## Current state (Phase 0-1 done, 5 Oct)
+
+- Pinned: Next 15.5, Nest 11, Prisma 6.19, TS 5.9, Tailwind 4, zod 3. Do not bump majors without asking.
+- Run: `pnpm db:up` (Postgres+Redis via podman/docker compose) → `pnpm --filter @spova/shared build` → `pnpm --filter @spova/api prisma:deploy && pnpm db:seed` → `pnpm dev`. Web :3000, API :4000. `apps/api/.env` is a symlink to root `.env` (Prisma CLI needs it).
+- Seeds: `admin@xyz.local / Admin@12345` (superadmin), `client@xyz.local / Client@12345` (demo login 100001). Brand/domain placeholder `XYZ` lives only in `.env`.
+- Money path: only `LedgerService.postInTx` touches `trading_accounts.balance/credit`. `ledger_entries` and `admin_audit` have DB triggers rejecting UPDATE/DELETE.
+- WS: API gateway relays `{room,event,payload}` from Redis channel `ws:events`; worker publishes to the same channel. Rooms `user:{id}`, `account:{id}`, `symbol:{S}`, `admin`.
+- Shared DTO/zod live in `packages/shared` (built to `dist/`; rebuild after edits).
+- Next: Phase 2 (KYC to R2, payment requests) then Phase 3 (feeds, candles, orders, risk engine in `apps/worker`).
