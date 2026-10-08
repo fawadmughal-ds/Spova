@@ -61,6 +61,31 @@ export class MailService {
       html: `<p>${esc(body)}</p>`,
     });
   }
+
+  kycResult(to: string, group: string, status: 'approved' | 'rejected', reason?: string) {
+    const label = { poi: 'Proof of identity', por: 'Proof of residence', payment: 'Payment method proof', other: 'Document' }[group] ?? 'Document';
+    const body = status === 'approved' ? `${label}: approved. Thank you for verifying your account.` : `${label}: rejected. Reason: ${reason ?? 'not given'}. Please upload a new document from the client area.`;
+    return this.send({ to, subject: `${env.BRAND_NAME} - verification ${status}`, text: body, html: `<p>${esc(body)}</p>` });
+  }
+
+  paymentResult(to: string, kind: 'deposit' | 'withdraw', amount: string, status: 'approved' | 'declined', note?: string) {
+    const body =
+      status === 'approved'
+        ? `Your ${kind} request for ${amount} USD has been approved and posted to your account.`
+        : `Your ${kind} request for ${amount} USD was declined. ${note ? `Note: ${note}` : ''}`.trim();
+    return this.send({ to, subject: `${env.BRAND_NAME} - ${kind} ${status}`, text: body, html: `<p>${esc(body)}</p>` });
+  }
+
+  ticketReply(to: string, subject: string, body: string) {
+    const text = `A support agent replied to your ticket "${subject}":\n\n${body}\n\nReply from the Help section of your client area.`;
+    return this.send({ to, subject: `${env.BRAND_NAME} - reply to your ticket`, text, html: `<p>${esc(text).replace(/\n/g, '<br>')}</p>` });
+  }
+
+  /** Back-office alert; silently skipped when ADMIN_NOTIFY_EMAIL is empty. */
+  adminAlert(subject: string, body: string) {
+    if (!env.ADMIN_NOTIFY_EMAIL) return Promise.resolve();
+    return this.send({ to: env.ADMIN_NOTIFY_EMAIL, subject: `[${env.BRAND_NAME} back office] ${subject}`, text: body, html: `<p>${esc(body)}</p>` });
+  }
 }
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);

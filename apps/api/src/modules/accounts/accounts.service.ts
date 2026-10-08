@@ -58,7 +58,7 @@ export class AccountsService {
   }
 
   async create(userId: string, type: AccountType) {
-    if (type === 'live') {
+    if (type === 'live' && env.KYC_REQUIRED_FOR_LIVE) {
       const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
       if (!user.kycPoi || !user.kycPor) {
         throw ApiError.forbidden('kyc_required', 'Complete identity and address verification before opening a live account');

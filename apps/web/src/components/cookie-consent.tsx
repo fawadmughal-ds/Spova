@@ -60,7 +60,7 @@ export function CookieConsent() {
   if (!open) return null;
 
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-[90] flex justify-center p-4 sm:justify-start sm:p-6" role="dialog" aria-live="polite" aria-label="Cookie preferences">
+    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center p-4 sm:justify-start sm:p-6" role="dialog" aria-live="polite" aria-label="Cookie preferences">
       <div className="card pointer-events-auto w-full max-w-md overflow-hidden shadow-lift [animation:slide-in-up_0.6s_var(--ease)_both]">
         <div className="flex items-start gap-3 p-5">
           <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-400/10 text-brand-300">

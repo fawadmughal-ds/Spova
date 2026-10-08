@@ -961,6 +961,48 @@
       box-shadow 0.4s ease,
       scale 0.4s var(--ease);
   }
+  /* back office: review / thread side pane */
+  .admin-pane {
+    scrollbar-width: thin;
+    overscroll-behavior: contain;
+  }
+  /* document preview sits on a soft checkerboard so transparent scans and small images stay visible */
+  .admin-preview {
+    background-color: var(--color-ink-900);
+    background-image:
+      linear-gradient(45deg, rgb(var(--tint) / 0.05) 25%, transparent 25%, transparent 75%, rgb(var(--tint) / 0.05) 75%),
+      linear-gradient(45deg, rgb(var(--tint) / 0.05) 25%, transparent 25%, transparent 75%, rgb(var(--tint) / 0.05) 75%);
+    background-size: 16px 16px;
+    background-position:
+      0 0,
+      8px 8px;
+  }
+  .admin-preview img {
+    min-height: 1rem;
+    min-width: 1rem;
+  }
+  .admin-bubble {
+    overflow-wrap: anywhere;
+  }
+  /* kyc upload zone: indeterminate bar while the file is in flight */
+  .upload-progress {
+    animation: upload-slide 1.1s var(--ease) infinite;
+  }
+  @keyframes upload-slide {
+    from {
+      translate: -100% 0;
+    }
+    to {
+      translate: 300% 0;
+    }
+  }
+  /* support thread: bubbles keep a square corner on the speaker's side */
+  .bubble-me {
+    border-bottom-right-radius: 6px;
+  }
+  .bubble-staff {
+    border-bottom-left-radius: 6px;
+  }
 }
 
 

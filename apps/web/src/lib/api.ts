@@ -74,3 +74,26 @@ export const get = <T>(path: string) => api<T>(path);
 export const post = <T>(path: string, body?: unknown) => api<T>(path, { method: 'POST', body });
 export const patch = <T>(path: string, body?: unknown) => api<T>(path, { method: 'PATCH', body });
 export const del = <T>(path: string) => api<T>(path, { method: 'DELETE' });
+
+/** multipart/form-data POST (file uploads). The browser sets the boundary header itself. */
+export async function upload<T>(path: string, form: FormData): Promise<T> {
+  const doFetch = () => fetch(`${API_URL}/v1${path}`, { method: 'POST', credentials: 'include', body: form });
+  let res = await doFetch();
+  if (res.status === 401) {
+    const ok = await refreshSession();
+    if (ok) res = await doFetch();
+  }
+  if (!res.ok) {
+    let payload: Partial<ApiErrorShape> = {};
+    try {
+      payload = (await res.json()) as ApiErrorShape;
+    } catch {
+      /* non-json */
+    }
+    throw new ApiError(res.status, payload.code ?? 'error', payload.message ?? res.statusText, payload.details);
+  }
+  return (await res.json()) as T;
+}
+
+/** URL of a private file served through the API (auth cookie travels with the request). */
+export const fileUrl = (path: string) => `${API_URL}/v1${path}`;

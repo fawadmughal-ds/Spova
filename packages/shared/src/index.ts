@@ -23,6 +23,10 @@ export const WS_EVENTS = {
   KYC_STATUS: 'kyc:status',
   PAYMENT_STATUS: 'payment:status',
   ADMIN_LEDGER: 'admin:ledger',
+  ADMIN_KYC_NEW: 'admin:kyc:new',
+  ADMIN_PAYMENT_NEW: 'admin:payment:new',
+  ADMIN_TICKET_NEW: 'admin:ticket:new',
+  TICKET_UPDATED: 'ticket:updated',
 } as const;
 
 export const COOKIE_NAMES = {

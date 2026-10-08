@@ -1,15 +1,19 @@
 import { z } from 'zod';
 import { config as loadDotenv } from 'dotenv';
 import { existsSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
 
 // Load repo-root .env when running from apps/api (dev). In docker the env is injected.
+let rootDir = process.cwd();
 for (const candidate of [resolve(process.cwd(), '.env'), resolve(process.cwd(), '../../.env')]) {
   if (existsSync(candidate)) {
     loadDotenv({ path: candidate });
+    rootDir = dirname(candidate);
     break;
   }
 }
+/** Repo root in dev (where .env lives); the working directory in docker. */
+export const ROOT_DIR = rootDir;
 
 const schema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
@@ -33,6 +37,18 @@ const schema = z.object({
   MAIL_PROVIDER: z.enum(['console', 'resend']).default('console'),
   RESEND_API_KEY: z.string().optional().default(''),
   MAIL_FROM: z.string().default('no-reply@localhost'),
+  // phase 2: private file storage for KYC documents
+  STORAGE_DRIVER: z.enum(['local', 's3']).default('local'),
+  STORAGE_LOCAL_DIR: z.string().default('infra/data/uploads'),
+  R2_ACCOUNT_ID: z.string().optional().default(''),
+  R2_ACCESS_KEY_ID: z.string().optional().default(''),
+  R2_SECRET_ACCESS_KEY: z.string().optional().default(''),
+  R2_BUCKET: z.string().optional().default('kyc'),
+  R2_ENDPOINT: z.string().optional().default(''),
+  KYC_REQUIRED_FOR_LIVE: z.string().optional().default('true').transform((v) => v !== 'false'),
+  KYC_REQUIRED_FOR_WITHDRAW: z.string().optional().default('true').transform((v) => v !== 'false'),
+  /** back-office inbox for new KYC / payment / ticket alerts (empty = no mail) */
+  ADMIN_NOTIFY_EMAIL: z.string().optional().default(''),
   SEED_ADMIN_EMAIL: z.string().email().optional(),
   SEED_ADMIN_PASSWORD: z.string().optional(),
 });

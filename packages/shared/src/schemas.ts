@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ACCOUNT_TYPES, LEDGER_TYPES, USER_STATUSES } from './enums';
+import { ACCOUNT_TYPES, KYC_GROUPS, KycGroup, LEDGER_TYPES, USER_STATUSES } from './enums';
 
 // Password policy (matches Spova hint): 8-32 chars, upper, lower, digit, special.
 export const passwordSchema = z
@@ -131,3 +131,83 @@ export const paginationSchema = z.object({
 });
 
 export const LEDGER_TYPE_VALUES = LEDGER_TYPES;
+
+// ---------- phase 2: kyc / payments / support ----------
+/** Accepted document types per KYC group (value -> label). */
+export const KYC_DOC_TYPES: Record<KycGroup, { value: string; label: string }[]> = {
+  poi: [
+    { value: 'passport', label: 'Passport' },
+    { value: 'id_card', label: 'National ID card' },
+    { value: 'driving_licence', label: 'Driving licence' },
+  ],
+  por: [
+    { value: 'utility_bill', label: 'Utility bill' },
+    { value: 'bank_statement', label: 'Bank statement' },
+    { value: 'tax_letter', label: 'Government or tax letter' },
+  ],
+  payment: [
+    { value: 'card_front', label: 'Card (front, middle digits hidden)' },
+    { value: 'bank_proof', label: 'Bank account proof' },
+    { value: 'crypto_wallet', label: 'Crypto wallet ownership' },
+  ],
+  other: [{ value: 'other', label: 'Other document' }],
+};
+export const KYC_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'] as const;
+export const KYC_MAX_BYTES = 10 * 1024 * 1024;
+
+export const kycUploadMetaSchema = z
+  .object({ group: z.enum(KYC_GROUPS), docType: z.string().trim().min(2).max(40) })
+  .refine((v) => KYC_DOC_TYPES[v.group].some((t) => t.value === v.docType), { path: ['docType'], message: 'Unknown document type for this group' });
+export type KycUploadMeta = z.infer<typeof kycUploadMetaSchema>;
+
+export const kycReviewSchema = z
+  .object({ status: z.enum(['approved', 'rejected']), reason: z.string().trim().max(300).optional() })
+  .refine((v) => v.status === 'approved' || (v.reason && v.reason.length >= 3), { path: ['reason'], message: 'Give the client a reason for the rejection' });
+export type KycReviewInput = z.infer<typeof kycReviewSchema>;
+
+/** Payment methods offered in v1. Card stays visible but disabled until a PSP is connected (Phase 5). */
+export const PAYMENT_METHODS = [
+  { id: 'bank', label: 'Bank transfer', kinds: ['deposit', 'withdraw'], enabled: true, minDeposit: '200', maxDeposit: '100000', minWithdraw: '50', maxWithdraw: '100000', eta: '1-3 business days' },
+  { id: 'crypto_usdt', label: 'Crypto (USDT)', kinds: ['deposit', 'withdraw'], enabled: true, minDeposit: '200', maxDeposit: '100000', minWithdraw: '50', maxWithdraw: '100000', eta: 'Same day' },
+  { id: 'card', label: 'Card', kinds: ['deposit'], enabled: false, minDeposit: '200', maxDeposit: '5000', minWithdraw: '0', maxWithdraw: '0', eta: 'Coming soon' },
+] as const;
+export type PaymentMethodId = (typeof PAYMENT_METHODS)[number]['id'];
+export const PAYMENT_METHOD_IDS = PAYMENT_METHODS.map((m) => m.id) as [PaymentMethodId, ...PaymentMethodId[]];
+
+export const depositRequestSchema = z.object({
+  accountId: z.string().uuid(),
+  amount: moneySchema,
+  method: z.enum(PAYMENT_METHOD_IDS),
+  /** bank reference / tx hash the client used, if any */
+  reference: z.string().trim().max(120).optional(),
+});
+export type DepositRequestInput = z.infer<typeof depositRequestSchema>;
+
+export const withdrawRequestSchema = z.object({
+  accountId: z.string().uuid(),
+  amount: moneySchema,
+  method: z.enum(PAYMENT_METHOD_IDS),
+  /** where to send the money: IBAN / account number or wallet address + network */
+  destination: z.object({
+    label: z.string().trim().min(2).max(80),
+    details: z.string().trim().min(4).max(200),
+  }),
+  reason: z.string().trim().max(200).optional(),
+});
+export type WithdrawRequestInput = z.infer<typeof withdrawRequestSchema>;
+
+export const paymentDecisionSchema = z
+  .object({ status: z.enum(['approved', 'declined']), note: z.string().trim().max(300).optional() })
+  .refine((v) => v.status === 'approved' || (v.note && v.note.length >= 3), { path: ['note'], message: 'Give the client a reason for the decline' });
+export type PaymentDecisionInput = z.infer<typeof paymentDecisionSchema>;
+
+export const createTicketSchema = z.object({
+  subject: z.string().trim().min(3).max(120),
+  message: z.string().trim().min(5).max(4000),
+});
+export type CreateTicketInput = z.infer<typeof createTicketSchema>;
+
+export const ticketMessageSchema = z.object({ body: z.string().trim().min(1).max(4000) });
+export type TicketMessageInput = z.infer<typeof ticketMessageSchema>;
+
+export const ticketStatusSchema = z.object({ status: z.enum(['open', 'answered', 'closed']) });

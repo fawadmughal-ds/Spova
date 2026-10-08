@@ -75,3 +75,19 @@ export function useAccountStream(onSnapshot: (s: WsAccountSnapshot) => void, onN
 
   return { connected };
 }
+
+/** Subscribe to any other per-user event (kyc:status, payment:status, ticket:updated). */
+export function useUserEvent<T = unknown>(event: string, handler: (payload: T) => void) {
+  const { socket, connected } = useSocket();
+  const cb = useRef(handler);
+  cb.current = handler;
+  useEffect(() => {
+    if (!socket) return;
+    const h = (p: T) => cb.current(p);
+    socket.on(event, h);
+    return () => {
+      socket.off(event, h);
+    };
+  }, [socket, event]);
+  return { connected };
+}

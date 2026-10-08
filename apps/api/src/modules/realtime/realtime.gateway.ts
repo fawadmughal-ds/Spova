@@ -134,4 +134,9 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
   admin(event: string, payload: unknown) {
     void this.publish('admin', event, payload);
   }
+
+  /** Any other event addressed to one user (kyc:status, payment:status, ticket:updated). */
+  user(userId: string, event: string, payload: unknown) {
+    void this.publish(`user:${userId}`, event, payload);
+  }
 }

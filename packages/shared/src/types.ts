@@ -1,9 +1,13 @@
 import type {
   AccountStatus,
   AccountType,
+  KycGroup,
   KycStatus,
   LedgerType,
+  PaymentKind,
+  PaymentStatus,
   Role,
+  TicketStatus,
   Tier,
   UserStatus,
 } from './enums';
@@ -134,3 +138,93 @@ export interface WsNotice {
 }
 
 export type KycStatusMap = Record<'poi' | 'por' | 'payment', 'incomplete' | KycStatus>;
+
+// ---------------------------------------------------------------- phase 2 DTOs
+export interface KycDocumentDto {
+  id: string;
+  group: KycGroup;
+  docType: string;
+  originalName: string;
+  mime: string;
+  size: number;
+  status: KycStatus;
+  rejectReason: string | null;
+  createdAt: string;
+  reviewedAt: string | null;
+}
+
+export interface AdminKycRowDto extends KycDocumentDto {
+  user: { id: string; email: string; firstName: string | null; lastName: string | null; countryCode: string | null };
+}
+
+export interface PaymentMethodDto {
+  id: string;
+  label: string;
+  kinds: PaymentKind[];
+  enabled: boolean;
+  minDeposit: string;
+  maxDeposit: string;
+  minWithdraw: string;
+  maxWithdraw: string;
+  eta: string;
+}
+
+export interface PaymentRequestDto {
+  id: string;
+  accountId: string;
+  accountLogin: number;
+  kind: PaymentKind;
+  amount: string;
+  currency: string;
+  method: string;
+  destination: { label: string; details: string } | null;
+  reference: string | null;
+  status: PaymentStatus;
+  adminNote: string | null;
+  decidedAt: string | null;
+  ledgerEntryId: string | null;
+  createdAt: string;
+}
+
+export interface AdminPaymentRowDto extends PaymentRequestDto {
+  user: { id: string; email: string; firstName: string | null; lastName: string | null };
+  account: { type: AccountType; balance: string; freeMargin: string };
+}
+
+export interface TicketMessageDto {
+  id: string;
+  authorId: string;
+  body: string;
+  isStaff: boolean;
+  createdAt: string;
+}
+
+export interface TicketDto {
+  id: string;
+  subject: string;
+  status: TicketStatus;
+  createdAt: string;
+  updatedAt: string;
+  messageCount: number;
+  lastMessage: { body: string; isStaff: boolean; createdAt: string } | null;
+  /** present on admin rows */
+  user?: { id: string; email: string; firstName: string | null; lastName: string | null };
+}
+
+export interface TicketDetailDto extends TicketDto {
+  messages: TicketMessageDto[];
+}
+
+export interface WsKycStatus {
+  documentId: string;
+  group: KycGroup;
+  status: KycStatus;
+  reason?: string;
+}
+
+export interface WsPaymentStatus {
+  paymentId: string;
+  kind: PaymentKind;
+  status: PaymentStatus;
+  note?: string;
+}

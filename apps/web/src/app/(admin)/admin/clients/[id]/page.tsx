@@ -13,6 +13,17 @@ import { useToast } from '@/components/toast';
 import { Badge, Button, Card, Spinner } from '@/components/ui';
 import { WalletPanel } from '@/components/admin/wallet-panel';
 import { AccountSettingsPanel } from '@/components/admin/account-settings-panel';
+import { KycQueue } from '@/components/admin/kyc-queue';
+import { PaymentsQueue } from '@/components/admin/payments-queue';
+import { TicketInbox } from '@/components/admin/ticket-inbox';
+import { SlidingTabs } from '@/components/portal/sliding-tabs';
+
+type Section = 'kyc' | 'payments' | 'tickets';
+const SECTIONS: { value: Section; label: string }[] = [
+  { value: 'kyc', label: 'KYC documents' },
+  { value: 'payments', label: 'Payment requests' },
+  { value: 'tickets', label: 'Tickets' },
+];
 
 const statusTone = { active: 'success', frozen: 'danger', closed: 'neutral' } as const;
 
@@ -24,6 +35,7 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
   const [selected, setSelected] = useState<string | null>(null);
   const [ledgerVersion, setLedgerVersion] = useState(0);
   const [busy, setBusy] = useState(false);
+  const [section, setSection] = useState<Section>('kyc');
 
   const load = useCallback(async () => {
     const d = await get<AdminUserDetailDto>(`/admin/users/${id}`);
@@ -93,7 +105,7 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
         }
       />
 
-      <div className="grid gap-6 xl:grid-cols-3">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 xl:grid-cols-3">
         {/* profile */}
         <Card title="Profile">
           <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
@@ -162,7 +174,7 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
       </div>
 
       {account && (
-        <div className="mt-6 grid gap-6 xl:grid-cols-3">
+        <div className="mt-6 grid grid-cols-[minmax(0,1fr)] gap-6 xl:grid-cols-3">
           <WalletPanel account={account} superadmin={me?.role === 'superadmin'} onChanged={onAccountChanged} />
           <AccountSettingsPanel account={account} onChanged={onAccountChanged} />
           <Card title={`Ledger · ${account.loginCode}`} className="xl:col-span-3">
@@ -170,6 +182,22 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
           </Card>
         </div>
       )}
+
+      {/* compliance + support for this client; same components as the queues, narrowed to one user */}
+      <section className="mt-6">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-ink-100">
+            <span className="h-3.5 w-0.5 rounded-full bg-gradient-to-b from-brand-300 to-brand-600" />
+            Compliance and support
+          </h2>
+          <SlidingTabs items={SECTIONS} value={section} onChange={setSection} />
+        </div>
+        <div key={section} className="animate-page-in">
+          {section === 'kyc' && <KycQueue userId={id} compact />}
+          {section === 'payments' && <PaymentsQueue userId={id} compact onChanged={() => void load().then(() => setLedgerVersion((v) => v + 1))} />}
+          {section === 'tickets' && <TicketInbox userId={id} compact />}
+        </div>
+      </section>
     </>
   );
 }

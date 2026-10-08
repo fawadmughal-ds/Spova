@@ -1,31 +1,73 @@
 import Link from 'next/link';
 import type { CSSProperties } from 'react';
-import { ArrowRight, Check, FileUser, Home, Rocket, UserCheck } from 'lucide-react';
+import { ArrowRight, Check, FileUser, Home, Hourglass, Rocket, UserCheck, X, type LucideIcon } from 'lucide-react';
+import type { KycStatusMap } from '@spova/shared';
 import { cn } from '@/lib/utils';
 import { buttonClass } from '@/lib/button';
 
-/** Verification as a four-stop track: registered -> identity -> address -> live trading. */
-export function KycSteps({ poi, por }: { poi: boolean; por: boolean }) {
-  const steps = [
-    { label: 'Registered', hint: 'Demo account ready', icon: UserCheck, done: true },
-    { label: 'Identity', hint: 'Passport or ID card', icon: FileUser, done: poi },
-    { label: 'Address', hint: 'Utility bill or statement', icon: Home, done: por },
-    { label: 'Live trading', hint: 'Deposits and withdrawals', icon: Rocket, done: poi && por },
+type StepState = 'done' | 'pending' | 'rejected' | 'next' | 'todo';
+type GroupStatus = KycStatusMap['poi'];
+
+const fromGroup = (s: GroupStatus | undefined, done: boolean): Exclude<StepState, 'next'> => {
+  if (done || s === 'approved') return 'done';
+  if (s === 'pending') return 'pending';
+  if (s === 'rejected') return 'rejected';
+  return 'todo';
+};
+
+/**
+ * Verification as a four-stop track: registered -> identity -> address -> live trading.
+ * `poi`/`por` are the account flags (approved); `status` adds the in-between states (pending review, rejected).
+ */
+export function KycSteps({ poi, por, status, cta = true, className }: { poi: boolean; por: boolean; status?: KycStatusMap | null; cta?: boolean; className?: string }) {
+  const steps: { label: string; hint: string; icon: LucideIcon; state: StepState }[] = [
+    { label: 'Registered', hint: 'Demo account ready', icon: UserCheck, state: 'done' },
+    { label: 'Identity', hint: 'Passport or ID card', icon: FileUser, state: fromGroup(status?.poi, poi) },
+    { label: 'Address', hint: 'Utility bill or statement', icon: Home, state: fromGroup(status?.por, por) },
+    { label: 'Live trading', hint: 'Deposits and withdrawals', icon: Rocket, state: poi && por ? 'done' : 'todo' },
   ];
+  // the first stop that still needs the client's attention pulses
+  const next = steps.findIndex((s) => s.state === 'todo' || s.state === 'rejected');
+  if (next > 0 && steps[next].state === 'todo') steps[next].state = 'next';
   // the rail fills up to the last consecutive finished stop
-  const reached = Math.max(0, steps.findIndex((s) => !s.done) - 1);
-  const next = steps.findIndex((s) => !s.done);
+  const firstOpen = steps.findIndex((s) => s.state !== 'done');
+  const reached = firstOpen === -1 ? 3 : Math.max(0, firstOpen - 1);
+
+  const rejected = steps.some((s) => s.state === 'rejected');
+  const pending = !rejected && steps.some((s) => s.state === 'pending');
+  const headline = rejected ? 'Action needed' : pending ? 'Documents in review' : 'Verification incomplete';
+  const copy = rejected
+    ? 'A document was rejected. Check the reason and upload a clearer copy.'
+    : pending
+      ? 'Our compliance team is checking your documents. This usually takes under one business day.'
+      : 'Upload your ID and proof of address to unlock live trading and withdrawals.';
+  const tone = rejected ? 'down' : pending ? 'sky' : 'gold';
+  const corner = rejected ? 'rgb(var(--down-rgb) / 0.4)' : pending ? 'rgb(2 132 199 / 0.4)' : 'rgb(var(--gold-rgb) / 0.4)';
 
   return (
-    <section data-in="true" className="card corners mb-6 overflow-hidden p-5 sm:p-6" style={{ '--corner': 'rgb(var(--gold-rgb) / 0.4)' } as CSSProperties}>
+    <section data-in="true" className={cn('card corners mb-6 overflow-hidden p-5 sm:p-6', className)} style={{ '--corner': corner } as CSSProperties}>
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="max-w-xl">
-          <div className="label !text-gold">Verification incomplete</div>
-          <p className="mt-1.5 text-sm text-ink-200">Upload your ID and proof of address to unlock live trading and withdrawals.</p>
+          <div className={cn('label', tone === 'down' ? '!text-down' : tone === 'sky' ? '!text-sky-700' : '!text-gold')}>{headline}</div>
+          <p className="mt-1.5 text-sm text-ink-200">{copy}</p>
         </div>
-        <Link href="/app/documents" className={buttonClass('outline', 'sm', 'group h-9 rounded-full border-gold/40 px-4 text-gold hover:border-gold hover:bg-gold/10 hover:text-gold')}>
-          Upload documents <ArrowRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-0.5" />
-        </Link>
+        {cta && (
+          <Link
+            href="/app/documents"
+            className={buttonClass(
+              'outline',
+              'sm',
+              cn(
+                'group h-9 rounded-full px-4',
+                tone === 'down' && 'border-down/40 text-down hover:border-down hover:bg-down/10 hover:text-down',
+                tone === 'sky' && 'border-sky-400/50 text-sky-700 hover:border-sky-500 hover:bg-sky-400/10 hover:text-sky-700',
+                tone === 'gold' && 'border-gold/40 text-gold hover:border-gold hover:bg-gold/10 hover:text-gold',
+              ),
+            )}
+          >
+            {rejected ? 'Fix document' : pending ? 'View documents' : 'Upload documents'} <ArrowRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-0.5" />
+          </Link>
+        )}
       </div>
 
       <ol className="relative mt-6 grid grid-cols-4">
@@ -38,14 +80,33 @@ export function KycSteps({ poi, por }: { poi: boolean; por: boolean }) {
             <span
               className={cn(
                 'relative flex h-9 w-9 items-center justify-center rounded-full border transition-colors duration-500',
-                s.done ? 'border-up/50 bg-up text-ink-950' : i === next ? 'border-gold/60 bg-ink-900 text-gold' : 'border-white/10 bg-ink-900 text-ink-500',
+                s.state === 'done' && 'border-up/50 bg-up text-ink-950',
+                s.state === 'pending' && 'border-sky-400/60 bg-sky-400/10 text-sky-700',
+                s.state === 'rejected' && 'border-down/60 bg-down/10 text-down',
+                s.state === 'next' && 'border-gold/60 bg-ink-900 text-gold',
+                s.state === 'todo' && 'border-white/10 bg-ink-900 text-ink-500',
               )}
             >
-              {i === next && <span className="absolute inset-0 animate-pulse-ring rounded-full border border-gold/60" />}
-              {s.done ? <Check className="h-4 w-4" strokeWidth={3} /> : <s.icon className="h-4 w-4" />}
+              {s.state === 'next' && <span className="absolute inset-0 animate-pulse-ring rounded-full border border-gold/60" />}
+              {s.state === 'rejected' && <span className="absolute inset-0 animate-pulse-ring rounded-full border border-down/60" />}
+              {s.state === 'pending' && <span className="absolute inset-0 animate-pulse-ring rounded-full border border-sky-400/60 [animation-duration:3.6s]" />}
+              {s.state === 'done' ? <Check className="h-4 w-4" strokeWidth={3} /> : s.state === 'pending' ? <Hourglass className="h-4 w-4" /> : s.state === 'rejected' ? <X className="h-4 w-4" strokeWidth={3} /> : <s.icon className="h-4 w-4" />}
             </span>
-            <span className={cn('mt-2.5 text-xs font-medium sm:text-sm', s.done ? 'text-white' : i === next ? 'text-gold' : 'text-ink-400')}>{s.label}</span>
-            <span className="mt-0.5 hidden text-[11px] text-ink-500 sm:block">{s.hint}</span>
+            <span
+              className={cn(
+                'mt-2.5 text-xs font-medium sm:text-sm',
+                s.state === 'done' && 'text-white',
+                s.state === 'pending' && 'text-sky-700',
+                s.state === 'rejected' && 'text-down',
+                s.state === 'next' && 'text-gold',
+                s.state === 'todo' && 'text-ink-400',
+              )}
+            >
+              {s.label}
+            </span>
+            <span className="mt-0.5 hidden text-[11px] text-ink-500 sm:block">
+              {s.state === 'pending' ? 'In review' : s.state === 'rejected' ? 'Rejected, re-upload' : s.hint}
+            </span>
           </li>
         ))}
       </ol>

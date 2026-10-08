@@ -62,3 +62,6 @@ export type CloseReason = (typeof CLOSE_REASONS)[number];
 
 export const TIMEFRAMES = ['m1', 'm5', 'm15', 'h1', 'h4', 'd1'] as const;
 export type Timeframe = (typeof TIMEFRAMES)[number];
+
+export const TICKET_STATUSES = ['open', 'answered', 'closed'] as const;
+export type TicketStatus = (typeof TICKET_STATUSES)[number];

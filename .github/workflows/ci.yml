@@ -46,4 +46,13 @@ jobs:
       - run: pnpm --filter @spova/api typecheck
       - run: pnpm --filter @spova/api build
       - run: pnpm --filter @spova/api prisma:seed
+      - name: api e2e (phase 2 flows)
+        run: |
+          node apps/api/dist/main.js > api.log 2>&1 &
+          for i in $(seq 1 30); do curl -fsS localhost:4000/health/ready && break; sleep 1; done
+          pnpm --filter @spova/api test:e2e || { cat api.log; exit 1; }
+        env:
+          SEED_ADMIN_EMAIL: admin@xyz.local
+          SEED_ADMIN_PASSWORD: Admin@12345
+          API_URL: http://localhost:4000
       - run: pnpm --filter @spova/web build
