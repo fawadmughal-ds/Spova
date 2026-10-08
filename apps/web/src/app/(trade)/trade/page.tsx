@@ -1,229 +1,255 @@
 'use client';
 
-import Link from 'next/link';
-import { useEffect, useState, type CSSProperties, type MouseEvent } from 'react';
-import { ArrowLeft, CandlestickChart, Search } from 'lucide-react';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { CandlestickChart } from 'lucide-react';
+import { WS_EVENTS, type AccountDto, type PlaceOrderResult, type QuoteDto, type Timeframe, type WsNotice, type WsTick } from '@spova/shared';
 import { RequireAuth } from '@/lib/auth-context';
 import { get } from '@/lib/api';
-import { buttonClass } from '@/lib/button';
+import { useAccounts } from '@/lib/use-accounts';
+import { useAccountStream, useSocket } from '@/lib/ws';
 import { BRAND, cn } from '@/lib/utils';
-import { marketByCls } from '@/lib/markets';
-import { Logo } from '@/components/logo';
-import { Reveal, Words } from '@/components/motion';
-import { Skeleton } from '@/components/ui';
-import { SimChart } from '@/components/trade/sim-chart';
+import { useToast } from '@/components/toast';
+import { SlidingTabs } from '@/components/portal/sliding-tabs';
+import { Skeleton, Spinner } from '@/components/ui';
+import { TerminalHeader } from '@/components/trade/terminal-header';
+import { Watchlist } from '@/components/trade/watchlist';
+import { ChartPanel } from '@/components/trade/chart-panel';
+import { OrderTicket } from '@/components/trade/order-ticket';
+import { BottomPanel } from '@/components/trade/bottom-panel';
+import { MarginCallStrip, StopOutCard, TradingBlockedBanner } from '@/components/trade/notices';
+import { quoteStore } from '@/components/trade/quote-store';
+import { useTradingData } from '@/components/trade/use-trading-data';
+import type { SymbolSpec } from '@/components/trade/format';
 
-interface WatchSymbol {
-  id: string;
-  name: string;
-  assetClass: string;
-  leverageMax: number;
-  quote: { bid: string; ask: string } | null;
-}
+type MobileTab = 'chart' | 'trade' | 'positions' | 'watch';
+const MOBILE_TABS: { value: MobileTab; label: string }[] = [
+  { value: 'chart', label: 'Chart' },
+  { value: 'trade', label: 'Trade' },
+  { value: 'positions', label: 'Positions' },
+  { value: 'watch', label: 'Watchlist' },
+];
+const QUOTE_POLL_MS = 15_000;
+const DEFAULT_SYMBOL = 'BTCUSD';
+const DEFAULT_TF: Timeframe = 'm1';
+const EMPTY: never[] = [];
 
-const FEATURES = ['Live Binance ticks', 'Candles 1m-1d', 'Market / limit / stop orders', 'Positions with live P/L', 'SL/TP', 'Margin engine'];
-const TIMEFRAMES = ['1m', '5m', '15m', '1h', '4h', '1d'];
+function Terminal() {
+  const params = useSearchParams();
+  const toast = useToast();
+  const { socket, connected } = useSocket();
+  const { all, data: accData, reload: reloadAccounts } = useAccounts();
 
-function UtcClock() {
-  const [now, setNow] = useState(() => new Date());
+  // ---------------------------------------------------------------- account
+  const [accountId, setAccountId] = useState<string | null>(params.get('acc'));
+  const [override, setOverride] = useState<AccountDto | null>(null);
   useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(t);
+    if (!accData) return;
+    const wanted = params.get('acc');
+    const pick = all.find((a) => a.id === wanted) ?? all[0];
+    if (pick && pick.id !== accountId) setAccountId(pick.id);
+    // runs once the list is loaded (accData), not on every render of `all`
+  }, [accData]); // eslint-disable-line react-hooks/exhaustive-deps
+  const selectAccount = useCallback((id: string) => {
+    setAccountId(id);
+    setOverride(null);
+    const url = new URL(window.location.href);
+    url.searchParams.set('acc', id);
+    window.history.replaceState(null, '', url.toString());
   }, []);
-  return (
-    <span className="tabular inline-flex items-center gap-2 font-mono text-xs text-ink-400">
-      <span className="live-dot text-brand-400" />
-      UTC {now.toISOString().slice(11, 19)}
-    </span>
+  const account = useMemo(() => {
+    const base = all.find((a) => a.id === accountId);
+    if (!base) return undefined;
+    return override && override.id === base.id ? { ...base, ...override } : base;
+    // `all` is rebuilt per render; accData is the real dependency
+  }, [accData, accountId, override]); // eslint-disable-line react-hooks/exhaustive-deps
+  /** Figures returned by a mutation are shown immediately; the next snapshot / reload supersedes them. */
+  const onAccount = useCallback(
+    (a: AccountDto) => {
+      setOverride(a);
+      void reloadAccounts().then(() => setOverride((o) => (o?.id === a.id ? null : o)));
+    },
+    [reloadAccounts],
   );
-}
 
-/** The terminal ships with milestone 2. Until then: its skeleton, a simulated chart behind glass, and what is coming. */
-function TerminalPreview() {
-  const [symbols, setSymbols] = useState<WatchSymbol[] | null>(null);
+  // ---------------------------------------------------------------- symbols + quotes
+  const [symbols, setSymbols] = useState<SymbolSpec[] | null>(null);
+  const [symbolsError, setSymbolsError] = useState(false);
+  const [selected, setSelected] = useState<string | null>(params.get('s'));
+  const [tf, setTf] = useState<Timeframe>(DEFAULT_TF);
   useEffect(() => {
-    get<WatchSymbol[]>('/market/symbols')
-      .then(setSymbols)
-      .catch(() => setSymbols([]));
+    let alive = true;
+    get<SymbolSpec[]>('/market/symbols')
+      .then((list) => {
+        if (!alive) return;
+        list.forEach((s) => s.quote && quoteStore.seed(s.id, { ...s.quote, open: s.isOpen }));
+        setSymbols(list);
+        setSelected((cur) => (cur && list.some((s) => s.id === cur) ? cur : list.some((s) => s.id === DEFAULT_SYMBOL) ? DEFAULT_SYMBOL : (list.find((s) => s.featured) ?? list[0])?.id ?? null));
+      })
+      .catch(() => alive && setSymbolsError(true));
+    return () => {
+      alive = false;
+    };
   }, []);
+  const symbolIds = useMemo(() => (symbols ? symbols.map((s) => s.id).join(',') : ''), [symbols]);
+  const symbolMap = useMemo(() => new Map((symbols ?? []).map((s) => [s.id, s])), [symbols]);
+  const spec = selected ? symbolMap.get(selected) : undefined;
 
-  // crosshair that follows the pointer over the chart
-  const onMove = (e: MouseEvent<HTMLElement>) => {
-    const r = e.currentTarget.getBoundingClientRect();
-    e.currentTarget.style.setProperty('--cx', `${e.clientX - r.left}px`);
-    e.currentTarget.style.setProperty('--cy', `${e.clientY - r.top}px`);
-  };
+  // ticks for every listed instrument (conversion pairs included), re-sent on every reconnect
+  useEffect(() => {
+    if (!socket || !symbolIds) return;
+    const sub = () => socket.emit(WS_EVENTS.SUBSCRIBE, { symbols: symbolIds.split(',') });
+    if (socket.connected) sub();
+    socket.on('connect', sub);
+    return () => {
+      socket.off('connect', sub);
+    };
+  }, [socket, symbolIds]);
+  useEffect(() => {
+    if (!socket || !accountId) return;
+    const sel = () => socket.emit(WS_EVENTS.SELECT_ACCOUNT, { accountId });
+    if (socket.connected) sel();
+    socket.on('connect', sel);
+    return () => {
+      socket.off('connect', sel);
+    };
+  }, [socket, accountId]);
+  useEffect(() => {
+    if (!socket) return;
+    const onTick = (t: WsTick) => quoteStore.tick(t);
+    socket.on(WS_EVENTS.TICK, onTick);
+    return () => {
+      socket.off(WS_EVENTS.TICK, onTick);
+    };
+  }, [socket]);
+
+  // session open/closed + stale flags come from REST, polled
+  useEffect(() => {
+    if (!symbolIds) return;
+    let alive = true;
+    const poll = async () => {
+      try {
+        const qs = await get<QuoteDto[]>(`/market/quotes?symbols=${symbolIds}`);
+        if (!alive) return;
+        qs.forEach((q) => quoteStore.seed(q.s, { bid: q.bid, ask: q.ask, ts: q.ts, open: q.open }));
+        setSymbols((prev) => {
+          if (!prev) return prev;
+          let changed = false;
+          const next = prev.map((s) => {
+            const q = qs.find((x) => x.s === s.id);
+            if (q && q.open !== s.isOpen) {
+              changed = true;
+              return { ...s, isOpen: q.open };
+            }
+            return s;
+          });
+          return changed ? next : prev;
+        });
+      } catch {
+        /* next poll */
+      }
+    };
+    void poll();
+    const t = setInterval(poll, QUOTE_POLL_MS);
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
+  }, [symbolIds]);
+
+  useEffect(() => {
+    document.title = `${selected ?? 'Terminal'} · ${BRAND} WebTrader`;
+  }, [selected]);
+
+  // ---------------------------------------------------------------- positions, orders, notices
+  const data = useTradingData(accountId);
+  const [stopOut, setStopOut] = useState<WsNotice | null>(null);
+  useAccountStream(
+    (s) => setOverride((o) => (o && o.id === s.accountId ? null : o)),
+    (n) => {
+      toast({ level: n.level, title: n.title, body: n.body });
+      if (n.type === 'stop_out') {
+        setStopOut(n);
+        void data.reload();
+      }
+      if (n.type === 'trading_blocked' || n.type === 'stop_out') void reloadAccounts();
+    },
+  );
+  const onPlaced = useCallback(
+    (r: PlaceOrderResult) => {
+      data.markOwn(r.order.id);
+      if (r.position) {
+        data.markOwn(r.position.id);
+        data.upsertPosition(r.position);
+      } else data.addOrder(r.order);
+      onAccount(r.account);
+    },
+    [data, onAccount],
+  );
+  const openPositions = data.positions ?? EMPTY;
+  const level = account?.marginLevel === null || account?.marginLevel === undefined ? null : Number(account.marginLevel);
+  const marginCall = level !== null && Number.isFinite(level) && level <= 100 && openPositions.length > 0;
+
+  // ---------------------------------------------------------------- layout
+  const [mtab, setMtab] = useState<MobileTab>('chart');
+  const pick = useCallback((id: string) => {
+    setSelected(id);
+    setMtab('chart');
+  }, []);
+  const show = (on: boolean) => (on ? 'flex' : 'hidden');
 
   return (
-    <div className="flex h-screen min-h-[640px] flex-col overflow-hidden bg-ink-950">
-      <header className="animate-page-in relative z-20 flex h-12 shrink-0 items-center justify-between border-b border-white/[0.06] bg-ink-900/60 px-4 backdrop-blur">
-        <Link href="/app" className="group flex items-center gap-2 text-sm text-ink-300 transition-colors hover:text-white">
-          <ArrowLeft className="h-4 w-4 transition-transform duration-300 group-hover:-translate-x-1" /> Client area
-        </Link>
-        <div className="group/logo flex items-center gap-2">
-          <Logo size={22} />
-          <span className="font-display text-sm font-bold">{BRAND} WebTrader</span>
-          <span className="hidden rounded-full bg-gold/10 px-2 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-[0.14em] text-gold ring-1 ring-inset ring-gold/30 sm:inline">Preview</span>
+    <div className="flex h-dvh flex-col overflow-hidden bg-ink-950 text-ink-100">
+      <TerminalHeader accounts={all} account={account} onSelect={selectAccount} connected={connected} />
+      {account?.tradingBlocked && <TradingBlockedBanner />}
+      {marginCall && level !== null && <MarginCallStrip level={level} />}
+      {stopOut && <StopOutCard notice={stopOut} onDismiss={() => setStopOut(null)} />}
+      <div className="shrink-0 border-b border-white/[0.07] bg-paper px-1 lg:hidden">
+        <SlidingTabs items={MOBILE_TABS} value={mtab} onChange={setMtab} variant="underline" className="!border-b-0 [&_button]:!px-3 [&_button]:!py-2 [&_button]:!text-xs" />
+      </div>
+
+      <div className="flex min-h-0 flex-1 flex-col lg:grid lg:grid-cols-[236px_minmax(0,1fr)_304px] xl:grid-cols-[256px_minmax(0,1fr)_320px]">
+        <Watchlist symbols={symbolsError ? [] : symbols} selected={selected} onSelect={pick} className={cn('min-h-0 flex-1', show(mtab === 'watch'), 'lg:flex lg:border-r lg:border-white/[0.07]')} />
+
+        <div className={cn('min-h-0 min-w-0 flex-1 flex-col', show(mtab === 'chart' || mtab === 'positions'), 'lg:flex')}>
+          {spec ? (
+            <ChartPanel spec={spec} tf={tf} onTf={setTf} positions={openPositions} className={cn('min-h-0 flex-1', show(mtab === 'chart'), 'lg:flex')} />
+          ) : (
+            <div className={cn('min-h-0 flex-1 items-center justify-center bg-paper', show(mtab === 'chart'), 'lg:flex')}>
+              {symbolsError ? (
+                <div className="flex flex-col items-center gap-2 text-center">
+                  <CandlestickChart className="h-5 w-5 text-down" />
+                  <div className="text-sm font-semibold text-ink-200">Could not load the instrument list</div>
+                  <div className="text-xs text-ink-500">Refresh the page to try again.</div>
+                </div>
+              ) : (
+                <Spinner />
+              )}
+            </div>
+          )}
+          {account ? (
+            <BottomPanel account={account} symbols={symbolMap} data={data} onAccount={onAccount} className={cn('min-h-0 flex-1', show(mtab === 'positions'), 'lg:flex lg:h-[272px] lg:flex-none lg:border-t lg:border-white/[0.07]')} />
+          ) : (
+            <div className={cn('min-h-0 flex-1 flex-col gap-2 bg-paper p-3', show(mtab === 'positions'), 'lg:flex lg:h-[272px] lg:flex-none lg:border-t lg:border-white/[0.07]')}>
+              <Skeleton className="h-6 w-64" />
+              <Skeleton className="h-5" />
+              <Skeleton className="h-5" />
+            </div>
+          )}
         </div>
-        <UtcClock />
-      </header>
 
-      <div className="grid min-h-0 flex-1 lg:grid-cols-[250px_1fr_290px]">
-        {/* watchlist */}
-        <aside className="preview-mock hidden min-h-0 flex-col border-r border-white/[0.06] lg:flex" aria-hidden>
-          <div className="flex items-center justify-between px-4 pb-2 pt-4">
-            <span className="label">Watchlist</span>
-            <span className="label !text-ink-500">Milestone 2</span>
+        {spec && account ? (
+          <OrderTicket spec={spec} account={account} onPlaced={onPlaced} className={cn('min-h-0 flex-1', show(mtab === 'trade'), 'lg:flex lg:border-l lg:border-white/[0.07]')} />
+        ) : (
+          <div className={cn('min-h-0 flex-1 flex-col gap-3 bg-paper p-3', show(mtab === 'trade'), 'lg:flex lg:border-l lg:border-white/[0.07]')}>
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-12" />
+            <Skeleton className="h-8" />
+            <Skeleton className="h-9" />
+            <Skeleton className="h-9" />
+            <Skeleton className="h-20" />
           </div>
-          <div className="mx-3 mb-2 flex h-9 items-center gap-2 rounded-lg bg-white/[0.04] px-3 text-xs text-ink-500">
-            <Search className="h-3.5 w-3.5" /> Search symbols
-          </div>
-          <ul className="min-h-0 flex-1 overflow-hidden px-2">
-            {symbols === null &&
-              Array.from({ length: 12 }, (_, i) => (
-                <li key={i} className="flex items-center justify-between px-2 py-2.5">
-                  <Skeleton className="w-20" />
-                  <Skeleton className="w-12" />
-                </li>
-              ))}
-            {symbols?.map((s, i) => (
-              <li
-                key={s.id}
-                style={{ '--c': marketByCls(s.assetClass)?.rgb ?? '15 23 42', animationDelay: `${Math.min(i, 18) * 40}ms` } as CSSProperties}
-                className={cn('animate-page-in flex items-center justify-between rounded-lg px-2 py-2', i === 0 && 'bg-white/[0.06]')}
-              >
-                <span className="flex items-center gap-2.5">
-                  <span className="h-1.5 w-1.5 rotate-45 bg-[rgb(var(--c))]" />
-                  <span>
-                    <span className="block text-[13px] font-semibold text-ink-100">{s.id}</span>
-                    <span className="block max-w-[120px] truncate text-[10px] text-ink-500">{s.name}</span>
-                  </span>
-                </span>
-                <span className="tabular text-right font-mono text-[11px] text-ink-400">{s.quote ? s.quote.bid : `1:${s.leverageMax}`}</span>
-              </li>
-            ))}
-          </ul>
-        </aside>
-
-        {/* chart + announcement */}
-        <main className="group/chart relative flex min-h-0 min-w-0 flex-col" onMouseMove={onMove}>
-          <div className="preview-mock flex h-11 shrink-0 items-center justify-between border-b border-white/[0.06] px-4" aria-hidden>
-            <div className="flex items-center gap-3">
-              <span className="font-display text-sm font-bold">{symbols?.[0]?.id ?? 'EURUSD'}</span>
-              <div className="flex rounded-md bg-white/[0.04] p-0.5">
-                {TIMEFRAMES.map((t, i) => (
-                  <span key={t} className={cn('rounded px-2 py-0.5 font-mono text-[10px]', i === 0 ? 'bg-white/10 text-white' : 'text-ink-500')}>
-                    {t}
-                  </span>
-                ))}
-              </div>
-            </div>
-            <span className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap font-mono text-[10px] uppercase tracking-[0.14em] text-ink-400">
-              <span className="live-dot text-gold" /> Simulated<span className="hidden sm:inline"> chart · not market data</span>
-            </span>
-          </div>
-
-          <div className="relative min-h-0 flex-1 overflow-hidden">
-            <div className="absolute inset-0 opacity-45 blur-[1.5px]">
-              <SimChart />
-            </div>
-            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgb(var(--paper-rgb)/0.88)_0%,rgb(var(--paper-rgb)/0.55)_45%,transparent_75%)]" />
-            {/* crosshair */}
-            <span className="pointer-events-none absolute inset-y-0 left-[var(--cx,-10px)] w-px bg-white/15 opacity-0 transition-opacity duration-300 group-hover/chart:opacity-100" />
-            <span className="pointer-events-none absolute inset-x-0 top-[calc(var(--cy,-10px)-2.75rem)] h-px bg-white/15 opacity-0 transition-opacity duration-300 group-hover/chart:opacity-100" />
-
-            <div className="absolute inset-0 flex items-center justify-center p-4">
-              <Reveal variant="scale" delay={200} className="w-full max-w-xl">
-                <div className="beam glass relative overflow-hidden rounded-3xl p-7 text-center shadow-lift sm:p-9">
-                  <div className="aurora-blob -top-28 left-1/2 h-56 w-80 -translate-x-1/2 bg-brand-500/20" />
-                  <div className="relative mx-auto flex h-16 w-16 items-center justify-center">
-                    <span className="absolute inset-0 animate-pulse-ring rounded-2xl border border-brand-400/50" />
-                    <span className="absolute inset-0 animate-pulse-ring rounded-2xl border border-brand-400/50 [animation-delay:1.3s]" />
-                    <span className="relative flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-b from-brand-300 to-brand-600 text-ink-950 shadow-glow">
-                      <CandlestickChart className="h-7 w-7" />
-                    </span>
-                  </div>
-                  <span className="eyebrow relative mt-6">Milestone 2 · 13 Oct</span>
-                  <h1 className="relative mt-4 font-display text-4xl font-extrabold leading-[0.98] tracking-tighter sm:text-5xl">
-                    <Words text="The terminal *is on its way*" delay={350} />
-                  </h1>
-                  <p className="relative mt-4 font-semibold text-ink-200">Terminal arrives with milestone 2 (13 Oct)</p>
-                  <Reveal as="ul" variant="stagger" delay={700} step={70} className="relative mt-5 flex flex-wrap justify-center gap-1.5">
-                    {FEATURES.map((f) => (
-                      <li key={f} className="rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 font-mono text-[11px] text-ink-200">
-                        {f}
-                      </li>
-                    ))}
-                  </Reveal>
-                  <Link href="/app" className={buttonClass('primary', 'md', 'group relative mt-7 rounded-full')}>
-                    <ArrowLeft className="h-4 w-4 transition-transform duration-300 group-hover:-translate-x-1" /> Back to client area
-                  </Link>
-                </div>
-              </Reveal>
-            </div>
-          </div>
-
-          {/* positions strip */}
-          <div className="preview-mock hidden h-36 shrink-0 border-t border-white/[0.06] md:block" aria-hidden>
-            <div className="flex gap-5 border-b border-white/[0.06] px-4">
-              {['Positions', 'Pending orders', 'History'].map((t, i) => (
-                <span key={t} className={cn('-mb-px border-b-2 py-2.5 text-xs', i === 0 ? 'border-brand-400 text-white' : 'border-transparent text-ink-500')}>
-                  {t}
-                </span>
-              ))}
-            </div>
-            <div className="space-y-3 p-4">
-              {[0, 1].map((r) => (
-                <div key={r} className="grid grid-cols-6 gap-4">
-                  {Array.from({ length: 6 }, (_, i) => (
-                    <Skeleton key={i} className={i === 5 ? 'w-2/3 justify-self-end' : 'w-full'} />
-                  ))}
-                </div>
-              ))}
-            </div>
-          </div>
-        </main>
-
-        {/* order ticket */}
-        <aside className="preview-mock hidden min-h-0 flex-col gap-4 border-l border-white/[0.06] p-4 lg:flex" aria-hidden>
-          <div className="flex items-center justify-between">
-            <span className="label">Order ticket</span>
-            <span className="label !text-ink-500">Milestone 2</span>
-          </div>
-          <div className="grid grid-cols-3 rounded-lg bg-white/[0.04] p-0.5 text-center font-mono text-[11px]">
-            {['Market', 'Limit', 'Stop'].map((t, i) => (
-              <span key={t} className={cn('rounded-md py-1.5', i === 0 ? 'bg-white/10 text-white' : 'text-ink-500')}>
-                {t}
-              </span>
-            ))}
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div className="rounded-xl bg-down/10 px-3 py-3 ring-1 ring-inset ring-down/25">
-              <div className="label !text-down/80">Sell</div>
-              <Skeleton className="mt-2 h-5 w-20" />
-            </div>
-            <div className="rounded-xl bg-up/10 px-3 py-3 text-right ring-1 ring-inset ring-up/25">
-              <div className="label !text-up/80">Buy</div>
-              <Skeleton className="ml-auto mt-2 h-5 w-20" />
-            </div>
-          </div>
-          {['Volume (lots)', 'Stop loss', 'Take profit'].map((l) => (
-            <div key={l}>
-              <div className="label mb-1.5">{l}</div>
-              <div className="flex h-10 items-center rounded-lg border border-white/[0.08] bg-white/[0.03] px-3">
-                <Skeleton className="w-16" />
-              </div>
-            </div>
-          ))}
-          <div className="mt-auto space-y-2.5 rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
-            {['Required margin', 'Free margin', 'Margin level'].map((l) => (
-              <div key={l} className="flex items-center justify-between">
-                <span className="text-[11px] text-ink-500">{l}</span>
-                <Skeleton className="h-3 w-14" />
-              </div>
-            ))}
-          </div>
-        </aside>
+        )}
       </div>
     </div>
   );
@@ -232,7 +258,15 @@ function TerminalPreview() {
 export default function TradePage() {
   return (
     <RequireAuth>
-      <TerminalPreview />
+      <Suspense
+        fallback={
+          <div className="flex h-dvh items-center justify-center bg-ink-950">
+            <Spinner />
+          </div>
+        }
+      >
+        <Terminal />
+      </Suspense>
     </RequireAuth>
   );
 }

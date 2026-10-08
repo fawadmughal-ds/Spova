@@ -49,6 +49,8 @@ const schema = z.object({
   KYC_REQUIRED_FOR_WITHDRAW: z.string().optional().default('true').transform((v) => v !== 'false'),
   /** back-office inbox for new KYC / payment / ticket alerts (empty = no mail) */
   ADMIN_NOTIFY_EMAIL: z.string().optional().default(''),
+  /** shared secret for /internal/trading/* (worker -> api) */
+  INTERNAL_TOKEN: z.string().min(24),
   SEED_ADMIN_EMAIL: z.string().email().optional(),
   SEED_ADMIN_PASSWORD: z.string().optional(),
 });

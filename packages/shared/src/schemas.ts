@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ACCOUNT_TYPES, KYC_GROUPS, KycGroup, LEDGER_TYPES, USER_STATUSES } from './enums';
+import { ACCOUNT_TYPES, KYC_GROUPS, KycGroup, LEDGER_TYPES, ORDER_SIDES, ORDER_TYPES, USER_STATUSES } from './enums';
 
 // Password policy (matches Spova hint): 8-32 chars, upper, lower, digit, special.
 export const passwordSchema = z
@@ -211,3 +211,44 @@ export const ticketMessageSchema = z.object({ body: z.string().trim().min(1).max
 export type TicketMessageInput = z.infer<typeof ticketMessageSchema>;
 
 export const ticketStatusSchema = z.object({ status: z.enum(['open', 'answered', 'closed']) });
+
+// ---------- phase 3: trading ----------
+const priceSchema = z.string().trim().regex(/^\d{1,12}(\.\d{1,6})?$/, 'Price must be a positive number with up to 6 decimals').refine((v) => Number(v) > 0, 'Price must be greater than 0');
+const lotsSchema = z.string().trim().regex(/^\d{1,6}(\.\d{1,2})?$/, 'Volume must have at most 2 decimals').refine((v) => Number(v) > 0, 'Volume must be greater than 0');
+
+export const placeOrderSchema = z
+  .object({
+    symbol: z.string().trim().min(3).max(16),
+    side: z.enum(ORDER_SIDES),
+    type: z.enum(ORDER_TYPES),
+    lots: lotsSchema,
+    /** required for limit / stop */
+    price: priceSchema.optional(),
+    sl: priceSchema.nullable().optional(),
+    tp: priceSchema.nullable().optional(),
+    /** idempotency: same clientRef on the same account returns the first order */
+    clientRef: z.string().trim().min(4).max(64).optional(),
+  })
+  .refine((v) => v.type === 'market' || !!v.price, { path: ['price'], message: 'Pending orders need a price' });
+export type PlaceOrderInput = z.infer<typeof placeOrderSchema>;
+
+export const modifyPositionSchema = z.object({ sl: priceSchema.nullable().optional(), tp: priceSchema.nullable().optional() });
+export type ModifyPositionInput = z.infer<typeof modifyPositionSchema>;
+
+export const closePositionSchema = z.object({ lots: lotsSchema.optional() });
+export type ClosePositionInput = z.infer<typeof closePositionSchema>;
+
+export const candlesQuerySchema = z.object({
+  tf: z.enum(['m1', 'm5', 'm15', 'h1', 'h4', 'd1']).default('m1'),
+  from: z.coerce.number().int().optional(),
+  to: z.coerce.number().int().optional(),
+  limit: z.coerce.number().int().min(1).max(1500).default(500),
+});
+
+// worker -> api (internal, token-guarded)
+const quoteBody = z.object({ bid: priceSchema, ask: priceSchema, ts: z.number().int() });
+export const internalCloseSchema = z.object({ positionId: z.string().uuid(), reason: z.enum(['sl', 'tp', 'stopout']), quote: quoteBody });
+export const internalFillSchema = z.object({ orderId: z.string().uuid(), quote: quoteBody });
+export const internalStopOutSchema = z.object({ accountId: z.string().uuid() });
+export const internalMarginCallSchema = z.object({ accountId: z.string().uuid(), level: z.string() });
+export const internalSwapSchema = z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) });

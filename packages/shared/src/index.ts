@@ -1,6 +1,7 @@
 export * from './enums';
 export * from './schemas';
 export * from './types';
+export * from './risk';
 
 export const WS_EVENTS = {
   // client -> server
@@ -27,6 +28,8 @@ export const WS_EVENTS = {
   ADMIN_PAYMENT_NEW: 'admin:payment:new',
   ADMIN_TICKET_NEW: 'admin:ticket:new',
   TICKET_UPDATED: 'ticket:updated',
+  ADMIN_POSITION: 'admin:position:event',
+  ADMIN_STOPOUT: 'admin:stopout',
 } as const;
 
 export const COOKIE_NAMES = {

@@ -121,7 +121,7 @@ export class PaymentsService {
     if (amount.gt(method.maxWithdraw)) throw ApiError.badRequest('amount_max', `Maximum withdrawal by ${method.label} is ${method.maxWithdraw} USD`);
 
     // v1: no hold. Pending withdrawals count against what can be requested, and the amount is re-checked at approval.
-    const snap = this.accounts.snapshot(acc);
+    const snap = await this.accounts.snapshot(acc);
     const pending = await this.prisma.paymentRequest.aggregate({ _sum: { amount: true }, where: { accountId: acc.id, kind: 'withdraw', status: 'pending' } });
     const available = Decimal_min(D(acc.balance), D(snap.freeMargin)).minus(D(pending._sum.amount));
     if (amount.gt(available)) {
@@ -164,15 +164,18 @@ export class PaymentsService {
         include: { account: true, user: { select: { id: true, email: true, profile: { select: { firstName: true, lastName: true } } } } },
       }),
     ]);
-    return {
-      items: rows.map((r) => {
-        const snap = this.accounts.snapshot(r.account);
+    const items = await Promise.all(
+      rows.map(async (r) => {
+        const snap = await this.accounts.snapshot(r.account);
         return {
           ...paymentToDto(r),
           user: { id: r.user.id, email: r.user.email, firstName: r.user.profile?.firstName ?? null, lastName: r.user.profile?.lastName ?? null },
           account: { type: r.account.type, balance: snap.balance, freeMargin: snap.freeMargin },
         };
       }),
+    );
+    return {
+      items,
       total,
       page: q.page,
       limit: q.limit,
@@ -237,7 +240,7 @@ export class PaymentsService {
     });
 
     if (account) {
-      const snap = this.accounts.snapshot({ ...account, balance: new Prisma.Decimal(money(account.balance)), credit: account.credit });
+      const snap = await this.accounts.snapshot(account);
       this.ws.accountSnapshot(row.userId, snap);
       this.ws.admin(WS_EVENTS.ADMIN_LEDGER, { ...snap, userId: row.userId });
     }

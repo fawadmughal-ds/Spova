@@ -10,9 +10,11 @@ import { LedgerModule } from './modules/ledger/ledger.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { MarketModule } from './modules/market/market.module';
 import { NewsletterModule } from './modules/newsletter/newsletter.module';
+import { QuotesModule } from './modules/quotes/quotes.module';
 import { KycModule } from './modules/kyc/kyc.module';
 import { PaymentsModule } from './modules/payments/payments.module';
 import { SupportModule } from './modules/support/support.module';
+import { TradingModule } from './modules/trading/trading.module';
 import { RealtimeModule } from './modules/realtime/realtime.module';
 import { HealthController } from './modules/health/health.controller';
 import { env } from './config/env';
@@ -28,6 +30,7 @@ import { env } from './config/env';
       },
     }),
     InfraModule,
+    QuotesModule,
     RealtimeModule,
     LedgerModule,
     AccountsModule,
@@ -39,6 +42,7 @@ import { env } from './config/env';
     KycModule,
     PaymentsModule,
     SupportModule,
+    TradingModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: JwtAuthGuard }],

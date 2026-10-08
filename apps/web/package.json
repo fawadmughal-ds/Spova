@@ -12,6 +12,7 @@
   "dependencies": {
     "@spova/shared": "workspace:*",
     "clsx": "^2.1.1",
+    "lightweight-charts": "^5.2.1",
     "lucide-react": "^0.475.0",
     "next": "~15.5.0",
     "react": "^19.1.0",

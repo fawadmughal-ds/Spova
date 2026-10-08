@@ -6,10 +6,13 @@
     "dev": "tsx watch src/main.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/main.js",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
-    "lint": "echo \"(lint) worker: skipped in phase 0\""
+    "typecheck": "tsc --noEmit -p tsconfig.typecheck.json",
+    "test": "tsx --test src/candles/aggregator.test.ts src/feeds/sessions.test.ts src/feeds/throttle.test.ts src/risk/engine.test.ts src/risk/guards.test.ts src/internal-client.test.ts src/candles/backfill.test.ts",
+    "prisma:generate": "prisma generate --schema ../api/prisma/schema.prisma",
+    "lint": "echo \"(lint) worker: skipped\""
   },
   "dependencies": {
+    "@prisma/client": "~6.19.0",
     "@spova/shared": "workspace:*",
     "decimal.js": "^10.5.0",
     "dotenv": "^16.5.0",
@@ -22,6 +25,7 @@
     "@types/node": "^20.19.0",
     "@types/ws": "^8.5.14",
     "pino-pretty": "^13.0.0",
+    "prisma": "~6.19.0",
     "tsx": "^4.19.0",
     "typescript": "~5.9.3"
   }

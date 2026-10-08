@@ -5,47 +5,7 @@
  */
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { config as loadDotenv } from 'dotenv';
-import { existsSync } from 'node:fs';
-import { resolve } from 'node:path';
-import Redis from 'ioredis';
-
-for (const c of [resolve(process.cwd(), '.env'), resolve(process.cwd(), '../../.env')]) if (existsSync(c)) loadDotenv({ path: c });
-
-const API = (process.env.API_URL ?? 'http://localhost:4000') + '/v1';
-const ADMIN_EMAIL = process.env.SEED_ADMIN_EMAIL ?? 'admin@xyz.local';
-const ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD ?? 'Admin@12345';
-
-/** Minimal cookie-jar fetch client. */
-class Session {
-  cookies = new Map<string, string>();
-  private absorb(res: Response) {
-    for (const sc of res.headers.getSetCookie?.() ?? []) {
-      const [pair, ...attrs] = sc.split(';');
-      const [k, v] = pair.split('=');
-      if (attrs.some((a) => a.trim().toLowerCase().startsWith('max-age=0')) || v === '') this.cookies.delete(k.trim());
-      else this.cookies.set(k.trim(), v);
-    }
-  }
-  async raw(method: string, path: string, body?: unknown, init: RequestInit = {}) {
-    const headers: Record<string, string> = { ...(init.headers as Record<string, string>) };
-    if (this.cookies.size) headers.cookie = [...this.cookies].map(([k, v]) => `${k}=${v}`).join('; ');
-    let payload: BodyInit | undefined;
-    if (body instanceof FormData) payload = body;
-    else if (body !== undefined) {
-      headers['content-type'] = 'application/json';
-      payload = JSON.stringify(body);
-    }
-    const res = await fetch(API + path, { ...init, method, headers, body: payload });
-    this.absorb(res);
-    return res;
-  }
-  async json<T = any>(method: string, path: string, body?: unknown): Promise<{ status: number; data: T }> {
-    const res = await this.raw(method, path, body);
-    const text = await res.text();
-    return { status: res.status, data: (text ? JSON.parse(text) : undefined) as T };
-  }
-}
+import { Session, adminLogin, register, resetRateLimits } from './http';
 
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
 const PDF = Buffer.from('%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[]/Count 0>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n');
@@ -85,19 +45,11 @@ let poiDocId = '';
 
 describe('phase 2: kyc -> live account -> payments -> tickets', () => {
   before(async () => {
-    // Local runs repeat quickly; clear the per-IP register/login limits so the suite is repeatable (dev Redis only).
-    if (process.env.E2E_KEEP_RATE_LIMITS !== '1') {
-      const redis = new Redis(process.env.REDIS_URL ?? 'redis://localhost:6379');
-      const keys = await redis.keys('rl:register:ip:*');
-      keys.push(...(await redis.keys('rl:login:*')), ...(await redis.keys('rl:kyc:upload:*')), ...(await redis.keys('rl:payments:*')), ...(await redis.keys('rl:tickets:*')));
-      if (keys.length) await redis.del(...keys);
-      await redis.quit();
-    }
+    await resetRateLimits();
     const a = await register(client, 'client');
     clientId = a.me.id;
     await register(other, 'other');
-    const login = await admin.json('POST', '/auth/login', { email: ADMIN_EMAIL, password: ADMIN_PASSWORD });
-    assert.equal(login.status, 200, `admin login: ${JSON.stringify(login.data)}`);
+    await adminLogin(admin);
     const accounts = await client.json('GET', '/me/accounts');
     demoAccountId = accounts.data.demo[0].id;
   });

@@ -126,7 +126,7 @@ export class AdminService {
       lastLoginIp: u.lastLoginIp,
       notes: u.adminNotes,
       profile: me.profile,
-      accounts: u.accounts.map((a) => this.accounts.toDto(a)),
+      accounts: await Promise.all(u.accounts.map((a) => this.accounts.toDto(a))),
     };
   }
 
@@ -199,7 +199,7 @@ export class AdminService {
       return a;
     });
 
-    this.ws.accountSnapshot(after.userId, this.accounts.snapshot(after));
+    this.ws.accountSnapshot(after.userId, await this.accounts.snapshot(after));
     if (patch.tradingBlocked === true) {
       this.ws.notice(after.userId, { type: 'trading_blocked', title: 'Trading disabled', body: `Trading on account ${after.loginCode} has been disabled by the broker.`, level: 'warning' });
     }
@@ -237,7 +237,7 @@ export class AdminService {
     });
 
     await this.afterMoneyChange(result.account.userId, result.account, `+${money(amount)} ${result.account.currency} ${input.type}`, input.reason);
-    return { entryId, account: this.accounts.toDto(result.account) };
+    return { entryId, account: await this.accounts.toDto(result.account) };
   }
 
   /** POST /admin/accounts/:id/debit  {amount, reason, type: withdraw|debit|fee, force?} */
@@ -272,7 +272,7 @@ export class AdminService {
     });
 
     await this.afterMoneyChange(result.account.userId, result.account, `${money(amount)} ${result.account.currency} ${input.type}`, input.reason);
-    return { entryId, account: this.accounts.toDto(result.account) };
+    return { entryId, account: await this.accounts.toDto(result.account) };
   }
 
   /** Remove bonus/credit bucket (credit is never withdrawable; admin can pull it). */
@@ -295,11 +295,11 @@ export class AdminService {
       return { result };
     });
     await this.afterMoneyChange(result.account.userId, result.account, `${money(amount)} credit removed`, input.reason);
-    return { entryId: result.entryId, account: this.accounts.toDto(result.account) };
+    return { entryId: result.entryId, account: await this.accounts.toDto(result.account) };
   }
 
   private async afterMoneyChange(userId: string, account: Parameters<AccountsService['snapshot']>[0], title: string, reason: string) {
-    const snap = this.accounts.snapshot(account);
+    const snap = await this.accounts.snapshot(account);
     this.ws.accountSnapshot(userId, snap);
     this.ws.notice(userId, { type: 'ledger', title: `Account ${account.loginCode}: ${title}`, body: reason, level: 'success' });
     this.ws.admin(WS_EVENTS.ADMIN_LEDGER, { ...snap, userId });
@@ -319,7 +319,7 @@ export class AdminService {
       orderBy: { createdAt: 'desc' },
       take: 100,
     });
-    return rows.map((a) => ({ ...this.accounts.toDto(a), userId: a.userId, userEmail: a.user.email }));
+    return Promise.all(rows.map(async (a) => ({ ...(await this.accounts.toDto(a)), userId: a.userId, userEmail: a.user.email })));
   }
 
   async audit(q: { page: number; limit: number; targetId?: string; actorId?: string }) {

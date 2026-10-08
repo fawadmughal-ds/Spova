@@ -1,6 +1,7 @@
 /**
  * Price feed adapter contract (ARCHITECTURE §08).
- * Phase 3 implements BinanceFeed (bookTicker WS) and SyntheticFeed (labelled DEMO FEED for FX until a paid key exists).
+ * BinanceFeed (bookTicker WS) for crypto, SyntheticFeed (DEMO FEED) for everything else until a paid key exists.
+ * Feeds emit raw venue prices; `Ingest` applies our spread markup and fans the tick out.
  */
 export interface Tick {
   symbol: string; // our symbol id, e.g. BTCUSD

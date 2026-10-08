@@ -1,11 +1,16 @@
 import type {
   AccountStatus,
   AccountType,
+  CloseReason,
   KycGroup,
   KycStatus,
   LedgerType,
+  OrderSide,
+  OrderStatus,
+  OrderType,
   PaymentKind,
   PaymentStatus,
+  PositionStatus,
   Role,
   TicketStatus,
   Tier,
@@ -227,4 +232,103 @@ export interface WsPaymentStatus {
   kind: PaymentKind;
   status: PaymentStatus;
   note?: string;
+}
+
+// ---------------------------------------------------------------- phase 3: trading DTOs
+export interface QuoteDto {
+  s: string;
+  bid: string;
+  ask: string;
+  ts: number;
+  /** older than QUOTE_MAX_AGE_MS or market closed: no trading */
+  stale: boolean;
+  open: boolean;
+}
+
+export interface WsTick {
+  s: string;
+  bid: string;
+  ask: string;
+  ts: number;
+}
+
+export interface CandleDto {
+  /** bucket start, unix seconds */
+  t: number;
+  o: string;
+  h: string;
+  l: string;
+  c: string;
+  v?: number;
+}
+
+export interface WsCandle extends CandleDto {
+  s: string;
+  tf: 'm1' | 'm5' | 'm15' | 'h1' | 'h4' | 'd1';
+  /** true when this bar has closed */
+  closed?: boolean;
+}
+
+export interface PositionDto {
+  id: string;
+  accountId: string;
+  symbol: string;
+  side: OrderSide;
+  lots: string;
+  openPrice: string;
+  openAt: string;
+  sl: string | null;
+  tp: string | null;
+  marginUsed: string;
+  swapAccrued: string;
+  commission: string;
+  status: PositionStatus;
+  closePrice: string | null;
+  closeAt: string | null;
+  realizedPnl: string | null;
+  closeReason: CloseReason | null;
+  /** present on open positions when a quote exists */
+  currentPrice: string | null;
+  floatingPnl: string | null;
+}
+
+export interface OrderDto {
+  id: string;
+  accountId: string;
+  symbol: string;
+  side: OrderSide;
+  type: OrderType;
+  lots: string;
+  price: string | null;
+  sl: string | null;
+  tp: string | null;
+  status: OrderStatus;
+  filledPrice: string | null;
+  filledAt: string | null;
+  positionId: string | null;
+  rejectReason: string | null;
+  clientRef: string | null;
+  createdAt: string;
+}
+
+/** Response of POST /me/accounts/:id/orders */
+export interface PlaceOrderResult {
+  order: OrderDto;
+  /** set when a market order filled */
+  position: PositionDto | null;
+  account: AccountDto;
+}
+
+export interface ClosePositionResult {
+  position: PositionDto;
+  realizedPnl: string;
+  account: AccountDto;
+}
+
+/** Published by the API on Redis channel trading:events so the worker can refresh its in-memory index. */
+export interface TradingEvent {
+  type: 'position.opened' | 'position.updated' | 'position.closed' | 'order.placed' | 'order.cancelled' | 'order.filled' | 'order.rejected' | 'account.changed';
+  accountId: string;
+  symbol?: string;
+  id?: string;
 }
