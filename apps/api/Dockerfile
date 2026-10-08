@@ -24,6 +24,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-cert
 COPY --from=build /out ./
 COPY --from=build /repo/apps/api/dist ./dist
 COPY --from=build /repo/apps/api/prisma ./prisma
+# generate the Prisma client for the runtime node_modules (pnpm deploy reinstalls them without it);
+# this also warms the npx cache for the migrate step at boot
+RUN npx --yes prisma@6.19.3 generate
 EXPOSE 4000
 # migrate on boot, then start
 # migrate on boot, seed reference data when SEED_ON_BOOT=true (hosted previews), then start
