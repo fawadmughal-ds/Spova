@@ -1,16 +1,28 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { ArrowDownToLine, ArrowUpFromLine, LineChart, Wifi, WifiOff } from 'lucide-react';
+import { ArrowDownToLine, ArrowRight, ArrowUpFromLine, ArrowUpRight, Coins, LineChart, Lock, PartyPopper, Receipt, Scale, Settings2, WalletMinimal } from 'lucide-react';
 import type { LedgerEntryDto, Paginated } from '@spova/shared';
 import { useAuth } from '@/lib/auth-context';
 import { useAccounts } from '@/lib/use-accounts';
 import { get } from '@/lib/api';
 import { cn, fmtDate, fmtMoney } from '@/lib/utils';
 import { PageHeader } from '@/components/app-shell';
-import { Alert, Badge, Button, Card, Empty, Spinner, Stat } from '@/components/ui';
+import { AnimatedNumber, Tilt } from '@/components/motion';
+import { Badge, Card, Empty, Skeleton, Stat } from '@/components/ui';
+import { AccountPlate, fmtLogin } from '@/components/portal/account-plate';
+import { BalanceChart } from '@/components/portal/balance-chart';
+import { KycSteps } from '@/components/portal/kyc-steps';
+import { LedgerIcon } from '@/components/portal/ledger-icon';
+import { MarginGauge } from '@/components/portal/margin-gauge';
+import { SlidingTabs } from '@/components/portal/sliding-tabs';
+
+function greeting() {
+  const h = new Date().getHours();
+  return h < 5 ? 'Good night' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
+}
 
 function Dashboard() {
   const { me } = useAuth();
@@ -18,12 +30,18 @@ function Dashboard() {
   const welcome = useSearchParams().get('welcome') === '1';
   const [selected, setSelected] = useState<string | null>(null);
   const [ledger, setLedger] = useState<LedgerEntryDto[] | null>(null);
+  const ledgerFor = useRef<string | null>(null);
+  // time-of-day greeting is local to the browser, so resolve it after mount
+  const [hello, setHello] = useState('Hello');
+  useEffect(() => setHello(greeting()), []);
 
   const account = all.find((a) => a.id === selected) ?? all[0];
 
   useEffect(() => {
     if (!account) return;
-    setLedger(null);
+    // switching account shows the skeleton; a live balance change keeps the old rows until the new ones land
+    if (ledgerFor.current !== account.id) setLedger(null);
+    ledgerFor.current = account.id;
     get<Paginated<LedgerEntryDto>>(`/me/accounts/${account.id}/ledger?limit=8`)
       .then((r) => setLedger(r.items))
       .catch(() => setLedger([]));
@@ -34,123 +52,237 @@ function Dashboard() {
   return (
     <>
       <PageHeader
-        title={`Hello, ${me?.profile?.firstName ?? 'trader'}`}
+        title={`${hello}, ${me?.profile?.firstName ?? 'trader'}`}
         sub="Your accounts at a glance."
         action={
-          <span className={cn('inline-flex items-center gap-1.5 text-xs', connected ? 'text-up' : 'text-ink-500')}>
-            {connected ? <Wifi className="h-3.5 w-3.5" /> : <WifiOff className="h-3.5 w-3.5" />}
+          <span
+            className={cn(
+              'inline-flex items-center gap-2 rounded-full border px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] transition-colors duration-500',
+              connected ? 'border-up/30 bg-up/10 text-up' : 'border-white/10 bg-white/[0.03] text-ink-400',
+            )}
+          >
+            <span className={cn('live-dot !h-1.5 !w-1.5', !connected && 'animate-pulse after:hidden')} />
             {connected ? 'Live' : 'Connecting'}
           </span>
         }
       />
 
       {welcome && (
-        <Alert tone="success" className="mb-5">
-          Welcome aboard. Your demo account is funded with virtual money. Verify your identity under Documents when you are ready to go live.
-        </Alert>
+        <div className="animate-pop-in beam relative mb-6 flex items-start gap-4 overflow-hidden rounded-2xl border border-up/20 bg-up/[0.07] p-4 sm:p-5">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-up/15 text-up">
+            <PartyPopper className="h-5 w-5" />
+          </span>
+          <div>
+            <div className="font-display text-lg font-semibold">Welcome aboard</div>
+            <p className="mt-0.5 text-sm text-ink-200">Your demo account is funded with virtual money. Verify your identity under Documents when you are ready to go live.</p>
+          </div>
+        </div>
       )}
-      {!kycDone && (
-        <Alert tone="warning" className="mb-5 flex flex-wrap items-center justify-between gap-3">
-          <span>Verification incomplete. Upload your ID and proof of address to unlock live trading and withdrawals.</span>
-          <Link href="/app/documents" className="text-sm font-semibold underline">
-            Upload documents
-          </Link>
-        </Alert>
-      )}
+      {me && !kycDone && <KycSteps poi={me.kyc.poi} por={me.kyc.por} />}
 
       {!data ? (
-        <div className="flex justify-center py-20">
-          <Spinner />
-        </div>
+        <DashboardSkeleton />
       ) : !account ? (
-        <Empty>No trading account yet.</Empty>
+        <Empty icon={<WalletMinimal className="h-6 w-6" />}>No trading account yet.</Empty>
       ) : (
         <>
-          <div className="mb-4 flex flex-wrap items-center gap-2">
-            {all.map((a) => (
-              <button
-                key={a.id}
-                onClick={() => setSelected(a.id)}
-                className={cn(
-                  'flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition',
-                  a.id === account.id ? 'border-brand-500/60 bg-brand-500/10 text-white' : 'border-white/10 text-ink-300 hover:border-white/20',
-                )}
-              >
-                <Badge tone={a.type === 'live' ? 'success' : 'info'}>{a.type}</Badge>
-                <span className="tabular">{a.loginCode}</span>
-              </button>
-            ))}
-            <Link href="/app/accounts" className="text-sm text-brand-300 hover:text-brand-200">
-              Manage →
+          <div className="mb-5 flex flex-wrap items-center gap-3">
+            <SlidingTabs
+              value={account.id}
+              onChange={setSelected}
+              items={all.map((a) => ({
+                value: a.id,
+                label: (
+                  <>
+                    <span className={cn('h-1.5 w-1.5 rounded-full', a.type === 'live' ? 'bg-up shadow-[0_0_8px_rgb(var(--up-rgb))]' : 'bg-sky-400')} />
+                    <span className="label !text-current">{a.type}</span>
+                    <span className="tabular font-mono text-[13px]">{fmtLogin(a.loginCode)}</span>
+                  </>
+                ),
+              }))}
+            />
+            <Link href="/app/accounts" className="group inline-flex items-center gap-1.5 text-sm text-brand-300">
+              <Settings2 className="h-4 w-4 transition-transform duration-500 group-hover:rotate-90" />
+              <span className="link-underline">Manage accounts</span>
             </Link>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <Stat label="Balance" value={fmtMoney(account.balance)} sub={account.currency} />
-            <Stat label="Equity" value={fmtMoney(account.equity)} sub={`Credit ${fmtMoney(account.credit)}`} />
-            <Stat label="Free margin" value={fmtMoney(account.freeMargin)} sub={`Used ${fmtMoney(account.usedMargin)}`} />
-            <Stat label="Margin level" value={account.marginLevel ? `${account.marginLevel}%` : '—'} sub={`Leverage 1:${account.leverage}`} />
+          {/* plate + dial */}
+          <div className="grid gap-5 lg:grid-cols-3">
+            <div key={account.id} className="animate-page-in lg:col-span-2">
+              <Tilt max={3} className="h-full">
+                <AccountPlate a={account} size="lg" countUp className="h-full">
+                  <Link
+                    href={`/trade?acc=${account.id}`}
+                    className="group/a inline-flex h-9 items-center gap-2 rounded-full bg-white px-4 text-sm font-semibold text-ink-950 transition-transform duration-300 hover:-translate-y-0.5"
+                  >
+                    <LineChart className="h-4 w-4" /> Trade this account
+                    <ArrowRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover/a:translate-x-0.5" />
+                  </Link>
+                  <Link
+                    href={`/app/accounts/${account.id}`}
+                    className="inline-flex h-9 items-center gap-2 rounded-full border border-white/15 px-4 text-sm text-ink-100 transition-colors duration-300 hover:border-white/40 hover:bg-white/[0.05]"
+                  >
+                    <Receipt className="h-4 w-4" /> Statement
+                  </Link>
+                </AccountPlate>
+              </Tilt>
+            </div>
+            <Card title="Margin level" className="animate-page-in flex flex-col [animation-delay:90ms]" action={<span className="tabular font-mono text-[11px] text-ink-400">1:{account.leverage}</span>}>
+              <MarginGauge key={account.id} level={account.marginLevel} usedMargin={account.usedMargin} freeMargin={account.freeMargin} />
+            </Card>
           </div>
 
-          <div className="mt-6 grid gap-6 lg:grid-cols-3">
-            <Card title="Quick actions" className="lg:col-span-1">
-              <div className="grid gap-2">
-                <Link href={`/trade?acc=${account.id}`}>
-                  <Button className="w-full justify-start" variant="primary">
-                    <LineChart className="h-4 w-4" /> Open terminal
-                  </Button>
-                </Link>
-                <Link href="/app/payments">
-                  <Button className="w-full justify-start" variant="secondary">
-                    <ArrowDownToLine className="h-4 w-4" /> Deposit
-                  </Button>
-                </Link>
-                <Link href="/app/payments?tab=withdraw">
-                  <Button className="w-full justify-start" variant="outline" disabled={account.type === 'demo'}>
-                    <ArrowUpFromLine className="h-4 w-4" /> Withdraw
-                  </Button>
-                </Link>
-                {account.type === 'demo' && <p className="text-xs text-ink-500">Withdrawals are available on live accounts only.</p>}
+          {/* live figures: tween + flash whenever a snapshot arrives */}
+          <div className="mt-5 grid grid-cols-2 gap-4 xl:grid-cols-4">
+            {[
+              { label: 'Equity', value: account.equity, sub: 'Balance + credit + floating P/L', icon: <Scale className="h-4 w-4" /> },
+              { label: 'Free margin', value: account.freeMargin, sub: 'Available for new positions', icon: <WalletMinimal className="h-4 w-4" /> },
+              { label: 'Used margin', value: account.usedMargin, sub: 'Held by open positions', icon: <Lock className="h-4 w-4" /> },
+              { label: 'Credit', value: account.credit, sub: 'Counts toward equity', icon: <Coins className="h-4 w-4" /> },
+            ].map((s, i) => (
+              <div key={s.label} className="animate-page-in" style={{ animationDelay: `${160 + i * 70}ms` }}>
+                <Stat label={s.label} icon={s.icon} value={<AnimatedNumber key={account.id} value={s.value} mountFrom={0} />} sub={s.sub} />
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-5 grid gap-5 lg:grid-cols-3">
+            <Card
+              title="Balance history"
+              className="animate-page-in [animation-delay:420ms] lg:col-span-2"
+              action={<span className="label">{ledger && ledger.length > 0 ? `last ${ledger.length} ${ledger.length === 1 ? 'entry' : 'entries'}` : 'ledger'}</span>}
+            >
+              {ledger === null ? <Skeleton className="h-52 rounded-xl" /> : <BalanceChart key={`${account.id}-${ledger[0]?.id ?? 'none'}`} entries={ledger} currency={account.currency} />}
+            </Card>
+
+            <Card title="Quick actions" className="animate-page-in [animation-delay:500ms]">
+              <div className="grid gap-2.5">
+                <ActionTile href={`/trade?acc=${account.id}`} icon={<LineChart className="h-5 w-5" />} title="Open terminal" hint="Charts, orders and positions" primary />
+                <ActionTile href="/app/payments" icon={<ArrowDownToLine className="h-5 w-5" />} title="Deposit" hint="Fund your account" />
+                {account.type === 'demo' ? (
+                  <ActionTile icon={<ArrowUpFromLine className="h-5 w-5" />} title="Withdraw" hint="Withdrawals are available on live accounts only." />
+                ) : (
+                  <ActionTile href="/app/payments?tab=withdraw" icon={<ArrowUpFromLine className="h-5 w-5" />} title="Withdraw" hint="Request a payout" />
+                )}
               </div>
             </Card>
-
-            <Card title="Recent transactions" className="lg:col-span-2" action={<span className="text-xs text-ink-500">Account {account.loginCode}</span>}>
-              {ledger === null ? (
-                <div className="flex justify-center py-8">
-                  <Spinner />
-                </div>
-              ) : ledger.length === 0 ? (
-                <Empty>No transactions yet.</Empty>
-              ) : (
-                <ul className="divide-y divide-white/5">
-                  {ledger.map((e) => {
-                    const neg = e.amount.startsWith('-');
-                    return (
-                      <li key={e.id} className="flex items-center justify-between py-2.5 text-sm">
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <Badge tone={neg ? 'danger' : 'success'}>{e.type}</Badge>
-                            <span className="truncate text-ink-300">{e.reason}</span>
-                          </div>
-                          <div className="mt-0.5 text-[11px] text-ink-500">{fmtDate(e.createdAt)}</div>
-                        </div>
-                        <div className="text-right tabular">
-                          <div className={cn('font-semibold', neg ? 'text-down' : 'text-up')}>
-                            {neg ? '' : '+'}
-                            {fmtMoney(e.amount)}
-                          </div>
-                          <div className="text-[11px] text-ink-500">bal {fmtMoney(e.balanceAfter)}</div>
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </Card>
           </div>
+
+          <Card
+            title="Recent transactions"
+            className="animate-page-in mt-5 [animation-delay:580ms]"
+            action={
+              <Link href={`/app/accounts/${account.id}`} className="group inline-flex items-center gap-1.5 text-xs text-brand-300">
+                <span className="link-underline">
+                  <span className="hidden sm:inline">Account {fmtLogin(account.loginCode)} </span>statement
+                </span>
+                <ArrowUpRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+              </Link>
+            }
+          >
+            {ledger === null ? (
+              <div className="space-y-3">
+                {[0, 1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-12 rounded-xl" />
+                ))}
+              </div>
+            ) : ledger.length === 0 ? (
+              <Empty icon={<Receipt className="h-6 w-6" />}>No transactions yet.</Empty>
+            ) : (
+              <ul key={`${account.id}-${ledger[0].id}`} className="-mx-2">
+                {ledger.map((e, i) => {
+                  const neg = e.amount.startsWith('-');
+                  return (
+                    <li
+                      key={e.id}
+                      className="animate-page-in group flex items-center gap-3.5 rounded-xl px-2 py-2.5 text-sm transition-colors duration-300 hover:bg-white/[0.035]"
+                      style={{ animationDelay: `${i * 55}ms` }}
+                    >
+                      <LedgerIcon type={e.type} negative={neg} />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <Badge tone={neg ? 'danger' : 'success'}>{e.type}</Badge>
+                          <span className="truncate text-ink-200">{e.reason}</span>
+                        </div>
+                        <div className="mt-1 text-[11px] text-ink-500">{fmtDate(e.createdAt)}</div>
+                      </div>
+                      <div className="tabular text-right font-mono">
+                        <div className={cn('font-semibold', neg ? 'text-down' : 'text-up')}>
+                          {neg ? '' : '+'}
+                          {fmtMoney(e.amount)}
+                        </div>
+                        <div className="mt-0.5 text-[11px] text-ink-500">bal {fmtMoney(e.balanceAfter)}</div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </Card>
         </>
       )}
     </>
+  );
+}
+
+/** Row-shaped link with an icon that tips on hover. Without `href` it renders as an unavailable action. */
+function ActionTile({ href, icon, title, hint, primary }: { href?: string; icon: React.ReactNode; title: string; hint: string; primary?: boolean }) {
+  const body = (
+    <>
+      <span
+        className={cn(
+          'flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-transform duration-500 ease-spring',
+          href && 'group-hover:-rotate-6 group-hover:scale-110',
+          primary ? 'bg-ink-950/15 text-ink-950' : href ? 'bg-brand-400/10 text-brand-300 ring-1 ring-inset ring-brand-400/20' : 'bg-white/[0.04] text-ink-500',
+        )}
+      >
+        {icon}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className={cn('block text-sm font-semibold', primary ? 'text-ink-950' : href ? 'text-white' : 'text-ink-400')}>{title}</span>
+        <span className={cn('block text-xs', primary ? 'text-ink-950/70' : 'text-ink-500')}>{hint}</span>
+      </span>
+      {href ? (
+        <ArrowRight className={cn('h-4 w-4 shrink-0 transition-transform duration-300 group-hover:translate-x-1', primary ? 'text-ink-950' : 'text-ink-500 group-hover:text-white')} />
+      ) : (
+        <Lock className="h-4 w-4 shrink-0 text-ink-600" />
+      )}
+    </>
+  );
+  const cls = cn(
+    'group flex items-center gap-3.5 rounded-2xl p-3 text-left',
+    primary
+      ? 'btn btn-shine bg-gradient-to-b from-brand-300 to-brand-500 shadow-glow'
+      : href
+        ? 'border border-white/[0.07] bg-white/[0.03] transition-colors duration-300 hover:border-brand-400/30 hover:bg-white/[0.06]'
+        : 'cursor-not-allowed border border-dashed border-white/[0.08]',
+  );
+  return href ? (
+    <Link href={href} className={cls}>
+      {body}
+    </Link>
+  ) : (
+    <div className={cls} aria-disabled>
+      {body}
+    </div>
+  );
+}
+
+function DashboardSkeleton() {
+  return (
+    <div className="space-y-5">
+      <Skeleton className="h-11 w-72 rounded-2xl" />
+      <div className="grid gap-5 lg:grid-cols-3">
+        <Skeleton className="h-72 rounded-3xl lg:col-span-2" />
+        <Skeleton className="h-72 rounded-3xl" />
+      </div>
+      <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+        {[0, 1, 2, 3].map((i) => (
+          <Skeleton key={i} className="h-28 rounded-2xl" />
+        ))}
+      </div>
+    </div>
   );
 }
 

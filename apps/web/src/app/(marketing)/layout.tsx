@@ -5,7 +5,7 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
   return (
     <>
       <SiteHeader />
-      <main>{children}</main>
+      <main className="overflow-x-clip">{children}</main>
       <SiteFooter />
     </>
   );

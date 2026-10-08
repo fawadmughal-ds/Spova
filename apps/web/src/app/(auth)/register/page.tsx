@@ -3,13 +3,25 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Eye, EyeOff } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { registerSchema, type MeDto, type RegisterInput } from '@spova/shared';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useForm } from '@/lib/use-form';
 import { COUNTRIES } from '@/lib/countries';
+import { Reveal } from '@/components/motion';
 import { Alert, Button, Input, Select } from '@/components/ui';
+import { AuthHeading, CheckRow, PasswordStrength, PasswordToggle } from '@/components/auth/parts';
+
+function Step({ n, children }: { n: string; children: string }) {
+  return (
+    <div className="flex items-center gap-3 pt-2">
+      <span className="font-mono text-[10px] font-semibold tracking-[0.16em] text-brand-300">{n}</span>
+      <span className="label">{children}</span>
+      <span className="h-px flex-1 bg-gradient-to-r from-white/10 to-transparent" />
+    </div>
+  );
+}
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -28,64 +40,69 @@ export default function RegisterPage() {
 
   return (
     <>
-      <h1 className="text-2xl font-bold">Open your account</h1>
-      <p className="mt-1 text-sm text-ink-400">Free demo with $10,000 virtual funds. Takes two minutes.</p>
-      <form onSubmit={onSubmit} className="mt-8 space-y-4" noValidate>
-        {f.serverError && <Alert tone="danger">{f.serverError}</Alert>}
-        <div className="grid grid-cols-2 gap-3">
-          <Input label="First name" autoComplete="given-name" {...f.bind('firstName')} />
-          <Input label="Last name" autoComplete="family-name" {...f.bind('lastName')} />
-        </div>
-        <Input label="Email" type="email" autoComplete="email" {...f.bind('email')} />
-        <div className="grid grid-cols-2 gap-3">
-          <Input label="Phone" type="tel" placeholder="+971501234567" autoComplete="tel" {...f.bind('phone')} />
-          <Input label="Date of birth" type="date" {...f.bind('dob')} />
-        </div>
-        <Select label="Country of residence" {...f.bind('countryCode')}>
-          {COUNTRIES.map(([code, name]) => (
-            <option key={code} value={code}>
-              {name}
-            </option>
-          ))}
-        </Select>
-        <Input
-          label="Password"
-          type={show ? 'text' : 'password'}
-          autoComplete="new-password"
-          hint="8-32 characters with upper, lower, number and symbol"
-          {...f.bind('password')}
-          right={
-            <button type="button" onClick={() => setShow((v) => !v)} className="hover:text-ink-200" aria-label="Toggle password">
-              {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-            </button>
-          }
-        />
-        <label className="flex items-start gap-3 text-sm text-ink-300">
-          <input type="checkbox" className="mt-0.5 h-4 w-4 accent-brand-500" {...f.bindCheckbox('tcAccepted')} />
-          <span>
-            I accept the{' '}
-            <Link href="/legal" className="text-brand-300">
-              Client Agreement
-            </Link>{' '}
-            and Privacy Policy.
-          </span>
-        </label>
-        {f.errors.tcAccepted && <p className="-mt-2 text-xs text-down">{f.errors.tcAccepted}</p>}
-        <label className="flex items-start gap-3 text-sm text-ink-300">
-          <input type="checkbox" className="mt-0.5 h-4 w-4 accent-brand-500" {...f.bindCheckbox('riskAccepted')} />
-          <span>I have read the Risk Disclosure and understand CFDs can lose money rapidly due to leverage.</span>
-        </label>
-        {f.errors.riskAccepted && <p className="-mt-2 text-xs text-down">{f.errors.riskAccepted}</p>}
-        <Button type="submit" size="lg" className="w-full" loading={f.submitting}>
-          Create account
-        </Button>
+      <AuthHeading eyebrow="Two minutes" title="Open *your account*" sub="Free demo with $10,000 virtual funds. Takes two minutes." />
+      <form onSubmit={onSubmit} className="mt-8" noValidate>
+        <Reveal variant="stagger" delay={250} step={55} className="space-y-4">
+          {f.serverError && <Alert tone="danger">{f.serverError}</Alert>}
+
+          <Step n="01">About you</Step>
+          <div className="grid grid-cols-2 gap-3">
+            <Input label="First name" autoComplete="given-name" {...f.bind('firstName')} />
+            <Input label="Last name" autoComplete="family-name" {...f.bind('lastName')} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Input label="Date of birth" type="date" {...f.bind('dob')} />
+            <Select label="Country of residence" {...f.bind('countryCode')}>
+              {COUNTRIES.map(([code, name]) => (
+                <option key={code} value={code}>
+                  {name}
+                </option>
+              ))}
+            </Select>
+          </div>
+
+          <Step n="02">Contact</Step>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Input label="Email" type="email" autoComplete="email" {...f.bind('email')} />
+            <Input label="Phone" type="tel" placeholder="+971501234567" autoComplete="tel" {...f.bind('phone')} />
+          </div>
+
+          <Step n="03">Security</Step>
+          <Input
+            label="Password"
+            type={show ? 'text' : 'password'}
+            autoComplete="new-password"
+            {...f.bind('password')}
+            right={<PasswordToggle show={show} onToggle={() => setShow((v) => !v)} />}
+          />
+          <PasswordStrength value={String(f.values.password ?? '')} />
+
+          <div className="space-y-2 pt-2">
+            <CheckRow {...f.bindCheckbox('tcAccepted')} error={f.errors.tcAccepted}>
+              I accept the{' '}
+              <Link href="/legal" className="link-underline text-brand-300">
+                Client Agreement
+              </Link>{' '}
+              and Privacy Policy.
+            </CheckRow>
+            <CheckRow {...f.bindCheckbox('riskAccepted')} error={f.errors.riskAccepted}>
+              I have read the Risk Disclosure and understand CFDs can lose money rapidly due to leverage.
+            </CheckRow>
+          </div>
+
+          <Button type="submit" size="lg" className="group w-full rounded-2xl" loading={f.submitting}>
+            Create account <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
+          </Button>
+        </Reveal>
       </form>
-      <p className="mt-6 text-center text-sm text-ink-400">
-        Already registered?{' '}
-        <Link href="/login" className="font-medium text-brand-300 hover:text-brand-200">
-          Log in
-        </Link>
-      </p>
+      <Reveal variant="fade" delay={900}>
+        <p className="mt-6 text-center text-sm text-ink-400">
+          Already registered?{' '}
+          <Link href="/login" className="link-underline font-medium text-brand-300 transition-colors hover:text-brand-200">
+            Log in
+          </Link>
+        </p>
+      </Reveal>
     </>
   );
 }

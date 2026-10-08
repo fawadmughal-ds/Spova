@@ -1,48 +1,28 @@
 import Link from 'next/link';
-import { Logo } from '@/components/logo';
-import { BRAND } from '@/lib/utils';
+import { ArrowLeft } from 'lucide-react';
+import { Wordmark } from '@/components/logo';
+import { BrandPanel } from '@/components/auth/brand-panel';
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="grid min-h-screen lg:grid-cols-2">
-      <aside className="relative hidden overflow-hidden bg-ink-900 lg:block">
-        <div className="bg-grid absolute inset-0" />
-        <div className="absolute -bottom-40 -left-20 h-[480px] w-[480px] rounded-full bg-brand-500/20 blur-3xl" />
-        <div className="relative flex h-full flex-col justify-between p-12">
-          <Link href="/" className="flex items-center gap-2">
-            <Logo />
-            <span className="text-lg font-bold">{BRAND}</span>
+    <div className="grid min-h-screen lg:grid-cols-[1.05fr_1fr]">
+      <BrandPanel />
+      <main className="relative flex min-h-screen flex-col overflow-hidden">
+        <div className="bg-dots absolute inset-0 opacity-40" />
+        <div className="aurora-blob -right-40 -top-40 h-[380px] w-[420px] bg-brand-500/10" />
+
+        <div className="relative flex items-center justify-between px-6 pt-6 sm:px-10">
+          <Link href="/" aria-label="Home" className="animate-page-in lg:invisible">
+            <Wordmark />
           </Link>
-          <div>
-            <h2 className="text-4xl font-bold leading-tight">
-              One account.
-              <br />
-              Every market.
-            </h2>
-            <p className="mt-4 max-w-md text-ink-300">Forex, indices, commodities, shares, crypto and metals with live pricing and instant execution.</p>
-            <dl className="mt-10 grid grid-cols-3 gap-6">
-              {[
-                ['$10,000', 'Demo funds'],
-                ['1:400', 'Leverage'],
-                ['24/7', 'Crypto'],
-              ].map(([v, l]) => (
-                <div key={l}>
-                  <dt className="text-2xl font-bold tabular">{v}</dt>
-                  <dd className="text-xs uppercase tracking-wider text-ink-400">{l}</dd>
-                </div>
-              ))}
-            </dl>
-          </div>
-          <p className="text-xs text-ink-500">CFDs are complex instruments and come with a high risk of losing money rapidly due to leverage.</p>
+          <Link href="/" className="animate-page-in group inline-flex items-center gap-2 rounded-full border border-white/[0.08] px-3.5 py-1.5 text-xs text-ink-300 transition-colors hover:border-white/20 hover:text-white">
+            <ArrowLeft className="h-3.5 w-3.5 transition-transform duration-300 group-hover:-translate-x-0.5" />
+            Back to site
+          </Link>
         </div>
-      </aside>
-      <main className="flex items-center justify-center p-6 sm:p-10">
-        <div className="w-full max-w-md">
-          <Link href="/" className="mb-8 flex items-center gap-2 lg:hidden">
-            <Logo />
-            <span className="text-lg font-bold">{BRAND}</span>
-          </Link>
-          {children}
+
+        <div className="relative flex flex-1 items-center justify-center px-6 py-10 sm:px-10">
+          <div className="w-full max-w-md">{children}</div>
         </div>
       </main>
     </div>

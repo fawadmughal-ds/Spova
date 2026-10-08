@@ -43,6 +43,8 @@ export class MarketController {
         lotStep: s.lotStep.toString(),
         leverageMax: s.leverageMax,
         spreadMarkup: s.spreadMarkup.toString(),
+        swapLong: s.swapLong.toString(),
+        swapShort: s.swapShort.toString(),
         isOpen: s.isOpen,
         featured: s.featured,
         quote: qv.bid ? { bid: qv.bid, ask: qv.ask, ts: Number(qv.ts) } : null,
@@ -55,6 +57,27 @@ export class MarketController {
     const s = await this.prisma.symbol.findUnique({ where: { id }, include: { sessions: true } });
     if (!s || !s.enabled) throw ApiError.notFound('symbol_not_found', 'Symbol not found');
     return s;
+  }
+
+  /** Weekly trading hours (UTC) for every enabled symbol. No rows for a symbol = open 24/7. */
+  @Get('sessions')
+  sessions() {
+    return this.prisma.symbolSession.findMany({
+      where: { symbol: { enabled: true } },
+      select: { symbolId: true, weekday: true, openTime: true, closeTime: true },
+      orderBy: [{ symbolId: 'asc' }, { weekday: 'asc' }, { openTime: 'asc' }],
+    });
+  }
+
+  /** Upcoming full-day closures per symbol (today onwards). */
+  @Get('holidays')
+  async holidays() {
+    const today = new Date(new Date().toISOString().slice(0, 10));
+    const rows = await this.prisma.symbolHoliday.findMany({
+      where: { date: { gte: today }, symbol: { enabled: true } },
+      orderBy: [{ date: 'asc' }, { symbolId: 'asc' }],
+    });
+    return rows.map((r) => ({ symbolId: r.symbolId, date: r.date.toISOString().slice(0, 10) }));
   }
 
   @Get('risk-config')

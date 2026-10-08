@@ -20,6 +20,14 @@ export interface PublicSymbol {
   digits: number;
   leverageMax: number;
   spreadMarkup: string;
+  contractSize?: string;
+  minLot?: string;
+  maxLot?: string;
+  lotStep?: string;
+  isOpen?: boolean;
+  /** overnight financing in account currency per lot per night, long / short (ARCHITECTURE §08) */
+  swapLong?: string;
+  swapShort?: string;
   featured: boolean;
   quote: { bid: string; ask: string; ts: number } | null;
 }
@@ -32,4 +40,18 @@ export interface PublicRisk {
   maxLeverage: number;
   minDeposit: string;
   spreadDiscountPct: string;
+}
+
+/** One trading window in UTC. weekday: 0 = Sunday. A symbol with no rows trades 24/7. */
+export interface PublicSession {
+  symbolId: string;
+  weekday: number;
+  openTime: string;
+  closeTime: string;
+}
+
+export interface PublicHoliday {
+  symbolId: string;
+  /** YYYY-MM-DD */
+  date: string;
 }

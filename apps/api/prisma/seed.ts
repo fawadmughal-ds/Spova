@@ -71,7 +71,7 @@ const SYMBOLS: Sym[] = [
 ];
 
 const RISK = [
-  { tier: 'classic', minDeposit: 150, defaultLeverage: 100, maxLeverage: 400, spreadDiscountPct: 0 },
+  { tier: 'classic', minDeposit: 200, defaultLeverage: 100, maxLeverage: 400, spreadDiscountPct: 0 },
   { tier: 'silver', minDeposit: 5000, defaultLeverage: 100, maxLeverage: 400, spreadDiscountPct: 10 },
   { tier: 'gold', minDeposit: 25000, defaultLeverage: 100, maxLeverage: 400, spreadDiscountPct: 20 },
   { tier: 'platinum', minDeposit: 50000, defaultLeverage: 100, maxLeverage: 400, spreadDiscountPct: 30 },

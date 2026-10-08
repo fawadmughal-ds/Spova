@@ -9,6 +9,7 @@ import { AccountsModule } from './modules/accounts/accounts.module';
 import { LedgerModule } from './modules/ledger/ledger.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { MarketModule } from './modules/market/market.module';
+import { NewsletterModule } from './modules/newsletter/newsletter.module';
 import { RealtimeModule } from './modules/realtime/realtime.module';
 import { HealthController } from './modules/health/health.controller';
 import { env } from './config/env';
@@ -31,6 +32,7 @@ import { env } from './config/env';
     UsersModule,
     AdminModule,
     MarketModule,
+    NewsletterModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: JwtAuthGuard }],
