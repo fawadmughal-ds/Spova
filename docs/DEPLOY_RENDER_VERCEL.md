@@ -50,12 +50,17 @@ and answers `/health`; its real work runs in the background.
 - **Emails** print to the API log (`MAIL_PROVIDER=console`). Set `MAIL_PROVIDER=resend` + `RESEND_API_KEY`
   for real mail.
 
-## Cookies across two domains
-The web (vercel.app) and the API (onrender.com) are different sites, so the API sets its auth cookies with
-`SameSite=None; Secure` (`COOKIE_SAMESITE=none`, already in `render.yaml`). If you later serve both under one
-domain (e.g. `app.example.com` + `api.example.com`), switch back to `lax` and set `COOKIE_DOMAIN=.example.com`.
+## The API must share your domain (required, not optional)
+The web app's route guard reads the login cookie on the **web** domain, so the API must set cookies on the same
+site. Put the API on a subdomain of your domain:
+1. Render → `spova-api` → **Settings → Custom Domains** → add `api.yourdomain.com`.
+2. DNS (Cloudflare/registrar): `CNAME api → spova-api.onrender.com` (DNS-only / grey cloud if Cloudflare).
+3. Render → `spova-api` → **Environment**: `WEB_ORIGIN=https://www.yourdomain.com,https://yourdomain.com`,
+   `COOKIE_SAMESITE=lax`, `COOKIE_DOMAIN=.yourdomain.com`. Save (redeploys).
+4. Vercel → project → **Settings → Environment Variables**: `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_WS_URL` =
+   `https://api.yourdomain.com` → **Redeploy** (env vars are baked in at build time).
+Only while you have no domain at all (pure `vercel.app` + `onrender.com`) use `COOKIE_SAMESITE=none`; then the
+public pages work but Safari/iPhone block the login cookie and the client area cannot keep you signed in.
 
-## Custom domain later
-Vercel → Project → Domains → add `www.yourdomain.com`; Render → `spova-api` → Settings → Custom domain
-`api.yourdomain.com`; then update `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_WS_URL`, `WEB_ORIGIN`, and the cookie
-settings above.
+## Web domain
+Vercel → Project → **Domains** → add `www.yourdomain.com` (and the apex) and follow the DNS records Vercel shows.
