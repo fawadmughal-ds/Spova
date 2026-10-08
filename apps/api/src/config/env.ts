@@ -18,6 +18,7 @@ const schema = z.object({
   REDIS_URL: z.string().min(1).default('redis://localhost:6379'),
   WEB_ORIGIN: z.string().min(1).default('http://localhost:3000'),
   COOKIE_DOMAIN: z.string().optional().default(''),
+  COOKIE_SAMESITE: z.enum(['lax', 'strict', 'none']).default('lax'),
   COOKIE_SECURE: z
     .string()
     .optional()

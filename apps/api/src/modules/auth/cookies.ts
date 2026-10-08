@@ -3,10 +3,12 @@ import { COOKIE_NAMES } from '@spova/shared';
 import { env, ttlToSeconds } from '../../config/env';
 import type { TokenPair } from './auth.service';
 
+// SameSite=None is required when the web app and the API live on different sites (e.g. vercel.app + onrender.com);
+// browsers then also require Secure.
 const base = (): CookieOptions => ({
   httpOnly: true,
-  secure: env.COOKIE_SECURE || env.NODE_ENV === 'production',
-  sameSite: 'lax',
+  secure: env.COOKIE_SECURE || env.NODE_ENV === 'production' || env.COOKIE_SAMESITE === 'none',
+  sameSite: env.COOKIE_SAMESITE,
   path: '/',
   ...(env.COOKIE_DOMAIN ? { domain: env.COOKIE_DOMAIN } : {}),
 });
