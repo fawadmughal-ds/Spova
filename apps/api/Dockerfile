@@ -26,4 +26,5 @@ COPY --from=build /repo/apps/api/dist ./dist
 COPY --from=build /repo/apps/api/prisma ./prisma
 EXPOSE 4000
 # migrate on boot, then start
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main.js"]
+# migrate on boot, seed reference data when SEED_ON_BOOT=true (hosted previews), then start
+CMD ["sh", "-c", "npx prisma migrate deploy && { [ \"$SEED_ON_BOOT\" = true ] && node dist/seed/cli.js || true; } && node dist/main.js"]

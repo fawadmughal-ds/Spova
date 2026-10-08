@@ -16,6 +16,7 @@ import { RiskEngine } from './risk/engine';
 import { SwapJob } from './jobs/swap';
 import { startHeartbeat } from './jobs/heartbeat';
 import { daily } from './jobs/scheduler';
+import { startHealthServer } from './health-server';
 import type { FeedAdapter } from './feed';
 import type { TradingEvent } from '@spova/shared';
 
@@ -117,6 +118,9 @@ async function main() {
     }, 3000).unref();
   }
 
+  // ---- optional HTTP health (PORT is set by hosts that require a bound port)
+  const stopHealth = process.env.PORT ? startHealthServer(Number(process.env.PORT), log, () => ({ ingest: ingest.counters(), risk: risk?.stats })) : undefined;
+
   // ---- periodic status line
   const statusTimer = setInterval(() => {
     log.info({ ingest: ingest.counters(), candles: candles.stats(), index: index?.stats(), risk: risk?.stats }, 'status');
@@ -138,6 +142,7 @@ async function main() {
       clearInterval(statusTimer);
       stopHeartbeat();
       stopRetention();
+      if (stopHealth) await stopHealth();
       swap.halt();
       health.stop();
       symbols.stop();
