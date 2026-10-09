@@ -14,7 +14,7 @@ import { fmtNum } from './format';
  * Trading accounts, Payments, Documents, Statement, InvestiQ / user, Help, Logout, language). It sits
  * OUTSIDE the `.terminal` dark scope, so its colours come from the normal light theme.
  */
-export function ClientRail({ accounts, account, onSelectAccount, me, onLogout, className }: { accounts: AccountDto[]; account: AccountDto | undefined; onSelectAccount: (id: string) => void; me: MeDto | null; onLogout: () => void; className?: string }) {
+export function ClientRail({ accounts, account, onSelectAccount, me, onLogout, onOpenDocuments, className }: { accounts: AccountDto[]; account: AccountDto | undefined; onSelectAccount: (id: string) => void; me: MeDto | null; onLogout: () => void; /** when given, Documents opens as an overlay over the terminal (like the reference) instead of leaving the page */ onOpenDocuments?: () => void; className?: string }) {
   const first = me?.profile?.firstName ?? '';
   const last = me?.profile?.lastName ?? '';
   const fullName = `${first} ${last}`.trim() || me?.email || '';
@@ -46,9 +46,15 @@ export function ClientRail({ accounts, account, onSelectAccount, me, onLogout, c
           </Link>
         </li>
         <li>
-          <Link href="/app/documents" className="trail-item">
-            <IdCard /> Documents
-          </Link>
+          {onOpenDocuments ? (
+            <button type="button" onClick={onOpenDocuments} className="trail-item">
+              <IdCard /> Documents
+            </button>
+          ) : (
+            <Link href="/app/documents" className="trail-item">
+              <IdCard /> Documents
+            </Link>
+          )}
         </li>
         <li>
           <Link href={account ? `/app/accounts/${account.id}` : '/app/accounts'} className="trail-item">

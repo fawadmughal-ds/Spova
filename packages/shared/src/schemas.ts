@@ -137,20 +137,31 @@ export const LEDGER_TYPE_VALUES = LEDGER_TYPES;
 export const KYC_DOC_TYPES: Record<KycGroup, { value: string; label: string }[]> = {
   poi: [
     { value: 'passport', label: 'Passport' },
-    { value: 'id_card', label: 'National ID card' },
-    { value: 'driving_licence', label: 'Driving licence' },
+    { value: 'id_card', label: 'ID Card Front' },
+    { value: 'id_card_back', label: 'ID Card Back' },
+    { value: 'driving_licence', label: 'Driving License Front' },
+    { value: 'driving_licence_back', label: 'Driving License Back' },
+    { value: 'selfie', label: 'Selfie with document' },
   ],
   por: [
-    { value: 'utility_bill', label: 'Utility bill' },
-    { value: 'bank_statement', label: 'Bank statement' },
-    { value: 'tax_letter', label: 'Government or tax letter' },
+    { value: 'utility_bill', label: 'Utility Bill' },
+    { value: 'bank_statement', label: 'Bank Statement' },
+    { value: 'tax_letter', label: 'Government / Tax Letter' },
+    { value: 'rental_agreement', label: 'Rental Agreement' },
+    { value: 'residence_other', label: 'Other proof of residence' },
   ],
   payment: [
-    { value: 'card_front', label: 'Card (front, middle digits hidden)' },
-    { value: 'bank_proof', label: 'Bank account proof' },
-    { value: 'crypto_wallet', label: 'Crypto wallet ownership' },
+    { value: 'card_front', label: 'Credit Card Front (middle digits hidden)' },
+    { value: 'card_back', label: 'Credit Card Back (CVV hidden)' },
+    { value: 'bank_proof', label: 'Bank Account Proof' },
+    { value: 'crypto_wallet', label: 'Crypto Wallet Ownership' },
+    { value: 'payment_other', label: 'Other payment document' },
   ],
-  other: [{ value: 'other', label: 'Other document' }],
+  other: [
+    { value: 'source_of_funds', label: 'Source of Funds' },
+    { value: 'declaration', label: 'Signed Declaration' },
+    { value: 'other', label: 'Other document' },
+  ],
 };
 export const KYC_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'] as const;
 export const KYC_MAX_BYTES = 10 * 1024 * 1024;

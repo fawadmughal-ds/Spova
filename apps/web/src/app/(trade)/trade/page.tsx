@@ -14,6 +14,7 @@ import { useToast } from '@/components/toast';
 import { Skeleton, Spinner } from '@/components/ui';
 import { TopBar, type NoticeItem, type TerminalView } from '@/components/trade/top-bar';
 import { ClientRail, railLinks } from '@/components/trade/client-rail';
+import { DocumentsPanel } from '@/components/portal/documents-panel';
 import { InfoPanel, MarketPanel, QuickTrade } from '@/components/trade/market-panel';
 import { ChartPanel } from '@/components/trade/chart-panel';
 import { OrderTicket } from '@/components/trade/order-ticket';
@@ -296,6 +297,7 @@ function Terminal() {
 
   // ---------------------------------------------------------------- layout
   const [view, setView] = useState<TerminalView>('trade');
+  const [docsOpen, setDocsOpen] = useState(false);
   const [mtab, setMtab] = useState<MobileTab>('chart');
   const [bottomTab, setBottomTab] = useState<BottomTab>('positions');
   const [ticket, setTicket] = useState<{ spec: SymbolSpec; side: OrderSide; lots: string } | null>(null);
@@ -334,7 +336,14 @@ function Terminal() {
   return (
     <div className="flex h-dvh overflow-hidden">
       {/* light client-area rail: a sibling of the dark terminal, so it keeps the normal theme */}
-      <ClientRail accounts={all} account={account} onSelectAccount={selectAccount} me={me} onLogout={() => void logout()} className="hidden lg:flex" />
+      <ClientRail accounts={all} account={account} onSelectAccount={selectAccount} me={me} onLogout={() => void logout()} onOpenDocuments={() => setDocsOpen(true)} className="hidden lg:flex" />
+      {docsOpen && (
+        <div className="light-scope fixed inset-0 z-[85] flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4" onMouseDown={(e) => e.target === e.currentTarget && setDocsOpen(false)}>
+          <div role="dialog" aria-modal aria-label="Documents" className="animate-pop-in max-h-[94dvh] w-full overflow-y-auto rounded-t-2xl bg-paper p-5 text-white shadow-lift sm:max-w-[760px] sm:rounded-2xl sm:p-8">
+            <DocumentsPanel onClose={() => setDocsOpen(false)} />
+          </div>
+        </div>
+      )}
       <div className="terminal flex h-dvh min-w-0 flex-1 flex-col overflow-hidden">
       <TopBar accounts={all} account={account} onSelectAccount={selectAccount} connected={connected} view={view} onView={setView} positions={openPositions} symbols={symbolMap} notices={notices} email={me?.email} onLogout={() => void logout()} />
       {account?.tradingBlocked && <TradingBlockedBanner />}

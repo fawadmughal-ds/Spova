@@ -1473,6 +1473,36 @@ body:has(.terminal) {
   }
 }
 
+/* ---- light scope: palette reset for overlays drawn over the dark terminal (Documents, QR) */
+.light-scope {
+  color-scheme: light;
+  --color-white: #0b1220;
+  --color-paper: #ffffff;
+  --color-ink-950: #f5f7fb;
+  --color-ink-900: #eceff6;
+  --color-ink-800: #e2e7f0;
+  --color-ink-700: #d3dae7;
+  --color-ink-600: #8793a8;
+  --color-ink-500: #6b778f;
+  --color-ink-400: #55617a;
+  --color-ink-300: #3f4a62;
+  --color-ink-200: #283248;
+  --color-ink-100: #141b2c;
+  --color-ink-50: #0a0f1a;
+  --color-brand-100: #172554;
+  --color-brand-200: #1e3a8a;
+  --color-brand-300: #1d4ed8;
+  --color-brand-400: #2563eb;
+  --color-brand-500: #2563eb;
+  --color-brand-600: #1e40af;
+  --color-brand-700: #1e3a8a;
+  --color-volt: #0284c7;
+  --color-iris: #6366f1;
+  --color-up: #15803d;
+  --color-down: #dc2626;
+  --color-gold: #ad6c07;
+}
+
 /* ---- client-area rail: the light 88px column left of the terminal (outside `.terminal`, normal light theme) */
 @layer components {
   .trail {

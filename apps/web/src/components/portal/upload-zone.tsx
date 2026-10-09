@@ -1,7 +1,7 @@
 'use client';
 
 import { forwardRef, useImperativeHandle, useRef, useState, type DragEvent } from 'react';
-import { CloudUpload, FileImage, FileText, TriangleAlert } from 'lucide-react';
+import { CloudUpload, FileImage, FileText, TriangleAlert, Upload } from 'lucide-react';
 import { KYC_MAX_BYTES, KYC_MIME_TYPES, type KycDocumentDto, type KycGroup } from '@spova/shared';
 import { upload } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -18,8 +18,8 @@ export const fmtBytes = (n: number) => (n >= 1024 * 1024 ? `${(n / 1024 / 1024).
 const ACCEPT = KYC_MIME_TYPES.join(',');
 
 /** Drag-and-drop / click-to-pick upload for one KYC document. Validates type and size before the request leaves the browser. */
-export const UploadZone = forwardRef<UploadZoneHandle, { group: KycGroup; docType: string; disabled?: boolean; onUploaded: (doc: KycDocumentDto) => void; className?: string }>(
-  function UploadZone({ group, docType, disabled, onUploaded, className }, ref) {
+export const UploadZone = forwardRef<UploadZoneHandle, { group: KycGroup; docType: string; disabled?: boolean; onUploaded: (doc: KycDocumentDto) => void; className?: string; /** `button`: a plain "Upload" pill instead of the drop zone */ variant?: 'zone' | 'button' }>(
+  function UploadZone({ group, docType, disabled, onUploaded, className, variant = 'zone' }, ref) {
     const input = useRef<HTMLInputElement>(null);
     const [drag, setDrag] = useState(false);
     const [busy, setBusy] = useState<{ name: string; size: number; image: boolean } | null>(null);
@@ -65,6 +65,30 @@ export const UploadZone = forwardRef<UploadZoneHandle, { group: KycGroup; docTyp
       const file = e.dataTransfer.files?.[0];
       if (file) void send(file);
     };
+
+    const errorBox = error && (
+      <div className="animate-pop-in mt-2 flex items-start gap-2 rounded-xl bg-down/10 px-3 py-2 text-xs text-down ring-1 ring-inset ring-down/30">
+        <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+        <span>{error}</span>
+      </div>
+    );
+
+    if (variant === 'button') {
+      return (
+        <div className={className}>
+          <input ref={input} type="file" accept={ACCEPT} className="sr-only" tabIndex={-1} disabled={disabled} onChange={(e) => e.target.files?.[0] && void send(e.target.files[0])} />
+          <button
+            type="button"
+            disabled={disabled || !!busy}
+            onClick={() => input.current?.click()}
+            className="inline-flex h-12 w-full items-center justify-center gap-2.5 rounded-full bg-[#0b1220] px-6 text-[15px] font-medium text-[#ffffff] transition-[background-color,transform] hover:bg-[#1c2538] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {busy ? <Spinner className="h-4" tone="current" /> : <Upload className="h-5 w-5" />} {busy ? 'Uploading…' : 'Upload'}
+          </button>
+          {errorBox}
+        </div>
+      );
+    }
 
     return (
       <div className={className}>
