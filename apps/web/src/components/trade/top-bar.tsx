@@ -11,6 +11,7 @@ import { fmtNum, type SymbolSpec } from './format';
 import { useFloatingTotal } from './pnl';
 import { Dropdown, ToggleRow } from './bits';
 import { PROFIT_FIGURES, settingsStore, toggleProfitFigure, useProfitFigures, useSettings, type ProfitFigure } from './settings';
+import { useT, type StringKey } from './i18n';
 
 export type TerminalView = 'trade' | 'analytics' | 'explore';
 export interface NoticeItem {
@@ -21,10 +22,10 @@ export interface NoticeItem {
   at: number;
 }
 
-const VIEWS: { value: TerminalView; label: string; icon: typeof Compass }[] = [
-  { value: 'trade', label: 'Trade', icon: ChartNoAxesColumn },
-  { value: 'analytics', label: 'Analytics', icon: ChartPie },
-  { value: 'explore', label: 'Explore', icon: Compass },
+const VIEWS: { value: TerminalView; label: StringKey; icon: typeof Compass }[] = [
+  { value: 'trade', label: 'trade', icon: ChartNoAxesColumn },
+  { value: 'analytics', label: 'analytics', icon: ChartPie },
+  { value: 'explore', label: 'explore', icon: Compass },
 ];
 
 function TypeTag({ type }: { type: AccountDto['type'] }) {
@@ -119,6 +120,7 @@ function FigureValue({ value, suffix, className }: { value: number | null; suffi
  * each with a checkbox; ticked figures are pinned inline next to the profit (persisted).
  */
 function ProfitBlock({ account, positions, symbols, compact }: { account: AccountDto | undefined; positions: PositionDto[]; symbols: Map<string, SymbolSpec>; compact?: boolean }) {
+  const t = useT();
   const total = useFloatingTotal(positions, symbols);
   const { shown } = useProfitFigures();
   const tone = total === null ? '' : total > 0 ? 't-pnl-up' : total < 0 ? 't-pnl-down' : 'text-white';
@@ -126,7 +128,7 @@ function ProfitBlock({ account, positions, symbols, compact }: { account: Accoun
   return (
     <div className={cn('flex shrink-0 items-center whitespace-nowrap', compact ? 'gap-1.5' : 'gap-3')}>
       <span className={cn('flex leading-none', compact ? 'items-baseline gap-1.5' : 'flex-col items-start')}>
-        <span className={cn('text-[11px] font-medium text-[var(--t-muted)]', compact && 'hidden min-[420px]:inline')}>Profit</span>
+        <span className={cn('text-[11px] font-medium text-[var(--t-muted)]', compact && 'hidden min-[420px]:inline')}>{t('profit')}</span>
         <span className={cn('font-semibold', compact ? 'text-[13px]' : 'mt-0.5 text-[15px]', tone)}>
           {total === null ? <span className="text-[var(--t-muted)]">—</span> : <AnimatedNumber value={total} duration={450} flash={false} format={(n) => fmtNum(n)} />}
           <span className="ml-1 text-[11px] font-medium text-[var(--t-muted)]">{account?.currency ?? 'USD'}</span>
@@ -269,6 +271,7 @@ export function TopBar({
   email: string | undefined;
   onLogout: () => void;
 }) {
+  const t = useT();
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
     setMounted(true);
@@ -290,7 +293,7 @@ export function TopBar({
       <div role="tablist" aria-label="Terminal view" className="t-bar ml-2 hidden !h-[40px] rounded-lg !px-1 lg:flex">
         {VIEWS.map((v) => (
           <button key={v.value} type="button" role="tab" aria-selected={view === v.value} data-on={view === v.value} onClick={() => onView(v.value)} className="t-tab !h-8">
-            <v.icon /> {v.label}
+            <v.icon /> {t(v.label)}
           </button>
         ))}
       </div>

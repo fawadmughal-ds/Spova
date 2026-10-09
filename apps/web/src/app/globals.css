@@ -1092,6 +1092,25 @@ body:has(.terminal) {
     box-shadow: 0 18px 40px -16px rgb(0 0 0 / 0.7);
     animation: pop-in 0.25s var(--ease-spring) both;
   }
+  .t-chip {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    border: 1px solid #3b434f;
+    padding: 3px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--t-text-2);
+    transition: background-color 0.12s ease, color 0.12s ease;
+  }
+  .t-chip:hover {
+    color: #fff;
+  }
+  .t-chip[data-on='true'] {
+    border-color: var(--t-blue);
+    background: rgb(42 195 237 / 0.12);
+    color: #fff;
+  }
   .t-menu-item {
     display: flex;
     width: 100%;
@@ -1476,6 +1495,12 @@ body:has(.terminal) {
 /* ---- light scope: palette reset for overlays drawn over the dark terminal (Documents, QR) */
 .light-scope {
   color-scheme: light;
+  --paper-rgb: 255 255 255;
+  --brand-rgb: 37 99 235;
+  --up-rgb: 21 128 61;
+  --down-rgb: 220 38 38;
+  --gold-rgb: 173 108 7;
+  --shadow-lift: 0 24px 60px -28px rgb(15 23 42 / 0.3), 0 0 0 1px rgb(15 23 42 / 0.06);
   --color-white: #0b1220;
   --color-paper: #ffffff;
   --color-ink-950: #f5f7fb;

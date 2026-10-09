@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type PointerEvent, type ReactNode } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { ChartCandlestick, ChartNoAxesColumn, ChartPie, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ChevronsUpDown, ClipboardList, Compass, Ellipsis, LogOut, Wallet } from 'lucide-react';
+import { ChartCandlestick, ChartNoAxesColumn, ChartPie, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ChevronsUpDown, ClipboardList, Compass, Ellipsis, LogOut, Wallet, X } from 'lucide-react';
 import { WS_EVENTS, type AccountDto, type OrderSide, type PlaceOrderResult, type QuoteDto, type WsNotice, type WsTick, type CandleDto } from '@spova/shared';
 import { RequireAuth, useAuth } from '@/lib/auth-context';
 import { get } from '@/lib/api';
@@ -13,8 +13,14 @@ import { BRAND, cn } from '@/lib/utils';
 import { useToast } from '@/components/toast';
 import { Skeleton, Spinner } from '@/components/ui';
 import { TopBar, type NoticeItem, type TerminalView } from '@/components/trade/top-bar';
-import { ClientRail, railLinks } from '@/components/trade/client-rail';
+import { ClientRail, railLinks, type RailPanel } from '@/components/trade/client-rail';
 import { DocumentsPanel } from '@/components/portal/documents-panel';
+import { PaymentsView } from '@/components/portal/payments-view';
+import { AccountsView } from '@/components/portal/accounts-view';
+import { StatementView } from '@/components/portal/statement-view';
+import { HelpView } from '@/components/portal/help-view';
+import { ProfileView } from '@/components/portal/profile-view';
+import { useT, type StringKey } from '@/components/trade/i18n';
 import { InfoPanel, MarketPanel, QuickTrade } from '@/components/trade/market-panel';
 import { ChartPanel } from '@/components/trade/chart-panel';
 import { OrderTicket } from '@/components/trade/order-ticket';
@@ -32,11 +38,11 @@ import { playSound, primeAudio } from '@/components/trade/sounds';
 import { groupSessions, type SessionRow } from '@/components/trade/sessions';
 
 type MobileTab = 'trade' | 'chart' | 'positions' | 'more';
-const MOBILE_TABS: { value: MobileTab; label: string; icon: typeof Compass }[] = [
-  { value: 'trade', label: 'Trade', icon: ChartNoAxesColumn },
-  { value: 'chart', label: 'Chart', icon: ChartCandlestick },
-  { value: 'positions', label: 'Positions', icon: ClipboardList },
-  { value: 'more', label: 'More', icon: Ellipsis },
+const MOBILE_TABS: { value: MobileTab; label: StringKey; icon: typeof Compass }[] = [
+  { value: 'trade', label: 'trade', icon: ChartNoAxesColumn },
+  { value: 'chart', label: 'chart', icon: ChartCandlestick },
+  { value: 'positions', label: 'positions', icon: ClipboardList },
+  { value: 'more', label: 'more', icon: Ellipsis },
 ];
 const QUOTE_POLL_MS = 15_000;
 const DEFAULT_SYMBOL = 'BTCUSD';
@@ -297,7 +303,8 @@ function Terminal() {
 
   // ---------------------------------------------------------------- layout
   const [view, setView] = useState<TerminalView>('trade');
-  const [docsOpen, setDocsOpen] = useState(false);
+  const [panel, setPanel] = useState<RailPanel | null>(null);
+  const t = useT();
   const [mtab, setMtab] = useState<MobileTab>('chart');
   const [bottomTab, setBottomTab] = useState<BottomTab>('positions');
   const [ticket, setTicket] = useState<{ spec: SymbolSpec; side: OrderSide; lots: string } | null>(null);
@@ -336,14 +343,8 @@ function Terminal() {
   return (
     <div className="flex h-dvh overflow-hidden">
       {/* light client-area rail: a sibling of the dark terminal, so it keeps the normal theme */}
-      <ClientRail accounts={all} account={account} onSelectAccount={selectAccount} me={me} onLogout={() => void logout()} onOpenDocuments={() => setDocsOpen(true)} className="hidden lg:flex" />
-      {docsOpen && (
-        <div className="light-scope fixed inset-0 z-[85] flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4" onMouseDown={(e) => e.target === e.currentTarget && setDocsOpen(false)}>
-          <div role="dialog" aria-modal aria-label="Documents" className="animate-pop-in max-h-[94dvh] w-full overflow-y-auto rounded-t-2xl bg-paper p-5 text-white shadow-lift sm:max-w-[760px] sm:rounded-2xl sm:p-8">
-            <DocumentsPanel onClose={() => setDocsOpen(false)} />
-          </div>
-        </div>
-      )}
+      <ClientRail accounts={all} account={account} onSelectAccount={selectAccount} me={me} onLogout={() => void logout()} onOpen={setPanel} className="hidden lg:flex" />
+      {panel && <RailOverlay panel={panel} accountId={account?.id} onClose={() => setPanel(null)} />}
       <div className="terminal flex h-dvh min-w-0 flex-1 flex-col overflow-hidden">
       <TopBar accounts={all} account={account} onSelectAccount={selectAccount} connected={connected} view={view} onView={setView} positions={openPositions} symbols={symbolMap} notices={notices} email={me?.email} onLogout={() => void logout()} />
       {account?.tradingBlocked && <TradingBlockedBanner />}
@@ -420,10 +421,10 @@ function Terminal() {
             <ul className="p-2">
               {(
                 [
-                  ['Analytics', 'Statistics and equity curve', <ChartPie key="a" />, () => setView('analytics')],
-                  ['Explore', 'All instruments by market', <Compass key="e" />, () => setView('explore')],
+                  [t('analytics'), 'Statistics and equity curve', <ChartPie key="a" />, () => setView('analytics')],
+                  [t('explore'), 'All instruments by market', <Compass key="e" />, () => setView('explore')],
                   [
-                    'Finance',
+                    t('finance'),
                     'Balance, margin and ledger',
                     <Wallet key="f" />,
                     () => {
@@ -445,16 +446,16 @@ function Terminal() {
                 </li>
               ))}
               <li className="my-1 border-t border-[var(--t-line)]" role="separator" />
-              {railLinks(account).map((l) => (
-                <li key={l.href}>
-                  <Link href={l.href} className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-white/[0.04]">
+              {railLinks(t).map((l) => (
+                <li key={l.panel}>
+                  <button type="button" onClick={() => setPanel(l.panel)} className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-white/[0.04]">
                     <span className="flex h-9 w-9 items-center justify-center rounded-md bg-[var(--t-raised)] text-[var(--t-text-2)] [&>svg]:h-4 [&>svg]:w-4">{l.icon}</span>
                     <span className="leading-tight">
                       <span className="block text-[14px] font-semibold text-white">{l.label}</span>
                       <span className="block text-[12px] text-[var(--t-muted)]">{l.sub}</span>
                     </span>
                     <ChevronRight className="ml-auto h-4 w-4 text-[var(--t-muted)]" />
-                  </Link>
+                  </button>
                 </li>
               ))}
               <li>
@@ -472,18 +473,18 @@ function Terminal() {
 
       {/* mobile bottom tab bar */}
       <nav className="flex h-14 shrink-0 border-t border-[var(--t-line)] bg-[var(--t-bg)] pb-[env(safe-area-inset-bottom)] lg:hidden" aria-label="Terminal sections">
-        {MOBILE_TABS.map((t) => (
+        {MOBILE_TABS.map((m) => (
           <button
-            key={t.value}
+            key={m.value}
             type="button"
-            data-on={mtab === t.value && (t.value === 'more' || view === 'trade')}
+            data-on={mtab === m.value && (m.value === 'more' || view === 'trade')}
             onClick={() => {
-              setMtab(t.value);
-              if (t.value !== 'more') setView('trade');
+              setMtab(m.value);
+              if (m.value !== 'more') setView('trade');
             }}
             className="t-mobile-tab"
           >
-            <t.icon /> {t.label}
+            <m.icon /> {t(m.label)}
           </button>
         ))}
       </nav>
@@ -511,5 +512,40 @@ export default function TradePage() {
         <Terminal />
       </Suspense>
     </RequireAuth>
+  );
+}
+
+const PANEL_LABEL: Record<RailPanel, string> = { deposit: 'Deposit', accounts: 'Trading accounts', payments: 'Payments', documents: 'Documents', statement: 'Statement', help: 'Help', profile: 'Profile' };
+
+/** Client-area module drawn over the terminal (light palette), like the reference's modal client area. */
+function RailOverlay({ panel, accountId, onClose }: { panel: RailPanel; accountId: string | undefined; onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
+  const narrow = panel === 'documents';
+  return (
+    <div className="light-scope fixed inset-0 z-[85] flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div role="dialog" aria-modal aria-label={PANEL_LABEL[panel]} className={cn('animate-pop-in relative max-h-[94dvh] w-full overflow-y-auto rounded-t-2xl bg-ink-950 p-5 text-white shadow-lift sm:rounded-2xl sm:p-8', narrow ? 'sm:max-w-[760px]' : 'sm:max-w-[1120px]')}>
+        {panel === 'documents' ? (
+          <DocumentsPanel onClose={onClose} />
+        ) : (
+          <>
+            <button type="button" onClick={onClose} aria-label="Close" className="absolute right-4 top-4 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-paper text-ink-400 shadow-sm ring-1 ring-ink-800 transition-colors hover:text-white sm:right-6 sm:top-6">
+              <X className="h-5 w-5" />
+            </button>
+            <Suspense fallback={<Skeleton className="h-96 rounded-2xl" />}>
+              {panel === 'deposit' && <PaymentsView embedded initialTab="deposit" />}
+              {panel === 'payments' && <PaymentsView embedded initialTab="history" />}
+              {panel === 'accounts' && <AccountsView />}
+              {panel === 'statement' && (accountId ? <StatementView id={accountId} embedded /> : <AccountsView />)}
+              {panel === 'help' && <HelpView />}
+              {panel === 'profile' && <ProfileView />}
+            </Suspense>
+          </>
+        )}
+      </div>
+    </div>
   );
 }

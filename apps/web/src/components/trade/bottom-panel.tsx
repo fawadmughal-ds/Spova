@@ -7,6 +7,7 @@ import { del, get, patch, post } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/components/toast';
 import { Spinner } from '@/components/ui';
+import { useT } from './i18n';
 import { fmtDateTimeParts, fmtLots, fmtNum, fmtPrice, fmtSignedNum, type SymbolSpec } from './format';
 import { useBookVersion, useQuote, type LiveQuote } from './quote-store';
 import { conversionPairs, livePnl } from './pnl';
@@ -627,6 +628,7 @@ export interface BottomPanelProps {
 
 /** Open positions / pending orders / closed positions / finance under the chart. */
 export function BottomPanel({ account, symbols, data, onAccount, ledgerVersion, className, style, tab: tabProp, onTab }: BottomPanelProps) {
+  const t = useT();
   const [tabState, setTabState] = useState<BottomTab>('positions');
   const tab = tabProp ?? tabState;
   const setTab = (t: BottomTab) => {
@@ -701,10 +703,10 @@ export function BottomPanel({ account, symbols, data, onAccount, ledgerVersion, 
   };
 
   const tabs: { value: BottomTab; label: string; icon: ReactNode; count?: number }[] = [
-    { value: 'positions', label: 'Open Positions', icon: <ClipboardList />, count: data.positions?.length },
-    { value: 'orders', label: 'Pending Orders', icon: <FileText />, count: data.orders?.length },
-    { value: 'closed', label: 'Closed Positions', icon: <History /> },
-    { value: 'finance', label: 'Finance', icon: <Wallet /> },
+    { value: 'positions', label: t('openPositions'), icon: <ClipboardList />, count: data.positions?.length },
+    { value: 'orders', label: t('pendingOrders'), icon: <FileText />, count: data.orders?.length },
+    { value: 'closed', label: t('closedPositions'), icon: <History /> },
+    { value: 'finance', label: t('finance'), icon: <Wallet /> },
   ];
 
   return (

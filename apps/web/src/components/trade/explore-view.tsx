@@ -8,7 +8,8 @@ import { MARKET_LIST, marketByCls } from '@/lib/markets';
 import { Skeleton } from '@/components/ui';
 import { dailyChange, fmtPrice, type SymbolSpec } from './format';
 import { quoteStore, useBookVersion, useQuote } from './quote-store';
-import { CalendarEmpty, CalendarRow, Dropdown, EmptyState, SplitBar, SymbolTile, type CalendarEvent } from './bits';
+import { Dropdown, EmptyState, SplitBar, SymbolTile } from './bits';
+import { CalendarTab } from './calendar-tab';
 import { useFavourites } from './settings';
 
 export interface SentimentRow {
@@ -136,8 +137,6 @@ function Card({ title, action, children, className, head = true }: { title: Reac
   );
 }
 
-const NO_EVENTS: CalendarEvent[] = [];
-
 /** Upcoming events, trending instruments, market sentiment and top movers (the reference "Explore" page). */
 export function ExploreView({ symbols, onTrade, className }: { symbols: SymbolSpec[] | null; onTrade: (id: string) => void; className?: string }) {
   const [trendCls, setTrendCls] = useState<string>('forex');
@@ -183,15 +182,7 @@ export function ExploreView({ symbols, onTrade, className }: { symbols: SymbolSp
           </span>
         }
       >
-        {NO_EVENTS.length === 0 ? (
-          <CalendarEmpty className="min-h-[300px]" />
-        ) : (
-          <ul>
-            {NO_EVENTS.map((e) => (
-              <CalendarRow key={e.id} e={e} />
-            ))}
-          </ul>
-        )}
+        <CalendarTab className="min-h-[300px]" />
       </Card>
 
       <div className="grid shrink-0 gap-[18px] lg:grid-cols-3">

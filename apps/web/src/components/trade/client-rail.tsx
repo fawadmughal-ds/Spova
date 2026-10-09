@@ -2,19 +2,24 @@
 
 import Link from 'next/link';
 import { useLayoutEffect, useState, type CSSProperties, type ReactNode, type RefObject } from 'react';
-import { Check, ChevronRight, CircleDollarSign, CircleHelp, CircleUser, CreditCard, FileText, IdCard, Lightbulb, LogOut, Wallet } from 'lucide-react';
+import { Check, ChevronRight, CircleDollarSign, CircleHelp, CircleUser, CreditCard, FileText, IdCard, LogOut, Wallet } from 'lucide-react';
 import type { AccountDto, MeDto } from '@spova/shared';
 import { cn, initials } from '@/lib/utils';
 import { Logo } from '@/components/logo';
 import { useDismiss } from './bits';
 import { fmtNum } from './format';
+import { LANGUAGES, flagEmoji, setLang, useLang, useT, type Lang } from './i18n';
+
+/** Client-area modules that open as overlays over the terminal (the reference never leaves the chart). */
+export type RailPanel = 'deposit' | 'accounts' | 'payments' | 'documents' | 'statement' | 'help' | 'profile';
 
 /**
  * Client-area rail on the far left of the terminal: the white 88px column of the reference (Deposit,
  * Trading accounts, Payments, Documents, Statement, InvestiQ / user, Help, Logout, language). It sits
  * OUTSIDE the `.terminal` dark scope, so its colours come from the normal light theme.
  */
-export function ClientRail({ accounts, account, onSelectAccount, me, onLogout, onOpenDocuments, className }: { accounts: AccountDto[]; account: AccountDto | undefined; onSelectAccount: (id: string) => void; me: MeDto | null; onLogout: () => void; /** when given, Documents opens as an overlay over the terminal (like the reference) instead of leaving the page */ onOpenDocuments?: () => void; className?: string }) {
+export function ClientRail({ accounts, account, onSelectAccount, me, onLogout, onOpen, className }: { accounts: AccountDto[]; account: AccountDto | undefined; onSelectAccount: (id: string) => void; me: MeDto | null; onLogout: () => void; /** opens a client-area module as an overlay over the terminal instead of leaving the page */ onOpen: (panel: RailPanel) => void; className?: string }) {
+  const t = useT();
   const first = me?.profile?.firstName ?? '';
   const last = me?.profile?.lastName ?? '';
   const fullName = `${first} ${last}`.trim() || me?.email || '';
@@ -23,7 +28,7 @@ export function ClientRail({ accounts, account, onSelectAccount, me, onLogout, o
   return (
     <nav className={cn('trail', className)} aria-label="Client area">
       <div className="trail-top">
-        <AccountPill accounts={accounts} account={account} onSelect={onSelectAccount} />
+        <AccountPill accounts={accounts} account={account} onSelect={onSelectAccount} onOpenAccounts={() => onOpen('accounts')} />
         <Link href="/app" className="trail-brand" title="Client area">
           <Logo size={26} />
         </Link>
@@ -31,58 +36,47 @@ export function ClientRail({ accounts, account, onSelectAccount, me, onLogout, o
 
       <ul className="trail-list">
         <li>
-          <Link href="/app/payments" className="trail-item trail-item-deposit">
-            <CircleDollarSign /> Deposit
-          </Link>
+          <button type="button" onClick={() => onOpen('deposit')} className="trail-item trail-item-deposit">
+            <CircleDollarSign /> {t('deposit')}
+          </button>
         </li>
         <li>
-          <Link href="/app/accounts" className="trail-item">
-            <Wallet /> Trading accounts
-          </Link>
+          <button type="button" onClick={() => onOpen('accounts')} className="trail-item">
+            <Wallet /> {t('accounts')}
+          </button>
         </li>
         <li>
-          <Link href="/app/payments?tab=history" className="trail-item">
-            <CreditCard /> Payments
-          </Link>
+          <button type="button" onClick={() => onOpen('payments')} className="trail-item">
+            <CreditCard /> {t('payments')}
+          </button>
         </li>
         <li>
-          {onOpenDocuments ? (
-            <button type="button" onClick={onOpenDocuments} className="trail-item">
-              <IdCard /> Documents
-            </button>
-          ) : (
-            <Link href="/app/documents" className="trail-item">
-              <IdCard /> Documents
-            </Link>
-          )}
+          <button type="button" onClick={() => onOpen('documents')} className="trail-item">
+            <IdCard /> {t('documents')}
+          </button>
         </li>
         <li>
-          <Link href={account ? `/app/accounts/${account.id}` : '/app/accounts'} className="trail-item">
-            <FileText /> Statement
-          </Link>
-        </li>
-        <li>
-          <Link href="/app/investiq" className="trail-item">
-            <Lightbulb /> InvestiQ
-          </Link>
+          <button type="button" onClick={() => onOpen('statement')} className="trail-item">
+            <FileText /> {t('statement')}
+          </button>
         </li>
       </ul>
 
       <ul className="trail-list trail-bottom">
         <li>
-          <Link href="/app/profile" className="trail-item" title={fullName}>
+          <button type="button" onClick={() => onOpen('profile')} className="trail-item" title={fullName}>
             {first || last ? <span className="trail-avatar">{initials(first, last)}</span> : <CircleUser />}
-            <span className="trail-name">{shortName || 'Profile'}</span>
-          </Link>
+            <span className="trail-name">{shortName || t('profile')}</span>
+          </button>
         </li>
         <li>
-          <Link href="/app/help" className="trail-item">
-            <CircleHelp /> Help
-          </Link>
+          <button type="button" onClick={() => onOpen('help')} className="trail-item">
+            <CircleHelp /> {t('help')}
+          </button>
         </li>
         <li>
           <button type="button" onClick={onLogout} className="trail-item">
-            <LogOut /> Logout
+            <LogOut /> {t('logout')}
           </button>
         </li>
         <li className="mt-2">
@@ -105,7 +99,7 @@ function useAnchor(open: boolean, ref: RefObject<HTMLElement | null>, side: 'bel
 }
 
 /** "Demo ›" / "Live ›" pill: opens the list of the user's accounts to switch between them. */
-function AccountPill({ accounts, account, onSelect }: { accounts: AccountDto[]; account: AccountDto | undefined; onSelect: (id: string) => void }) {
+function AccountPill({ accounts, account, onSelect, onOpenAccounts }: { accounts: AccountDto[]; account: AccountDto | undefined; onSelect: (id: string) => void; onOpenAccounts: () => void }) {
   const [open, setOpen, ref] = useDismiss<HTMLDivElement>();
   const anchor = useAnchor(open, ref, 'below');
   const label = account ? (account.type === 'live' ? 'Live' : 'Demo') : '…';
@@ -141,9 +135,16 @@ function AccountPill({ accounts, account, onSelect }: { accounts: AccountDto[]; 
             </button>
           ))}
           <div className="mt-1 border-t border-[#e2e7f0] pt-1">
-            <Link href="/app/accounts" className="trail-menu-item" onClick={() => setOpen(false)}>
+            <button
+              type="button"
+              className="trail-menu-item"
+              onClick={() => {
+                setOpen(false);
+                onOpenAccounts();
+              }}
+            >
               Open a new account
-            </Link>
+            </button>
           </div>
         </div>
       )}
@@ -151,32 +152,37 @@ function AccountPill({ accounts, account, onSelect }: { accounts: AccountDto[]; 
   );
 }
 
-const LANGUAGES: { code: string; label: string; native: string; ready: boolean }[] = [
-  { code: 'en', label: 'English', native: 'English', ready: true },
-  { code: 'hi', label: 'Hindi', native: 'हिन्दी', ready: false },
-  { code: 'ar', label: 'Arabic', native: 'العربية', ready: false },
-  { code: 'es', label: 'Spanish', native: 'Español', ready: false },
-];
-
-/** Flag + "En": the language picker. Only English ships today; the others are listed as coming soon. */
+/** Flag + code: the language picker. The choice is kept in localStorage and applied to the terminal chrome. */
 function LanguageItem() {
   const [open, setOpen, ref] = useDismiss<HTMLDivElement>();
   const anchor = useAnchor(open, ref, 'right');
+  const lang = useLang();
+  const t = useT();
+  const current = LANGUAGES.find((l) => l.code === lang) ?? LANGUAGES[0];
+  const label = lang.charAt(0).toUpperCase() + lang.slice(1);
   return (
     <div ref={ref} className="relative">
-      <button type="button" onClick={() => setOpen((v) => !v)} aria-haspopup="menu" aria-expanded={open} className="trail-item" title="Language">
-        <UkFlag /> En
+      <button type="button" onClick={() => setOpen((v) => !v)} aria-haspopup="menu" aria-expanded={open} className="trail-item" title={t('language')}>
+        {lang === 'en' ? <UkFlag /> : <span className="text-[20px] leading-none">{flagEmoji(current.flag)}</span>} {label}
       </button>
       {open && (
-        <div role="menu" className="trail-menu w-52" style={anchor}>
-          <div className="trail-menu-label">Language</div>
+        <div role="menu" className="trail-menu w-56" style={anchor}>
+          <div className="trail-menu-label">{t('language')}</div>
           {LANGUAGES.map((l) => (
-            <button key={l.code} type="button" role="menuitemradio" aria-checked={l.code === 'en'} disabled={!l.ready} onClick={() => setOpen(false)} className="trail-menu-item">
-              <span className="min-w-0 flex-1 text-left">
-                <span className="block font-medium">{l.native}</span>
-                {!l.ready && <span className="block text-[10px] uppercase tracking-wider text-[#6b778f]">Coming soon</span>}
-              </span>
-              {l.code === 'en' && <Check className="text-[#2563eb]" strokeWidth={3} />}
+            <button
+              key={l.code}
+              type="button"
+              role="menuitemradio"
+              aria-checked={l.code === lang}
+              onClick={() => {
+                setLang(l.code as Lang);
+                setOpen(false);
+              }}
+              className="trail-menu-item"
+            >
+              <span className="w-6 text-center text-[18px] leading-none">{flagEmoji(l.flag)}</span>
+              <span className="min-w-0 flex-1 text-left font-medium">{l.native}</span>
+              {l.code === lang && <Check className="text-[#2563eb]" strokeWidth={3} />}
             </button>
           ))}
         </div>
@@ -199,11 +205,14 @@ function UkFlag() {
 }
 
 /** Links of the rail for the mobile "More" sheet (the rail itself is desktop-only). */
-export function railLinks(account: AccountDto | undefined): { label: string; sub: string; href: string; icon: ReactNode }[] {
+export function railLinks(t: (k: 'deposit' | 'accounts' | 'payments' | 'documents' | 'statement' | 'help' | 'profile') => string): { label: string; sub: string; panel: RailPanel; icon: ReactNode }[] {
   return [
-    { label: 'Deposit', sub: 'Fund the account', href: '/app/payments', icon: <CircleDollarSign /> },
-    { label: 'Documents', sub: 'Verification (KYC)', href: '/app/documents', icon: <IdCard /> },
-    { label: 'Statement', sub: 'Account history and ledger', href: account ? `/app/accounts/${account.id}` : '/app/accounts', icon: <FileText /> },
-    { label: 'Help', sub: 'Support tickets', href: '/app/help', icon: <CircleHelp /> },
+    { label: t('deposit'), sub: 'Fund the account', panel: 'deposit', icon: <CircleDollarSign /> },
+    { label: t('accounts'), sub: 'Demo and live accounts', panel: 'accounts', icon: <Wallet /> },
+    { label: t('payments'), sub: 'Deposit and withdrawal history', panel: 'payments', icon: <CreditCard /> },
+    { label: t('documents'), sub: 'Verification (KYC)', panel: 'documents', icon: <IdCard /> },
+    { label: t('statement'), sub: 'Account history and ledger', panel: 'statement', icon: <FileText /> },
+    { label: t('profile'), sub: 'Personal details and password', panel: 'profile', icon: <CircleUser /> },
+    { label: t('help'), sub: 'Support tickets', panel: 'help', icon: <CircleHelp /> },
   ];
 }

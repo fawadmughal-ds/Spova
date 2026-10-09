@@ -10,8 +10,10 @@ import { useToast } from '@/components/toast';
 import { Skeleton, Spinner } from '@/components/ui';
 import { dailyChange, fmtCountdown, fmtLots, fmtNum, fmtPrice, spreadPoints, type SymbolSpec } from './format';
 import { quoteStore, useBookVersion, useQuote } from './quote-store';
-import { CalendarEmpty, EmptyState, SplitBar, SymbolTile } from './bits';
+import { EmptyState, SplitBar, SymbolTile } from './bits';
 import { useSentiment } from './explore-view';
+import { useT } from './i18n';
+import { CalendarTab } from './calendar-tab';
 import { favouritesStore, settingsStore, toggleFavourite, useFavourites, useSettings } from './settings';
 import { nextOpen, type SessionRow } from './sessions';
 import { tradeError } from './errors';
@@ -46,6 +48,7 @@ function Change({ v, className }: { v: number | null; className?: string }) {
 /** Volume stepper + SELL / BUY one-click blocks + "Advanced Order" row inside the selected watchlist row. */
 export function QuickTrade({ spec, account, onPlaced, onAdvanced }: { spec: SymbolSpec; account: AccountDto | undefined; onPlaced: (r: PlaceOrderResult) => void; onAdvanced: (side: OrderSide, lots: string) => void }) {
   const toast = useToast();
+  const t = useT();
   const q = useQuote(spec.id);
   useBookVersion();
   const settings = useSettings();
@@ -122,7 +125,7 @@ export function QuickTrade({ spec, account, onPlaced, onAdvanced }: { spec: Symb
       ) : (
         <div className="flex items-stretch gap-2">
           <button type="button" onClick={() => click('sell')} disabled={!!blocker || !!busy} title={blocker ?? `Sell ${lots} ${spec.id} at market`} className="t-quick bg-[var(--t-sell)]">
-            <span className="text-[12px] font-bold tracking-wide">SELL</span>
+            <span className="text-[12px] font-bold tracking-wide">{t('sell')}</span>
             <span className="mt-1 text-[15px] font-semibold">{busy === 'sell' ? <Spinner className="h-4" tone="current" /> : px('sell')}</span>
           </button>
           <div className="flex w-[108px] shrink-0 flex-col items-stretch rounded-lg bg-[var(--t-bg)] ring-1 ring-inset ring-[#3b434f]">
@@ -153,7 +156,7 @@ export function QuickTrade({ spec, account, onPlaced, onAdvanced }: { spec: Symb
             </div>
           </div>
           <button type="button" onClick={() => click('buy')} disabled={!!blocker || !!busy} title={blocker ?? `Buy ${lots} ${spec.id} at market`} className="t-quick bg-[var(--t-buy)]">
-            <span className="text-[12px] font-bold tracking-wide">BUY</span>
+            <span className="text-[12px] font-bold tracking-wide">{t('buy')}</span>
             <span className="mt-1 text-[15px] font-semibold">{busy === 'buy' ? <Spinner className="h-4" tone="current" /> : px('buy')}</span>
           </button>
         </div>
@@ -161,7 +164,7 @@ export function QuickTrade({ spec, account, onPlaced, onAdvanced }: { spec: Symb
       {blocker && !confirm && <div className="mt-1 text-center text-[11px] text-[var(--t-muted)]">{blocker}</div>}
       <div className="mt-2 flex h-9 items-center gap-2 rounded-lg bg-[var(--t-raised)] pl-3 pr-1.5">
         <button type="button" onClick={() => onAdvanced('buy', lots)} className="flex min-w-0 flex-1 items-center gap-2 text-left text-[13px] font-medium text-[var(--t-text-2)] transition-colors hover:text-white">
-          <LayoutGrid className="h-3.5 w-3.5 text-[var(--t-muted)]" /> Advanced Order
+          <LayoutGrid className="h-3.5 w-3.5 text-[var(--t-muted)]" /> {t('advancedOrder')}
         </button>
         <span className="t-icon-btn !h-7 !w-7" title={settings.confirmOrders ? 'Orders ask for confirmation (settings)' : 'One-click trading: orders are sent immediately (settings)'}>
           <Info className="!h-4 !w-4" />
@@ -227,6 +230,7 @@ export interface MarketPanelProps {
 export function MarketPanel({ symbols, selected, onSelect, account, onPlaced, onAdvanced, sessions, className, quickTrade = true }: MarketPanelProps) {
   const [tab, setTab] = useState<ListTab>('fav');
   const [query, setQuery] = useState('');
+  const t = useT();
   const favs = useFavourites();
   const bookVersion = useBookVersion();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -265,10 +269,10 @@ export function MarketPanel({ symbols, selected, onSelect, account, onPlaced, on
     <section className={cn('t-panel', className)} aria-label="Instruments">
       <div className="t-bar">
         <button type="button" role="tab" aria-selected={tab === 'fav'} data-on={tab === 'fav'} onClick={() => setTab('fav')} className="t-tab flex-1 justify-center">
-          <Star className={cn(tab === 'fav' && 'fill-current text-[var(--t-blue)]')} /> Favorites
+          <Star className={cn(tab === 'fav' && 'fill-current text-[var(--t-blue)]')} /> {t('favorites')}
         </button>
         <button type="button" role="tab" aria-selected={tab === 'movers'} data-on={tab === 'movers'} onClick={() => setTab('movers')} className="t-tab flex-1 justify-center">
-          <Flame /> Top Movers
+          <Flame /> {t('topMovers')}
         </button>
         <button type="button" role="tab" aria-selected={tab === 'search'} data-on={tab === 'search'} onClick={() => setTab('search')} aria-label="Search instruments" className="t-icon-btn !h-[33px] !w-[40px]">
           <Search />
@@ -286,9 +290,9 @@ export function MarketPanel({ symbols, selected, onSelect, account, onPlaced, on
         </div>
       )}
       <div className="grid h-[33px] shrink-0 grid-cols-[26px_minmax(0,1fr)_auto_minmax(72px,auto)] items-center gap-x-3 border-b border-[var(--t-line)] px-3 text-[12px] text-[var(--t-muted)]">
-        <span className="col-span-2">Symbol</span>
-        <span className="text-right">Price</span>
-        <span className="text-right">Daily</span>
+        <span className="col-span-2">{t('symbol')}</span>
+        <span className="text-right">{t('price')}</span>
+        <span className="text-right">{t('daily')}</span>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto">
         {symbols === null &&
@@ -505,21 +509,22 @@ function MarketTab({ spec }: { spec: SymbolSpec | undefined }) {
 
 export function InfoPanel({ spec, account, className }: { symbols?: SymbolSpec[]; spec: SymbolSpec | undefined; sessions?: Map<string, SessionRow[]>; account?: AccountDto; className?: string }) {
   const [tab, setTab] = useState<InfoTab>('calendar');
+  const t = useT();
   return (
     <section className={cn('t-panel', className)} aria-label="Market information">
       <div className="t-bar">
         <button type="button" role="tab" aria-selected={tab === 'calendar'} data-on={tab === 'calendar'} onClick={() => setTab('calendar')} className="t-tab">
-          <Calendar /> Calendar
+          <Calendar /> {t('calendar')}
         </button>
         <button type="button" role="tab" aria-selected={tab === 'market'} data-on={tab === 'market'} onClick={() => setTab('market')} className="t-tab">
-          <ChartColumn /> Market
+          <ChartColumn /> {t('market')}
         </button>
         <button type="button" role="tab" aria-selected={tab === 'symbol'} data-on={tab === 'symbol'} onClick={() => setTab('symbol')} className="t-tab">
-          <Building2 /> Symbol info
+          <Building2 /> {t('symbolInfo')}
         </button>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {tab === 'calendar' && <CalendarEmpty />}
+        {tab === 'calendar' && <CalendarTab />}
         {tab === 'market' && <MarketTab spec={spec} />}
         {tab === 'symbol' && <SymbolInfo spec={spec} account={account} />}
       </div>

@@ -1,11 +1,19 @@
 import { Controller, Get, Param, Query } from '@nestjs/common';
 import { z } from 'zod';
-import { ASSET_CLASSES } from '@spova/shared';
+import { ASSET_CLASSES, type CalendarEventDto } from '@spova/shared';
 import { PrismaService } from '../../infra/prisma.service';
 import { RedisService } from '../../infra/redis.service';
 import { Public } from '../../common/auth/decorators';
 import { ZodPipe } from '../../common/pipes/zod.pipe';
 import { ApiError } from '../../common/errors';
+
+/** Public weekly economic calendar (ForexFactory's open JSON feed), cached in Redis for 15 minutes. */
+const CALENDAR_URLS = ['https://nfs.faireconomy.media/ff_calendar_thisweek.json', 'https://nfs.faireconomy.media/ff_calendar_nextweek.json'];
+const CALENDAR_KEY = 'calendar:thisweek';
+const CALENDAR_TTL = 15 * 60;
+const CURRENCY_COUNTRY: Record<string, string> = { USD: 'US', EUR: 'EU', GBP: 'GB', JPY: 'JP', AUD: 'AU', NZD: 'NZ', CAD: 'CA', CHF: 'CH', CNY: 'CN', INR: 'IN', All: 'WW' };
+const IMPACT: Record<string, CalendarEventDto['impact']> = { High: 3, Medium: 2, Low: 1, Holiday: 0 };
+interface FfEvent { title: string; country: string; date: string; impact: string; forecast?: string; previous?: string; actual?: string }
 
 const symbolsQuery = z.object({
   class: z.enum(ASSET_CLASSES).optional(),
@@ -70,6 +78,42 @@ export class MarketController {
   }
 
   /** Upcoming full-day closures per symbol (today onwards). */
+  @Get('calendar')
+  async calendar(): Promise<CalendarEventDto[]> {
+    const cached = await this.redis.client.get(CALENDAR_KEY);
+    if (cached) return JSON.parse(cached) as CalendarEventDto[];
+    let raw: FfEvent[] = [];
+    try {
+      // this week + next week, so the list is never empty on a weekend
+      const pages = await Promise.all(CALENDAR_URLS.map((u) => fetch(u, { signal: AbortSignal.timeout(8000), headers: { 'user-agent': 'spova-terminal/1.0' } }).then((r) => (r.ok ? (r.json() as Promise<FfEvent[]>) : []))));
+      raw = pages.flat();
+      if (raw.length === 0) throw new Error('empty');
+    } catch {
+      /* feed down: serve whatever is cached, else empty */
+      const stale = await this.redis.client.get(`${CALENDAR_KEY}:stale`);
+      if (stale) return JSON.parse(stale) as CalendarEventDto[];
+      return [];
+    }
+    const events: CalendarEventDto[] = raw
+      .filter((e) => e && e.title && e.date)
+      .map((e, i) => ({
+        id: `${e.date}-${e.country}-${i}`,
+        country: CURRENCY_COUNTRY[e.country] ?? e.country.slice(0, 2).toUpperCase(),
+        currency: e.country === 'All' ? '' : e.country,
+        at: new Date(e.date).toISOString(),
+        title: e.title,
+        impact: IMPACT[e.impact] ?? 1,
+        previous: e.previous || null,
+        forecast: e.forecast || null,
+        actual: e.actual || null,
+      }))
+      .sort((a, b) => a.at.localeCompare(b.at));
+    const json = JSON.stringify(events);
+    await this.redis.client.set(CALENDAR_KEY, json, 'EX', CALENDAR_TTL);
+    await this.redis.client.set(`${CALENDAR_KEY}:stale`, json, 'EX', 7 * 24 * 3600);
+    return events;
+  }
+
   @Get('holidays')
   async holidays() {
     const today = new Date(new Date().toISOString().slice(0, 10));

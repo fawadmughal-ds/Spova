@@ -181,6 +181,22 @@ export interface DepositChannelDto {
   /** a payment slip / screenshot must be attached to the request */
   proofRequired: boolean;
 }
+/** Economic calendar release (public feed, cached by the API). */
+export interface CalendarEventDto {
+  id: string;
+  /** ISO 3166-1 alpha-2 of the issuing economy ("EU" for the euro area, "WW" for global) */
+  country: string;
+  currency: string;
+  /** ISO timestamp of the release */
+  at: string;
+  title: string;
+  /** 0 = holiday / no impact, 1 low, 2 medium, 3 high */
+  impact: 0 | 1 | 2 | 3;
+  previous: string | null;
+  forecast: string | null;
+  actual: string | null;
+}
+
 export interface PaymentMethodDto {
   id: string;
   label: string;
