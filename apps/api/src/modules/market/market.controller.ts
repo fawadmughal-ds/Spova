@@ -8,7 +8,7 @@ import { ZodPipe } from '../../common/pipes/zod.pipe';
 import { ApiError } from '../../common/errors';
 
 /** Public weekly economic calendar (ForexFactory's open JSON feed), cached in Redis for 15 minutes. */
-const CALENDAR_URLS = ['https://nfs.faireconomy.media/ff_calendar_thisweek.json', 'https://nfs.faireconomy.media/ff_calendar_nextweek.json'];
+const CALENDAR_URLS = ['https://nfs.faireconomy.media/ff_calendar_thisweek.json'];
 const CALENDAR_KEY = 'calendar:thisweek';
 const CALENDAR_TTL = 15 * 60;
 const CURRENCY_COUNTRY: Record<string, string> = { USD: 'US', EUR: 'EU', GBP: 'GB', JPY: 'JP', AUD: 'AU', NZD: 'NZ', CAD: 'CA', CHF: 'CH', CNY: 'CN', INR: 'IN', All: 'WW' };
@@ -84,7 +84,7 @@ export class MarketController {
     if (cached) return JSON.parse(cached) as CalendarEventDto[];
     let raw: FfEvent[] = [];
     try {
-      // this week + next week, so the list is never empty on a weekend
+      // the provider publishes the current week (Sunday to Saturday) and rolls over on Sunday evening
       const pages = await Promise.all(CALENDAR_URLS.map((u) => fetch(u, { signal: AbortSignal.timeout(8000), headers: { 'user-agent': 'spova-terminal/1.0' } }).then((r) => (r.ok ? (r.json() as Promise<FfEvent[]>) : []))));
       raw = pages.flat();
       if (raw.length === 0) throw new Error('empty');
