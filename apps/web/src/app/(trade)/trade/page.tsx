@@ -2,7 +2,8 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type PointerEvent, type ReactNode } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { ChartCandlestick, ChartNoAxesColumn, ChartPie, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ClipboardList, Compass, Ellipsis, Wallet } from 'lucide-react';
+import Link from 'next/link';
+import { ChartCandlestick, ChartNoAxesColumn, ChartPie, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ChevronsUpDown, ClipboardList, Compass, Ellipsis, LogOut, Wallet } from 'lucide-react';
 import { WS_EVENTS, type AccountDto, type OrderSide, type PlaceOrderResult, type QuoteDto, type WsNotice, type WsTick, type CandleDto } from '@spova/shared';
 import { RequireAuth, useAuth } from '@/lib/auth-context';
 import { get } from '@/lib/api';
@@ -12,6 +13,7 @@ import { BRAND, cn } from '@/lib/utils';
 import { useToast } from '@/components/toast';
 import { Skeleton, Spinner } from '@/components/ui';
 import { TopBar, type NoticeItem, type TerminalView } from '@/components/trade/top-bar';
+import { ClientRail, railLinks } from '@/components/trade/client-rail';
 import { InfoPanel, MarketPanel, QuickTrade } from '@/components/trade/market-panel';
 import { ChartPanel } from '@/components/trade/chart-panel';
 import { OrderTicket } from '@/components/trade/order-ticket';
@@ -330,7 +332,10 @@ function Terminal() {
   );
 
   return (
-    <div className="terminal flex h-dvh flex-col overflow-hidden">
+    <div className="flex h-dvh overflow-hidden">
+      {/* light client-area rail: a sibling of the dark terminal, so it keeps the normal theme */}
+      <ClientRail accounts={all} account={account} onSelectAccount={selectAccount} me={me} onLogout={() => void logout()} className="hidden lg:flex" />
+      <div className="terminal flex h-dvh min-w-0 flex-1 flex-col overflow-hidden">
       <TopBar accounts={all} account={account} onSelectAccount={selectAccount} connected={connected} view={view} onView={setView} positions={openPositions} symbols={symbolMap} notices={notices} email={me?.email} onLogout={() => void logout()} />
       {account?.tradingBlocked && <TradingBlockedBanner />}
       {marginCall && level !== null && <MarginCallStrip level={level} />}
@@ -341,7 +346,11 @@ function Terminal() {
           <>
             <aside className={cn('relative min-h-0 flex-col gap-2', show(mtab === 'trade'), 'lg:flex', !sidebar && 'lg:invisible')}>
               <MarketPanel symbols={symbolsError ? [] : symbols} selected={selected} onSelect={pick} account={account} onPlaced={onPlaced} onAdvanced={(s, side, lots) => setTicket({ spec: s, side, lots })} sessions={sessions} className="min-h-0 flex-1" />
-              {symbols && <InfoPanel symbols={symbols} spec={spec} sessions={sessions} className="hidden h-[270px] shrink-0 lg:flex" />}
+              {/* handle: swap the space between the instrument list and the info panel */}
+              <button type="button" onClick={() => settingsStore.patch({ infoTall: !settings.infoTall })} aria-label={settings.infoTall ? 'Shrink the information panel' : 'Expand the information panel'} className="absolute left-1/2 z-10 hidden h-[14px] w-[38px] -translate-x-1/2 items-center justify-center rounded-full bg-[var(--t-raised)] text-[var(--t-muted)] hover:text-white lg:flex" style={{ bottom: (settings.infoTall ? 520 : 270) + 1 }}>
+                <ChevronsUpDown className="h-3 w-3" />
+              </button>
+              {symbols && <InfoPanel spec={spec} account={account} className={cn('hidden shrink-0 lg:flex', settings.infoTall ? 'h-[520px]' : 'h-[270px]')} />}
             </aside>
             {/* sidebar collapse handle (desktop) */}
             <button type="button" onClick={() => setSidebar((v) => !v)} aria-label={sidebar ? 'Collapse the instrument panel' : 'Expand the instrument panel'} className={cn('absolute top-1/2 z-20 hidden h-9 w-[14px] -translate-y-1/2 items-center justify-center rounded-md bg-[var(--t-raised)] text-[var(--t-text-2)] hover:text-white lg:flex', sidebar ? 'left-[385px]' : 'left-[3px]')}>
@@ -426,6 +435,27 @@ function Terminal() {
                   </button>
                 </li>
               ))}
+              <li className="my-1 border-t border-[var(--t-line)]" role="separator" />
+              {railLinks(account).map((l) => (
+                <li key={l.href}>
+                  <Link href={l.href} className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-white/[0.04]">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-md bg-[var(--t-raised)] text-[var(--t-text-2)] [&>svg]:h-4 [&>svg]:w-4">{l.icon}</span>
+                    <span className="leading-tight">
+                      <span className="block text-[14px] font-semibold text-white">{l.label}</span>
+                      <span className="block text-[12px] text-[var(--t-muted)]">{l.sub}</span>
+                    </span>
+                    <ChevronRight className="ml-auto h-4 w-4 text-[var(--t-muted)]" />
+                  </Link>
+                </li>
+              ))}
+              <li>
+                <button type="button" onClick={() => void logout()} className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-white/[0.04]">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-md bg-[var(--t-raised)] text-[var(--t-sell)] [&>svg]:h-4 [&>svg]:w-4">
+                    <LogOut />
+                  </span>
+                  <span className="block text-[14px] font-semibold text-white">Logout</span>
+                </button>
+              </li>
             </ul>
           </section>
         )}
@@ -454,6 +484,7 @@ function Terminal() {
           <OrderTicket spec={symbolMap.get(ticket.spec.id) ?? ticket.spec} account={account} onPlaced={onPlaced} initialSide={ticket.side} initialLots={ticket.lots} confirmOrders={settings.confirmOrders} onClose={() => setTicket(null)} className="max-h-[92dvh]" />
         </Modal>
       )}
+      </div>
     </div>
   );
 }

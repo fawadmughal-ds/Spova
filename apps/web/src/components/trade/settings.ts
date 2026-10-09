@@ -60,6 +60,8 @@ export interface TerminalSettings {
   /** height of the bottom panel on desktop */
   bottomHeight: number;
   bottomCollapsed: boolean;
+  /** information panel (Calendar / Market / Symbol info) expanded over the instrument list */
+  infoTall: boolean;
 }
 export const DEFAULT_SETTINGS: TerminalSettings = {
   confirmOrders: false,
@@ -73,6 +75,7 @@ export const DEFAULT_SETTINGS: TerminalSettings = {
   bollinger: false,
   bottomHeight: 330,
   bottomCollapsed: false,
+  infoTall: false,
 };
 export const settingsStore = createLocalStore<TerminalSettings>('wt-settings', DEFAULT_SETTINGS);
 export const useSettings = settingsStore.use;
@@ -106,3 +109,19 @@ export const TEMPLATE_NAMES = ['Template 1', 'Template 2', 'Template 3'] as cons
 export const templatesStore = createLocalStore<{ active: string; saved: Record<string, ChartTemplate> }>('wt-templates', { active: 'Template 1', saved: {} });
 export const useTemplates = templatesStore.use;
 export const pickTemplate = (s: TerminalSettings): ChartTemplate => ({ chartType: s.chartType, tf: s.tf, ma20: s.ma20, ma50: s.ma50, bollinger: s.bollinger, showVolume: s.showVolume, showPositionLines: s.showPositionLines });
+
+/** Account figures ticked in the Profit dropdown; the ticked ones are shown inline in the top bar. */
+export type ProfitFigure = 'equity' | 'balance' | 'free' | 'margin' | 'level';
+export const PROFIT_FIGURES: { key: ProfitFigure; label: string }[] = [
+  { key: 'equity', label: 'Equity' },
+  { key: 'balance', label: 'Balance' },
+  { key: 'free', label: 'Free funds' },
+  { key: 'margin', label: 'Margin' },
+  { key: 'level', label: 'Margin Lvl' },
+];
+export const profitFiguresStore = createLocalStore<{ shown: ProfitFigure[] }>('wt-profit-figures', { shown: [] });
+export const useProfitFigures = profitFiguresStore.use;
+export const toggleProfitFigure = (key: ProfitFigure) => {
+  const shown = profitFiguresStore.get().shown;
+  profitFiguresStore.set({ shown: shown.includes(key) ? shown.filter((k) => k !== key) : [...shown, key] });
+};

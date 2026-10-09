@@ -80,6 +80,30 @@ export class MarketController {
     return rows.map((r) => ({ symbolId: r.symbolId, date: r.date.toISOString().slice(0, 10) }));
   }
 
+  /**
+   * Market sentiment = share of open volume that is long vs short per symbol across the whole book
+   * (our own clients, not an external feed). Symbols without open positions are omitted.
+   */
+  @Get('sentiment')
+  async sentiment(@Query('symbols') symbols?: string) {
+    const ids = (symbols ?? '').split(',').map((s) => s.trim()).filter(Boolean).slice(0, 100);
+    const rows = await this.prisma.position.groupBy({
+      by: ['symbolId', 'side'],
+      where: { status: 'open', ...(ids.length && { symbolId: { in: ids } }) },
+      _sum: { lots: true },
+    });
+    const bySymbol = new Map<string, { buy: number; sell: number }>();
+    for (const r of rows) {
+      const e = bySymbol.get(r.symbolId) ?? { buy: 0, sell: 0 };
+      e[r.side] += Number(r._sum.lots ?? 0);
+      bySymbol.set(r.symbolId, e);
+    }
+    return [...bySymbol.entries()].map(([s, v]) => {
+      const total = v.buy + v.sell;
+      return { s, buyPct: total ? Math.round((v.buy / total) * 100) : 50, sellPct: total ? 100 - Math.round((v.buy / total) * 100) : 50, lots: total.toFixed(2) };
+    });
+  }
+
   @Get('risk-config')
   riskConfig() {
     return this.prisma.riskConfig.findMany({ orderBy: { minDeposit: 'asc' } });

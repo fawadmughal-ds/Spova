@@ -1,18 +1,19 @@
 'use client';
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Calendar, Check, Flame, Info, LayoutGrid, Minus, Moon, Plus, Search, Star, Store, X } from 'lucide-react';
-import { dec, effectiveLeverage, notional, quoteCurrency, requiredMarginUsd, toUsd, validateLots, type AccountDto, type OrderSide, type PlaceOrderResult } from '@spova/shared';
+import { Building2, Calendar, ChartColumn, Check, ChevronDown, Flame, Info, LayoutGrid, Minus, Moon, Plus, Search, Star, X } from 'lucide-react';
+import { dec, effectiveLeverage, notional, quoteCurrency, requiredMarginUsd, toUsd, validateLots, type AccountDto, type CandleDto, type OrderSide, type PlaceOrderResult } from '@spova/shared';
 import { get, post } from '@/lib/api';
 import { cn } from '@/lib/utils';
-import { MARKET_LIST, marketByCls } from '@/lib/markets';
+import { marketByCls } from '@/lib/markets';
 import { useToast } from '@/components/toast';
 import { Skeleton, Spinner } from '@/components/ui';
 import { dailyChange, fmtCountdown, fmtLots, fmtNum, fmtPrice, spreadPoints, type SymbolSpec } from './format';
 import { quoteStore, useBookVersion, useQuote } from './quote-store';
-import { EmptyState, SymbolTile } from './bits';
+import { CalendarEmpty, EmptyState, SplitBar, SymbolTile } from './bits';
+import { useSentiment } from './explore-view';
 import { favouritesStore, settingsStore, toggleFavourite, useFavourites, useSettings } from './settings';
-import { isOpenAt, nextClose, nextOpen, sessionsLabel, type SessionRow } from './sessions';
+import { nextOpen, type SessionRow } from './sessions';
 import { tradeError } from './errors';
 
 type ListTab = 'fav' | 'movers' | 'search';
@@ -181,7 +182,6 @@ const Row = memo(function Row({ s, selected, onSelect, sessions, children }: { s
   const now = useNow(closed);
   const opens = closed && sessions ? nextOpen(sessions, new Date(now)) : null;
   const mid = hasPrice ? (Number(q.bid) + Number(q.ask)) / 2 : null;
-  const meta = marketByCls(s.assetClass);
   return (
     <li className={cn('border-b border-[var(--t-line)]', selected && 'bg-[var(--t-raised)]')}>
       <button type="button" onClick={() => onSelect(s.id)} aria-current={selected || undefined} className={cn('grid h-[50px] w-full grid-cols-[26px_minmax(0,1fr)_auto_minmax(72px,auto)] items-center gap-x-3 px-3 text-left transition-colors', !selected && 'hover:bg-white/[0.03]')}>
@@ -189,7 +189,6 @@ const Row = memo(function Row({ s, selected, onSelect, sessions, children }: { s
         <span className="min-w-0 leading-tight">
           <span className="flex items-center gap-1.5">
             <span className="truncate text-[14px] font-semibold text-white">{s.id}</span>
-            {selected && !closed && <span className="rounded bg-[#1f6867] px-1 text-[10px] font-medium text-[#9ff0e5]">{meta?.label}</span>}
           </span>
           {closed ? (
             <span className="flex items-center gap-1 text-[11px] text-[var(--t-muted)]">
@@ -316,48 +315,29 @@ export function MarketPanel({ symbols, selected, onSelect, account, onPlaced, on
   );
 }
 
-// ---------------------------------------------------------------- Calendar / Market / Symbol Info
+// ---------------------------------------------------------------- Calendar / Market / Symbol info
 
 interface SymbolDetail extends SymbolSpec {
   sessions: SessionRow[];
 }
+const DAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-function MarketHours({ symbols, sessions }: { symbols: SymbolSpec[]; sessions: Map<string, SessionRow[]> }) {
-  const now = useNow();
-  const groups = MARKET_LIST.map((m) => {
-    const first = symbols.find((s) => s.assetClass === m.cls);
-    if (!first) return null;
-    const rows = sessions.get(first.id) ?? [];
-    const open = rows.length ? isOpenAt(rows, new Date(now)) : (quoteStore.get(first.id)?.open ?? first.isOpen);
-    const until = open ? nextClose(rows, new Date(now)) : nextOpen(rows, new Date(now));
-    return { m, rows, open, until, count: symbols.filter((s) => s.assetClass === m.cls).length };
-  }).filter((g): g is NonNullable<typeof g> => !!g);
+function InfoCard({ label, children, className }: { label: string; children: ReactNode; className?: string }) {
   return (
-    <ul>
-      {groups.map(({ m, rows, open, until, count }) => (
-        <li key={m.cls} className="flex items-center gap-3 border-b border-[var(--t-line)] px-3 py-2">
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md" style={{ background: `rgb(${m.rgb} / 0.18)`, color: `rgb(${m.rgb})` }}>
-            <m.icon className="h-3.5 w-3.5" />
-          </span>
-          <span className="min-w-0 flex-1 leading-tight">
-            <span className="flex items-center gap-2 text-[13px] font-semibold text-white">
-              {m.label} <span className="text-[11px] font-normal text-[var(--t-muted)]">{count}</span>
-            </span>
-            <span className="block truncate text-[11px] text-[var(--t-muted)]">{sessionsLabel(rows)}</span>
-          </span>
-          <span className="text-right leading-tight">
-            <span className={cn('block text-[11px] font-semibold', open ? 't-pnl-up' : 'text-[var(--t-sell)]')}>{open ? 'Open' : 'Closed'}</span>
-            {until && <span className="block text-[10px] text-[var(--t-muted)]">{open ? 'closes' : 'opens'} in {fmtCountdown(until.getTime() - now)}</span>}
-          </span>
-        </li>
-      ))}
-    </ul>
+    <div className={cn('t-card', className)}>
+      <div className="text-[11px] text-[var(--t-text-2)]">{label}</div>
+      <div className="mt-1 text-[13px] font-semibold leading-snug text-white">{children}</div>
+    </div>
   );
 }
 
-function SymbolInfo({ spec }: { spec: SymbolSpec | undefined }) {
+/** Reference "Symbol info": a 2-column grid of small cards plus the "Market Hours" accordion. */
+function SymbolInfo({ spec, account }: { spec: SymbolSpec | undefined; account: AccountDto | undefined }) {
   const [detail, setDetail] = useState<SymbolDetail | null>(null);
   const [error, setError] = useState(false);
+  const [hoursOpen, setHoursOpen] = useState(false);
+  const q = useQuote(spec?.id);
+  useBookVersion();
   useEffect(() => {
     setDetail(null);
     setError(false);
@@ -372,31 +352,158 @@ function SymbolInfo({ spec }: { spec: SymbolSpec | undefined }) {
   }, [spec?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!spec) return <EmptyState title="Select an instrument" />;
   const d = detail ?? spec;
-  const rows: [string, ReactNode][] = [
-    ['Name', d.name],
-    ['Market', marketByCls(d.assetClass)?.label ?? d.assetClass],
-    ['Digits', d.digits],
-    ['Contract size', dec(d.contractSize).toString()],
-    ['Min / max lot', `${dec(d.minLot).toString()} / ${dec(d.maxLot).toString()}`],
-    ['Lot step', dec(d.lotStep).toString()],
-    ['Max leverage', `1:${d.leverageMax}`],
-    ['Spread markup', `${dec(d.spreadMarkup).toString()} pts`],
-    ['Swap long / short', `${dec(d.swapLong).toString()} / ${dec(d.swapShort).toString()}`],
-    ['Sessions (UTC)', detail ? sessionsLabel(detail.sessions) : error ? '—' : <Spinner className="h-3" />],
-  ];
+  const mid = q && q.bid && q.ask ? (Number(q.bid) + Number(q.ask)) / 2 : null;
+  const ccy = quoteCurrency(spec.id, spec.assetClass);
+  const pointSize = dec(10).pow(-spec.digits);
+  const nominal = mid !== null ? toUsd(notional('1', spec.contractSize, mid), ccy, quoteStore.book()) : null;
+  const pointValue = toUsd(dec(spec.contractSize).times(pointSize), ccy, quoteStore.book());
+  const lev = account ? effectiveLeverage(account.leverage, spec.leverageMax) : spec.leverageMax;
+  const sessions = detail?.sessions ?? null;
   return (
-    <dl className="px-3 py-1">
-      {rows.map(([k, v]) => (
-        <div key={k} className="flex items-baseline justify-between gap-3 border-b border-[var(--t-line)] py-[7px] text-[12px] last:border-b-0">
-          <dt className="shrink-0 text-[var(--t-muted)]">{k}</dt>
-          <dd className="truncate text-right font-medium text-white">{v}</dd>
-        </div>
-      ))}
-    </dl>
+    <div className="p-3">
+      <div className="grid grid-cols-2 gap-2">
+        <InfoCard label="Details">{d.name}</InfoCard>
+        <InfoCard label="Symbol Class">{marketByCls(d.assetClass)?.label ?? d.assetClass} CFD</InfoCard>
+        <InfoCard label="Min. Position Size">{dec(d.minLot).toString()}</InfoCard>
+        <InfoCard label="Point Size">{pointSize.toFixed(spec.digits)}</InfoCard>
+        <InfoCard label="Swap (Points)">
+          Long: {dec(d.swapLong).toString()}
+          <br />
+          Short: {dec(d.swapShort).toString()}
+        </InfoCard>
+        <InfoCard label="Nominal Value of 1 Lot">{nominal ? `${fmtNum(nominal.toFixed(2))} USD` : '—'}</InfoCard>
+        <InfoCard label="Point Value of 1 Lot">{pointValue ? `${fmtNum(pointValue.toFixed(2))} USD` : '—'}</InfoCard>
+        <InfoCard label="Leverage">
+          1 : {lev} ({(100 / lev).toFixed(2)}%)
+        </InfoCard>
+      </div>
+      <button type="button" onClick={() => setHoursOpen((v) => !v)} aria-expanded={hoursOpen} className="mt-4 flex h-9 w-full items-center justify-between px-2 text-[13px] font-semibold text-white">
+        Market Hours
+        <ChevronDown className={cn('h-4 w-4 text-[var(--t-text-2)] transition-transform', hoursOpen && 'rotate-180')} />
+      </button>
+      {hoursOpen && (
+        <ul className="mt-1 px-2 text-[12px]">
+          {sessions === null ? (
+            <li className="py-2 text-[var(--t-muted)]">{error ? 'Trading hours unavailable.' : 'Loading…'}</li>
+          ) : sessions.length === 0 ? (
+            <li className="py-2 text-[var(--t-muted)]">Open 24/7</li>
+          ) : (
+            DAY.map((name, day) => {
+              const w = sessions.filter((r) => r.weekday === day);
+              return (
+                <li key={name} className="flex justify-between border-b border-[var(--t-line)] py-[6px] last:border-b-0">
+                  <span className="text-[var(--t-text-2)]">{name}</span>
+                  <span className={cn('font-medium', w.length ? 'text-white' : 'text-[var(--t-muted)]')}>{w.length ? w.map((r) => `${r.openTime} – ${r.closeTime}`).join(', ') : 'Closed'}</span>
+                </li>
+              );
+            })
+          )}
+          <li className="pt-2 text-[11px] text-[var(--t-muted)]">Times in UTC.</li>
+        </ul>
+      )}
+    </div>
   );
 }
 
-export function InfoPanel({ symbols, spec, sessions, className }: { symbols: SymbolSpec[]; spec: SymbolSpec | undefined; sessions: Map<string, SessionRow[]>; className?: string }) {
+interface PriceWindow {
+  change: number | null;
+  low: number | null;
+  high: number | null;
+}
+const emptyWindow: PriceWindow = { change: null, low: null, high: null };
+
+/** Change and range over the last N days of daily bars; the live mid extends today's range. */
+function windowStats(candles: CandleDto[], days: number, mid: number | null): PriceWindow {
+  if (candles.length === 0) return emptyWindow;
+  const from = Date.now() / 1000 - days * 86_400;
+  const inWin = candles.filter((c) => c.t >= from);
+  if (inWin.length === 0) return emptyWindow;
+  const idx = candles.indexOf(inWin[0]);
+  const ref = idx > 0 ? Number(candles[idx - 1].c) : Number(inWin[0].o);
+  const last = mid ?? Number(inWin[inWin.length - 1].c);
+  let low = Math.min(...inWin.map((c) => Number(c.l)));
+  let high = Math.max(...inWin.map((c) => Number(c.h)));
+  if (mid !== null) {
+    low = Math.min(low, mid);
+    high = Math.max(high, mid);
+  }
+  return { change: ref > 0 ? ((last - ref) / ref) * 100 : null, low, high };
+}
+
+function RangeRow({ label, w, mid, digits }: { label: string; w: PriceWindow; mid: number | null; digits: number }) {
+  const pos = w.low !== null && w.high !== null && mid !== null && w.high > w.low ? Math.min(100, Math.max(0, ((mid - w.low) / (w.high - w.low)) * 100)) : null;
+  return (
+    <div className="t-card">
+      <div className="text-[11px] text-[var(--t-text-2)]">{label}</div>
+      <div className="mt-1 flex items-center gap-2 text-[12px] font-semibold">
+        <span className="shrink-0 whitespace-nowrap t-pnl-down">L: {w.low === null ? '—' : fmtNum(w.low, digits)}</span>
+        <span className="relative h-[3px] min-w-0 flex-1 rounded-full bg-[var(--t-raised-2)]">
+          {pos !== null && <span className="absolute top-[5px] h-0 w-0 -translate-x-1/2 border-x-[4px] border-b-[5px] border-x-transparent border-b-[var(--t-text-2)]" style={{ left: `${pos}%` }} aria-hidden />}
+        </span>
+        <span className="shrink-0 whitespace-nowrap text-right t-pnl-up">H: {w.high === null ? '—' : fmtNum(w.high, digits)}</span>
+      </div>
+    </div>
+  );
+}
+
+/** Reference "Market" tab: sentiment bar, Daily / Weekly / Monthly change and range of the selected instrument. */
+function MarketTab({ spec }: { spec: SymbolSpec | undefined }) {
+  const q = useQuote(spec?.id);
+  const [candles, setCandles] = useState<CandleDto[] | null>(null);
+  const sentiment = useSentiment(useMemo(() => (spec ? [spec.id] : []), [spec]));
+  useEffect(() => {
+    setCandles(null);
+    if (!spec) return;
+    let alive = true;
+    get<CandleDto[]>(`/market/candles/${spec.id}?tf=d1&limit=31`)
+      .then((rows) => alive && setCandles(rows))
+      .catch(() => alive && setCandles([]));
+    return () => {
+      alive = false;
+    };
+  }, [spec?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!spec) return <EmptyState title="Select an instrument" />;
+  const mid = q && q.bid && q.ask ? (Number(q.bid) + Number(q.ask)) / 2 : null;
+  const rows = candles ?? [];
+  const daily: PriceWindow = { ...windowStats(rows.slice(-1), 1, mid), change: dailyChange(q) };
+  const weekly = windowStats(rows, 7, mid);
+  const monthly = windowStats(rows, 30, mid);
+  const row = sentiment?.get(spec.id);
+  const pct = (v: number | null) => (v === null ? '—' : `${v.toFixed(2)}%`);
+  const tone = (v: number | null) => (v === null ? 'text-[var(--t-dim)]' : v > 0 ? 't-pnl-up' : v < 0 ? 't-pnl-down' : 'text-white');
+  return (
+    <div className="p-3">
+      <div className="t-card">
+        <div className="text-[11px] text-[var(--t-text-2)]">Market sentiment</div>
+        {sentiment === null ? <Skeleton className="mt-2 h-3 w-full" /> : row ? <SplitBar sellPct={row.sellPct} buyPct={row.buyPct} className="mt-1.5" /> : <div className="mt-1 text-[12px] text-[var(--t-muted)]">No open positions</div>}
+      </div>
+      <div className="mt-3 text-[13px] font-semibold text-white">Change</div>
+      <div className="mt-2 grid grid-cols-3 gap-2">
+        {(
+          [
+            ['Daily', daily.change],
+            ['Weekly', weekly.change],
+            ['Monthly', monthly.change],
+          ] as [string, number | null][]
+        ).map(([k, v]) => (
+          <div key={k} className="t-card">
+            <div className="text-[11px] text-[var(--t-text-2)]">{k}</div>
+            <div className={cn('mt-1 text-[13px] font-semibold', tone(v))}>{candles === null && k !== 'Daily' ? '…' : pct(v)}</div>
+          </div>
+        ))}
+      </div>
+      <div className="mt-3 text-[13px] font-semibold text-white">Range</div>
+      <div className="mt-2 flex flex-col gap-2">
+        <RangeRow label="Daily" w={daily} mid={mid} digits={spec.digits} />
+        <RangeRow label="Weekly" w={weekly} mid={mid} digits={spec.digits} />
+        <RangeRow label="Monthly" w={monthly} mid={mid} digits={spec.digits} />
+      </div>
+      {candles !== null && candles.length === 0 && <div className="mt-2 text-[11px] text-[var(--t-muted)]">No daily history for this instrument yet.</div>}
+    </div>
+  );
+}
+
+export function InfoPanel({ spec, account, className }: { symbols?: SymbolSpec[]; spec: SymbolSpec | undefined; sessions?: Map<string, SessionRow[]>; account?: AccountDto; className?: string }) {
   const [tab, setTab] = useState<InfoTab>('calendar');
   return (
     <section className={cn('t-panel', className)} aria-label="Market information">
@@ -405,20 +512,16 @@ export function InfoPanel({ symbols, spec, sessions, className }: { symbols: Sym
           <Calendar /> Calendar
         </button>
         <button type="button" role="tab" aria-selected={tab === 'market'} data-on={tab === 'market'} onClick={() => setTab('market')} className="t-tab">
-          <Store /> Market
+          <ChartColumn /> Market
         </button>
         <button type="button" role="tab" aria-selected={tab === 'symbol'} data-on={tab === 'symbol'} onClick={() => setTab('symbol')} className="t-tab">
-          <Info /> Symbol Info
+          <Building2 /> Symbol info
         </button>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {tab === 'calendar' && (
-          <EmptyState icon={<Calendar />} title="Economic calendar feed not connected">
-            Scheduled releases will appear here once a calendar provider is configured for this broker.
-          </EmptyState>
-        )}
-        {tab === 'market' && <MarketHours symbols={symbols} sessions={sessions} />}
-        {tab === 'symbol' && <SymbolInfo spec={spec} />}
+        {tab === 'calendar' && <CalendarEmpty />}
+        {tab === 'market' && <MarketTab spec={spec} />}
+        {tab === 'symbol' && <SymbolInfo spec={spec} account={account} />}
       </div>
     </section>
   );

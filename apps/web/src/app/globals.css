@@ -1406,6 +1406,224 @@ body:has(.terminal) {
   background: rgb(42 195 237 / 0.12);
 }
 
+/* ---- terminal extras: section cards, segmented control, explore rows */
+@layer components {
+  .terminal .t-card {
+    border-radius: 6px;
+    background: #2a313b;
+    padding: 10px 12px;
+  }
+  .terminal .t-h2 {
+    font-size: 20px;
+    font-weight: 600;
+    line-height: 1.2;
+    color: #fff;
+  }
+  .terminal .t-seg {
+    display: inline-flex;
+    height: 36px;
+    align-items: center;
+    gap: 2px;
+    border-radius: 8px;
+    background: var(--t-raised);
+    padding: 3px;
+  }
+  .terminal .t-seg > button {
+    height: 30px;
+    border-radius: 6px;
+    padding: 0 10px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--t-text-2);
+    transition:
+      background-color 0.15s ease,
+      color 0.15s ease;
+  }
+  .terminal .t-seg > button:hover {
+    color: #fff;
+  }
+  .terminal .t-seg > button[data-on='true'] {
+    background: var(--t-bg);
+    color: #fff;
+  }
+  /* explore cards: symbol / price / daily rows */
+  .terminal .t-xrow {
+    display: grid;
+    height: 50px;
+    width: 100%;
+    grid-template-columns: 24px minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+    align-items: center;
+    column-gap: 12px;
+    border-bottom: 1px solid var(--t-line);
+    padding: 0 8px;
+    text-align: left;
+    transition: background-color 0.12s ease;
+  }
+  .terminal .t-xrow:hover {
+    background: rgb(255 255 255 / 0.03);
+  }
+}
+
+/* ---- client-area rail: the light 88px column left of the terminal (outside `.terminal`, normal light theme) */
+@layer components {
+  .trail {
+    /* body:has(.terminal) re-points the palette tokens to the dark set; the rail keeps the light ones */
+    --color-paper: #ffffff;
+    --color-brand-200: #1e3a8a;
+    --color-brand-400: #2563eb;
+    --color-brand-500: #2563eb;
+    --color-brand-600: #1e40af;
+    display: flex;
+    width: 88px;
+    flex-shrink: 0;
+    flex-direction: column;
+    overflow: hidden auto;
+    border-right: 1px solid #e3e8ef;
+    background: #fff;
+    color: #3f4a62;
+    scrollbar-width: none;
+  }
+  .trail-top {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-bottom: 14px;
+  }
+  .trail-pill {
+    display: inline-flex;
+    height: 24px;
+    align-items: center;
+    gap: 2px;
+    align-self: flex-start;
+    margin-left: 20px;
+    border-radius: 0 0 10px 10px;
+    background: #2563eb;
+    padding: 0 6px 0 10px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #fff;
+    transition: filter 0.15s ease;
+  }
+  .trail-pill:hover {
+    filter: brightness(1.1);
+  }
+  .trail-pill svg {
+    width: 12px;
+    height: 12px;
+  }
+  .trail-brand {
+    display: inline-flex;
+    margin-top: 6px;
+  }
+  .trail-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 0 6px;
+  }
+  .trail-bottom {
+    margin-top: auto;
+    border-top: 1px solid #e9edf3;
+    padding-top: 12px;
+    padding-bottom: 10px;
+  }
+  .trail-item {
+    display: flex;
+    width: 100%;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    border-radius: 12px;
+    padding: 7px 2px;
+    font-size: 11.5px;
+    line-height: 1.1;
+    text-align: center;
+    color: #3f4a62;
+    transition:
+      background-color 0.15s ease,
+      color 0.15s ease;
+  }
+  .trail-item:hover {
+    background: #f1f4f9;
+    color: #0b1220;
+  }
+  .trail-item svg {
+    width: 20px;
+    height: 20px;
+    color: #55617a;
+  }
+  .trail-item-deposit {
+    background: #e4f6ea;
+    color: #1b2b23;
+  }
+  .trail-item-deposit svg {
+    color: #1f9d55;
+  }
+  .trail-item-deposit:hover {
+    background: #d6f0df;
+  }
+  .trail-avatar {
+    display: grid;
+    height: 24px;
+    width: 24px;
+    place-items: center;
+    border-radius: 999px;
+    background: #e9edf5;
+    font-size: 10px;
+    font-weight: 700;
+    color: #3f4a62;
+  }
+  .trail-name {
+    max-width: 100%;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+  .trail-menu {
+    position: absolute;
+    z-index: 70;
+    border-radius: 10px;
+    border: 1px solid #e3e8ef;
+    background: #fff;
+    padding: 4px;
+    color: #141b2c;
+    box-shadow: 0 18px 40px -16px rgb(15 23 42 / 0.35);
+    animation: pop-in 0.25s var(--ease-spring) both;
+  }
+  .trail-menu-label {
+    padding: 6px 10px 4px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #6b778f;
+  }
+  .trail-menu-item {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: 9px;
+    border-radius: 6px;
+    padding: 7px 10px;
+    text-align: left;
+    font-size: 13px;
+    color: #283248;
+    transition: background-color 0.12s ease;
+  }
+  .trail-menu-item:hover:not(:disabled) {
+    background: #f1f4f9;
+  }
+  .trail-menu-item:disabled {
+    cursor: not-allowed;
+    color: #8793a8;
+  }
+  .trail-menu-item svg {
+    width: 15px;
+    height: 15px;
+    flex-shrink: 0;
+  }
+}
+
 /* === page-specific styles: client portal === */
 @layer components {
   /* demo account plates are hatched so they never read as real money */

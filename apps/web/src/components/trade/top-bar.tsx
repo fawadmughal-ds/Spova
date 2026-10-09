@@ -10,7 +10,7 @@ import { AnimatedNumber } from '@/components/motion';
 import { fmtNum, type SymbolSpec } from './format';
 import { useFloatingTotal } from './pnl';
 import { Dropdown, ToggleRow } from './bits';
-import { settingsStore, useSettings } from './settings';
+import { PROFIT_FIGURES, settingsStore, toggleProfitFigure, useProfitFigures, useSettings, type ProfitFigure } from './settings';
 
 export type TerminalView = 'trade' | 'analytics' | 'explore';
 export interface NoticeItem {
@@ -87,63 +87,89 @@ function AccountChip({ accounts, account, onSelect }: { accounts: AccountDto[]; 
   );
 }
 
-function Figure({ label, value, tone, suffix, decimals = 2 }: { label: string; value: string | number | null | undefined; tone?: 'up' | 'down' | 'warn'; suffix?: string; decimals?: number }) {
+/** Value of one account figure, formatted like the reference ("17 541 245.04 USD" / "664.11 %"). */
+function figureValue(account: AccountDto | undefined, key: ProfitFigure): { value: number | null; suffix: string } {
+  if (!account) return { value: null, suffix: '' };
+  const num = (v: string | null) => (v === null || v === undefined || v === '' ? null : Number(v));
+  switch (key) {
+    case 'equity':
+      return { value: num(account.equity), suffix: account.currency };
+    case 'balance':
+      return { value: num(account.balance), suffix: account.currency };
+    case 'free':
+      return { value: num(account.freeMargin), suffix: account.currency };
+    case 'margin':
+      return { value: num(account.usedMargin), suffix: account.currency };
+    case 'level':
+      return { value: num(account.marginLevel), suffix: '%' };
+  }
+}
+
+function FigureValue({ value, suffix, className }: { value: number | null; suffix: string; className?: string }) {
   return (
-    <div className="flex items-baseline justify-between gap-4 px-2.5 py-1.5">
-      <span className="text-[12px] text-[var(--t-muted)]">{label}</span>
-      <span className={cn('text-[13px] font-semibold text-white', tone === 'up' && 't-pnl-up', tone === 'down' && 't-pnl-down', tone === 'warn' && 'text-[var(--t-alert)]')}>
-        {value === null || value === undefined ? '—' : <AnimatedNumber value={value} duration={500} format={(n) => fmtNum(n, decimals)} />}
-        {suffix && value !== null && value !== undefined ? <span className="ml-1 text-[11px] font-normal text-[var(--t-muted)]">{suffix}</span> : null}
-      </span>
-    </div>
+    <span className={cn('whitespace-nowrap font-semibold text-[var(--t-blue)]', className)}>
+      {value === null ? <span className="text-[var(--t-muted)]">—</span> : <AnimatedNumber value={value} duration={500} flash={false} format={(n) => fmtNum(n)} />}
+      <span className="ml-1 text-[10px] font-medium">{suffix}</span>
+    </span>
   );
 }
 
-/** "Profit" block: live floating P/L of the open positions, with the account figures behind the chevron. */
+/**
+ * "Profit" block: live floating P/L of the open positions. The chevron opens the panel of account figures,
+ * each with a checkbox; ticked figures are pinned inline next to the profit (persisted).
+ */
 function ProfitBlock({ account, positions, symbols, compact }: { account: AccountDto | undefined; positions: PositionDto[]; symbols: Map<string, SymbolSpec>; compact?: boolean }) {
   const total = useFloatingTotal(positions, symbols);
-  const level = account?.marginLevel === null || account?.marginLevel === undefined ? null : Number(account.marginLevel);
-  const levelTone = level === null ? undefined : level <= 100 ? 'down' : level <= 200 ? 'warn' : 'up';
+  const { shown } = useProfitFigures();
   const tone = total === null ? '' : total > 0 ? 't-pnl-up' : total < 0 ? 't-pnl-down' : 'text-white';
+  const pinned = PROFIT_FIGURES.filter((f) => shown.includes(f.key));
   return (
-    <Dropdown
-      title="Account figures"
-      align={compact ? 'right' : 'left'}
-      buttonClassName={cn('flex shrink-0 items-center whitespace-nowrap rounded-md px-1 py-0.5 transition-colors hover:bg-white/[0.04]', compact ? 'gap-1.5' : 'gap-3')}
-      button={(open) => (
-        <>
-          <span className={cn('flex leading-none', compact ? 'items-baseline gap-1.5' : 'flex-col items-start')}>
-            <span className={cn('text-[11px] font-medium text-[var(--t-muted)]', compact && 'hidden min-[420px]:inline')}>Profit</span>
-            <span className={cn('font-semibold', compact ? 'text-[13px]' : 'mt-0.5 text-[15px]', tone)}>
-              {total === null ? <span className="text-[var(--t-muted)]">—</span> : <AnimatedNumber value={total} duration={450} flash={false} format={(n) => fmtNum(n)} />}
-              <span className="ml-1 text-[11px] font-medium text-[var(--t-muted)]">{account?.currency ?? 'USD'}</span>
+    <div className={cn('flex shrink-0 items-center whitespace-nowrap', compact ? 'gap-1.5' : 'gap-3')}>
+      <span className={cn('flex leading-none', compact ? 'items-baseline gap-1.5' : 'flex-col items-start')}>
+        <span className={cn('text-[11px] font-medium text-[var(--t-muted)]', compact && 'hidden min-[420px]:inline')}>Profit</span>
+        <span className={cn('font-semibold', compact ? 'text-[13px]' : 'mt-0.5 text-[15px]', tone)}>
+          {total === null ? <span className="text-[var(--t-muted)]">—</span> : <AnimatedNumber value={total} duration={450} flash={false} format={(n) => fmtNum(n)} />}
+          <span className="ml-1 text-[11px] font-medium text-[var(--t-muted)]">{account?.currency ?? 'USD'}</span>
+        </span>
+      </span>
+      {!compact &&
+        pinned.map((f) => {
+          const v = figureValue(account, f.key);
+          return (
+            <span key={f.key} className="flex flex-col items-start border-l border-[#3b434f] pl-3 leading-none">
+              <span className="text-[11px] font-medium text-[var(--t-muted)]">{f.label}</span>
+              <FigureValue value={v.value} suffix={v.suffix} className="mt-0.5 text-[15px]" />
             </span>
-          </span>
-          {!compact && <span className="h-7 w-px bg-[#3b434f]" />}
-          <ChevronDown className={cn('h-4 w-4 shrink-0 text-[var(--t-text-2)] transition-transform', open && 'rotate-180')} />
-        </>
-      )}
-    >
-      {() => (
-        <div className="w-64 py-1">
-          {account ? (
-            <>
-              <Figure label="Balance" value={account.balance} />
-              <Figure label="Equity" value={account.equity} />
-              <Figure label="Margin" value={account.usedMargin} />
-              <Figure label="Free margin" value={account.freeMargin} />
-              <Figure label="Margin level" value={level === null ? null : account.marginLevel} suffix="%" tone={levelTone} />
-              <Figure label="Credit" value={account.credit} />
-              <div className="mt-1 border-t border-[#3b434f] px-2.5 pt-2 text-[11px] text-[var(--t-muted)]">
-                Leverage 1:{account.leverage} · {account.tier} · {account.currency}
-              </div>
-            </>
-          ) : (
-            <div className="px-2.5 py-2 text-[12px] text-[var(--t-muted)]">No account selected.</div>
-          )}
-        </div>
-      )}
-    </Dropdown>
+          );
+        })}
+      <Dropdown
+        title="Account figures"
+        align="right"
+        buttonClassName="t-top-btn !h-9 !w-9 !rounded-md"
+        menuClassName="!p-0"
+        button={(open) => <ChevronDown className={cn('transition-transform', open && 'rotate-180')} />}
+      >
+        {() => (
+          <div className="w-60 py-2">
+            {account ? (
+              PROFIT_FIGURES.map((f) => {
+                const v = figureValue(account, f.key);
+                const on = shown.includes(f.key);
+                return (
+                  <label key={f.key} className="flex h-12 cursor-pointer items-center gap-3 px-4 text-[13px] hover:bg-white/[0.04]">
+                    <input type="checkbox" className="t-check" checked={on} onChange={() => toggleProfitFigure(f.key)} aria-label={`Show ${f.label} in the top bar`} />
+                    <span className="font-medium text-white">{f.label}</span>
+                    <FigureValue value={v.value} suffix={v.suffix} className="text-[12px]" />
+                  </label>
+                );
+              })
+            ) : (
+              <div className="px-4 py-2 text-[12px] text-[var(--t-muted)]">No account selected.</div>
+            )}
+          </div>
+        )}
+      </Dropdown>
+    </div>
   );
 }
 

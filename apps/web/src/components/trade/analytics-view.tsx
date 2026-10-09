@@ -1,115 +1,116 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ChartPie, TrendingDown, TrendingUp } from 'lucide-react';
-import { AreaSeries, ColorType, CrosshairMode, LineStyle, createChart, type UTCTimestamp } from 'lightweight-charts';
+import { ChartPie, ChevronLeft, ChevronRight, CirclePlus, TrendingDown, TrendingUp } from 'lucide-react';
+import { ColorType, CrosshairMode, LineSeries, LineStyle, createChart, type UTCTimestamp } from 'lightweight-charts';
 import type { AccountDto, LedgerEntryDto, Paginated, PositionDto } from '@spova/shared';
 import { get } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { Spinner } from '@/components/ui';
-import { fmtDateTimeParts, fmtDuration, fmtNum, fmtSignedNum, type SymbolSpec } from './format';
-import { EmptyState, SymbolTile } from './bits';
+import { fmtNum, type SymbolSpec } from './format';
+import { EmptyState, InfoTip } from './bits';
 
-interface Stats {
-  trades: number;
-  wins: number;
-  losses: number;
-  winRate: number | null;
-  grossProfit: number;
-  grossLoss: number;
-  profitFactor: number | null;
-  total: number;
-  best: PositionDto | null;
-  worst: PositionDto | null;
-  avgHoldMs: number | null;
-  bySymbol: { symbol: string; trades: number; pnl: number }[];
+type Period = '3m' | '1y' | 'all';
+const PERIODS: { value: Period; label: string; days: number | null }[] = [
+  { value: '3m', label: '3M', days: 91 },
+  { value: '1y', label: '1Y', days: 365 },
+  { value: 'all', label: 'ALL', days: null },
+];
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const DAY_MS = 86_400_000;
+const LINE = '#3fb6d8';
+
+interface Closed {
+  p: PositionDto;
+  pnl: number;
+  /** price move in the instrument's points (sign follows the P/L direction) */
+  points: number | null;
+  closeMs: number;
 }
 
-function compute(history: PositionDto[]): Stats {
-  let wins = 0;
-  let losses = 0;
-  let grossProfit = 0;
-  let grossLoss = 0;
-  let total = 0;
-  let best: PositionDto | null = null;
-  let worst: PositionDto | null = null;
-  let hold = 0;
-  let held = 0;
-  const sym = new Map<string, { trades: number; pnl: number }>();
-  for (const p of history) {
-    const pnl = Number(p.realizedPnl ?? 0);
-    total += pnl;
-    if (pnl > 0) {
-      wins++;
-      grossProfit += pnl;
-    } else if (pnl < 0) {
-      losses++;
-      grossLoss += -pnl;
-    }
-    if (!best || pnl > Number(best.realizedPnl ?? 0)) best = p;
-    if (!worst || pnl < Number(worst.realizedPnl ?? 0)) worst = p;
-    if (p.closeAt) {
-      hold += new Date(p.closeAt).getTime() - new Date(p.openAt).getTime();
-      held++;
-    }
-    const s = sym.get(p.symbol) ?? { trades: 0, pnl: 0 };
-    sym.set(p.symbol, { trades: s.trades + 1, pnl: s.pnl + pnl });
+const toClosed = (history: PositionDto[], symbols: Map<string, SymbolSpec>): Closed[] =>
+  history
+    .filter((p) => p.closeAt)
+    .map((p) => {
+      const digits = symbols.get(p.symbol)?.digits;
+      const open = Number(p.openPrice);
+      const close = p.closePrice === null ? NaN : Number(p.closePrice);
+      const points = digits === undefined || !Number.isFinite(close) ? null : (p.side === 'buy' ? close - open : open - close) * Math.pow(10, digits);
+      return { p, pnl: Number(p.realizedPnl ?? 0), points, closeMs: new Date(p.closeAt!).getTime() };
+    })
+    .sort((a, b) => a.closeMs - b.closeMs);
+
+/**
+ * Balance at a moment: the balance after the last ledger entry before it. An account funded later than
+ * `atMs` (or an "ALL" period) uses its first funding as the starting balance. Null when nothing was ever booked.
+ */
+function balanceAt(ledger: LedgerEntryDto[], atMs: number): number | null {
+  if (ledger.length === 0) return null;
+  let last: LedgerEntryDto | null = null;
+  for (const e of ledger) {
+    if (new Date(e.createdAt).getTime() <= atMs) last = e;
+    else break;
   }
-  const trades = history.length;
-  return {
-    trades,
-    wins,
-    losses,
-    winRate: trades ? (wins / trades) * 100 : null,
-    grossProfit,
-    grossLoss,
-    profitFactor: grossLoss > 0 ? grossProfit / grossLoss : grossProfit > 0 ? Infinity : null,
-    total,
-    best,
-    worst,
-    avgHoldMs: held ? hold / held : null,
-    bySymbol: Array.from(sym.entries())
-      .map(([symbol, v]) => ({ symbol, ...v }))
-      .sort((a, b) => b.pnl - a.pnl),
-  };
+  const v = Number(last ? last.balanceAfter : ledger[0].balanceAfter);
+  return Number.isFinite(v) && v > 0 ? v : null;
 }
+const roiOf = (pnl: number, base: number | null) => (base === null ? null : (pnl / base) * 100);
+const fmtRoi = (v: number | null) => (v === null ? '—' : `${v.toFixed(2)}%`);
+const toneOf = (v: number | null) => (v === null ? 'text-white' : v > 0 ? 't-pnl-up' : v < 0 ? 't-pnl-down' : 'text-white');
 
-/** Balance after every ledger entry, oldest first, as an area chart (single series: no legend needed). */
-function EquityCurve({ ledger, currency }: { ledger: LedgerEntryDto[]; currency: string }) {
+/** Cumulative ROI % after every closed trade, teal line on a % axis with the 0% baseline. */
+function RoiChart({ trades, base }: { trades: Closed[]; base: number | null }) {
   const host = useRef<HTMLDivElement>(null);
   const points = useMemo(() => {
-    const sorted = [...ledger].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    if (base === null || trades.length === 0) return [];
     const out: { time: UTCTimestamp; value: number }[] = [];
+    let cum = 0;
     let lastT = 0;
-    for (const e of sorted) {
-      let t = Math.floor(new Date(e.createdAt).getTime() / 1000);
-      if (t <= lastT) t = lastT + 1; // ledger rows can share a second; the series needs strictly increasing times
-      lastT = t;
-      out.push({ time: t as UTCTimestamp, value: Number(e.balanceAfter) + Number(e.creditAfter) });
+    const first = Math.floor(trades[0].closeMs / 1000) - 1;
+    out.push({ time: first as UTCTimestamp, value: 0 });
+    lastT = first;
+    for (const t of trades) {
+      cum += t.pnl;
+      let time = Math.floor(t.closeMs / 1000);
+      if (time <= lastT) time = lastT + 1; // closes can share a second; the series needs strictly increasing times
+      lastT = time;
+      out.push({ time: time as UTCTimestamp, value: (cum / base) * 100 });
     }
     return out;
-  }, [ledger]);
+  }, [trades, base]);
   useEffect(() => {
     const el = host.current;
     if (!el || points.length === 0) return;
+    // dates when the series spans days, date + time when everything closed within three days
+    const spanSec = points[points.length - 1].time - points[0].time;
+    const fmtDate = (t: number) => {
+      const d = new Date(t * 1000);
+      const day = `${String(d.getUTCDate()).padStart(2, '0')} ${MONTHS[d.getUTCMonth()]}`;
+      return spanSec < 3 * 86_400 ? `${day} ${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}` : `${day} ${d.getUTCFullYear()}`;
+    };
     const c = createChart(el, {
       autoSize: false,
       width: el.clientWidth,
       height: el.clientHeight,
-      layout: { background: { type: ColorType.Solid, color: '#20252c' }, textColor: '#858c99', fontFamily: 'var(--ff-body), ui-sans-serif, system-ui, sans-serif', fontSize: 11, attributionLogo: false },
-      grid: { vertLines: { color: 'rgba(255,255,255,0.045)' }, horzLines: { color: 'rgba(255,255,255,0.045)' } },
-      crosshair: { mode: CrosshairMode.Magnet, vertLine: { color: 'rgba(186,195,210,0.4)', labelBackgroundColor: '#4b5868', style: LineStyle.Dashed }, horzLine: { color: 'rgba(186,195,210,0.4)', labelBackgroundColor: '#4b5868', style: LineStyle.Dashed } },
-      rightPriceScale: { borderColor: 'rgba(255,255,255,0.08)', scaleMargins: { top: 0.1, bottom: 0.1 } },
-      timeScale: { borderColor: 'rgba(255,255,255,0.08)', timeVisible: true, secondsVisible: false },
-      handleScroll: true,
-      handleScale: true,
-      localization: { locale: 'en-GB' },
+      layout: { background: { type: ColorType.Solid, color: '#20252c' }, textColor: '#9ea7b5', fontFamily: 'var(--ff-body), ui-sans-serif, system-ui, sans-serif', fontSize: 12, attributionLogo: false },
+      grid: { vertLines: { visible: false }, horzLines: { color: 'rgba(255,255,255,0.08)' } },
+      crosshair: { mode: CrosshairMode.Magnet, vertLine: { color: 'rgba(186,195,210,0.35)', labelBackgroundColor: '#4b5868', style: LineStyle.Dashed }, horzLine: { color: 'rgba(186,195,210,0.35)', labelBackgroundColor: '#4b5868', style: LineStyle.Dashed } },
+      leftPriceScale: { visible: true, borderVisible: false, scaleMargins: { top: 0.12, bottom: 0.12 } },
+      rightPriceScale: { visible: false },
+      timeScale: { borderVisible: false, timeVisible: false, fixLeftEdge: true, fixRightEdge: true, tickMarkFormatter: (t: number) => fmtDate(t) },
+      handleScroll: false,
+      handleScale: false,
+      localization: { locale: 'en-GB', timeFormatter: (t: number) => fmtDate(t) },
     });
-    const s = c.addSeries(AreaSeries, { lineColor: '#2ac3ed', topColor: 'rgba(42,195,237,0.28)', bottomColor: 'rgba(42,195,237,0.02)', lineWidth: 2, priceFormat: { type: 'price', precision: 2, minMove: 0.01 }, priceLineColor: '#2ac3ed', crosshairMarkerRadius: 4 });
+    const s = c.addSeries(LineSeries, { color: LINE, lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerRadius: 4, priceFormat: { type: 'custom', formatter: (v: number) => (Math.abs(v) < 0.005 ? '0%' : `${v.toFixed(2)}%`), minMove: 0.01 } });
     s.setData(points);
+    s.createPriceLine({ price: 0, color: 'rgba(255,255,255,0.35)', lineWidth: 1, lineStyle: LineStyle.Solid, axisLabelVisible: false, title: '' });
     c.timeScale().fitContent();
     const ro = new ResizeObserver(() => {
-      if (el.clientWidth > 0 && el.clientHeight > 0) c.applyOptions({ width: el.clientWidth, height: el.clientHeight });
+      if (el.clientWidth > 0 && el.clientHeight > 0) {
+        c.applyOptions({ width: el.clientWidth, height: el.clientHeight });
+        c.timeScale().fitContent();
+      }
     });
     ro.observe(el);
     return () => {
@@ -117,151 +118,284 @@ function EquityCurve({ ledger, currency }: { ledger: LedgerEntryDto[]; currency:
       c.remove();
     };
   }, [points]);
-  if (points.length === 0) return <EmptyState title="No ledger entries yet">The equity curve builds from your deposits and closed trades.</EmptyState>;
+  if (base === null) return <EmptyState title="No starting balance">ROI needs a funded account: deposit or credit first.</EmptyState>;
+  if (points.length === 0) return <EmptyState title="No closed trades in this period" />;
+  return <div ref={host} className="absolute inset-0" />;
+}
+
+function PerfCard({ icon, label, usd, points, tone, tip, children }: { icon: React.ReactNode; label: string; usd?: number | null; points?: number | null; tone: 'up' | 'down' | 'neutral'; tip?: string; children?: React.ReactNode }) {
   return (
-    <div className="relative h-full min-h-[220px]">
-      <div ref={host} className="absolute inset-0" />
-      <div className="pointer-events-none absolute left-3 top-2 text-[11px] text-[var(--t-muted)]">Balance + credit after each ledger entry · {currency}</div>
+    <div className="t-card flex items-start gap-3 !px-4 !py-[18px]">
+      <span className={cn('mt-0.5 flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-[5px] [&>svg]:h-[15px] [&>svg]:w-[15px]', tone === 'down' ? 'bg-[rgb(239_85_109/0.18)] text-[var(--t-sell)]' : 'bg-[rgb(65_208_193/0.16)] text-[var(--t-up)]')}>{icon}</span>
+      <span className="min-w-0 leading-tight">
+        <span className="flex items-center gap-2 text-[13px] text-[var(--t-text-2)]">
+          {label}
+          {tip && <InfoTip text={tip} />}
+        </span>
+        {children ?? (
+          <>
+            <span className="mt-1.5 block text-[16px] font-semibold text-white">
+              {usd === null || usd === undefined ? '—' : fmtNum(usd)}
+              {usd !== null && usd !== undefined && <span className="ml-1 text-[10px] font-semibold text-[var(--t-text-2)]">USD</span>}
+            </span>
+            <span className="mt-1 block text-[16px] font-semibold text-white">
+              {points === null || points === undefined ? '—' : fmtNum(points)}
+              {points !== null && points !== undefined && <span className="ml-1 text-[10px] font-semibold text-[var(--t-text-2)]">POINTS</span>}
+            </span>
+          </>
+        )}
+      </span>
     </div>
   );
 }
 
-function Tile({ label, value, sub, tone, className }: { label: string; value: string; sub?: string; tone?: 'up' | 'down'; className?: string }) {
+/** "33 buys (22%) ———— 118 buys (78%)": profitable vs losing split with a teal / red proportional bar. */
+function SplitRow({ noun, win, lose }: { noun: string; win: number; lose: number }) {
+  const total = win + lose;
+  const pct = (n: number) => (total ? Math.round((n / total) * 100) : 0);
   return (
-    <div className={cn('bg-[var(--t-bg)] px-4 py-3', className)}>
-      <div className="text-[11px] text-[var(--t-muted)]">{label}</div>
-      <div className={cn('mt-0.5 text-[18px] font-semibold text-white', tone === 'up' && 't-pnl-up', tone === 'down' && 't-pnl-down')}>{value}</div>
-      {sub && <div className="text-[11px] text-[var(--t-muted)]">{sub}</div>}
+    <div>
+      <div className="flex items-baseline justify-between text-[15px] font-semibold text-white">
+        <span>
+          {win} {noun} <span className="font-normal text-[var(--t-text-2)]">({pct(win)}%)</span>
+        </span>
+        <span>
+          {lose} {noun} <span className="font-normal text-[var(--t-text-2)]">({pct(lose)}%)</span>
+        </span>
+      </div>
+      <div className="mt-2 flex h-[7px] gap-[3px]">
+        {total === 0 ? <span className="h-full flex-1 rounded-full bg-[var(--t-raised-2)]" /> : (
+          <>
+            {win > 0 && <span className="h-full rounded-full bg-[var(--t-up)]" style={{ width: `${(win / total) * 100}%` }} />}
+            {lose > 0 && <span className="h-full rounded-full bg-[var(--t-sell)]" style={{ width: `${(lose / total) * 100}%` }} />}
+          </>
+        )}
+      </div>
+      <div className="mt-1.5 flex justify-between text-[11px] text-[var(--t-text-2)]">
+        <span className="rounded bg-[var(--t-raised)] px-1.5 py-px">Profitable {noun[0].toUpperCase() + noun.slice(1)}</span>
+        <span className="rounded bg-[var(--t-raised)] px-1.5 py-px">Losing {noun[0].toUpperCase() + noun.slice(1)}</span>
+      </div>
     </div>
   );
 }
 
-/** Account statistics from the closed positions and the ledger. */
+/** Teal / red donut (profitable vs losing days). */
+function Donut({ win, lose, size = 230 }: { win: number; lose: number; size?: number }) {
+  const total = win + lose;
+  const r = 38;
+  const c = 2 * Math.PI * r;
+  const winLen = total ? (win / total) * c : 0;
+  return (
+    <svg viewBox="0 0 100 100" width={size} height={size} className="shrink-0" role="img" aria-label={`${win} profitable days, ${lose} losing days`}>
+      <circle cx="50" cy="50" r={r} fill="none" stroke={total ? 'var(--t-sell)' : 'var(--t-raised-2)'} strokeWidth="24" />
+      {winLen > 0 && <circle cx="50" cy="50" r={r} fill="none" stroke="var(--t-up)" strokeWidth="24" strokeDasharray={`${winLen} ${c - winLen}`} strokeDashoffset={c / 4} />}
+    </svg>
+  );
+}
+
+/** Account analytics: ROI over the period, trade performance, trade summary, daily performance, monthly ROI. */
 export function AnalyticsView({ account, history, loadHistory, symbols, ledgerVersion, className }: { account: AccountDto; history: PositionDto[] | null; loadHistory: () => Promise<void>; symbols: Map<string, SymbolSpec>; ledgerVersion: number; className?: string }) {
   const [ledger, setLedger] = useState<LedgerEntryDto[] | null>(null);
+  const [period, setPeriod] = useState<Period>('3m');
+  const [year, setYear] = useState(() => new Date().getUTCFullYear());
   useEffect(() => {
     if (history === null) void loadHistory();
   }, [history, loadHistory]);
   useEffect(() => {
     let alive = true;
-    // newest 100 entries (API page size cap); enough for the curve of a retail account
-    get<Paginated<LedgerEntryDto>>(`/me/accounts/${account.id}/ledger?page=1&limit=100`)
-      .then((r) => alive && setLedger(r.items))
-      .catch(() => alive && setLedger([]));
+    // whole ledger, oldest first (pages of 100; a retail account rarely has more than a few hundred rows)
+    (async () => {
+      const all: LedgerEntryDto[] = [];
+      for (let page = 1; page <= 10; page++) {
+        const r = await get<Paginated<LedgerEntryDto>>(`/me/accounts/${account.id}/ledger?page=${page}&limit=100`);
+        all.push(...r.items);
+        if (r.items.length < 100 || all.length >= r.total) break;
+      }
+      if (alive) setLedger(all.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()));
+    })().catch(() => alive && setLedger([]));
     return () => {
       alive = false;
     };
   }, [account.id, ledgerVersion]);
-  const stats = useMemo(() => (history ? compute(history) : null), [history]);
-  const tone = (n: number | null | undefined) => (n === null || n === undefined ? undefined : n > 0 ? 'up' : n < 0 ? 'down' : undefined);
 
-  if (!stats || ledger === null)
+  const closed = useMemo(() => (history ? toClosed(history, symbols) : null), [history, symbols]);
+  const stats = useMemo(() => {
+    if (!closed || !ledger) return null;
+    const now = Date.now();
+    const days = PERIODS.find((p) => p.value === period)!.days;
+    const startMs = days === null ? 0 : now - days * DAY_MS;
+    const trades = closed.filter((t) => t.closeMs >= startMs);
+    const base = balanceAt(ledger, days === null ? 0 : startMs);
+    const total = trades.reduce((s, t) => s + t.pnl, 0);
+    const wins = trades.filter((t) => t.pnl > 0);
+    const losses = trades.filter((t) => t.pnl < 0);
+    const avg = (xs: number[]) => (xs.length ? xs.reduce((s, x) => s + x, 0) / xs.length : null);
+    const avgPoints = (xs: Closed[]) => avg(xs.map((t) => t.points).filter((x): x is number => x !== null));
+    const grossProfit = wins.reduce((s, t) => s + t.pnl, 0);
+    const grossLoss = -losses.reduce((s, t) => s + t.pnl, 0);
+    const buys = trades.filter((t) => t.p.side === 'buy');
+    const sells = trades.filter((t) => t.p.side === 'sell');
+    const byDay = new Map<string, number>();
+    trades.forEach((t) => {
+      const k = new Date(t.closeMs).toISOString().slice(0, 10);
+      byDay.set(k, (byDay.get(k) ?? 0) + t.pnl);
+    });
+    const dayPnls = Array.from(byDay.values());
+    const months = MONTHS.map((_, m) => {
+      const start = Date.UTC(year, m, 1);
+      const end = Date.UTC(year, m + 1, 1);
+      const xs = closed.filter((t) => t.closeMs >= start && t.closeMs < end);
+      if (xs.length === 0) return null;
+      return roiOf(
+        xs.reduce((s, t) => s + t.pnl, 0),
+        balanceAt(ledger, start),
+      );
+    });
+    const years = closed.length ? Array.from(new Set(closed.map((t) => new Date(t.closeMs).getUTCFullYear()))).sort() : [year];
+    return {
+      trades,
+      base,
+      total,
+      roi: roiOf(total, base),
+      avgWin: avg(wins.map((t) => t.pnl)),
+      avgWinPts: avgPoints(wins),
+      avgLoss: avg(losses.map((t) => t.pnl)),
+      avgLossPts: avgPoints(losses),
+      profitFactor: grossLoss > 0 ? grossProfit / grossLoss : grossProfit > 0 ? Infinity : null,
+      buyWin: buys.filter((t) => t.pnl > 0).length,
+      buyLose: buys.filter((t) => t.pnl <= 0).length,
+      sellWin: sells.filter((t) => t.pnl > 0).length,
+      sellLose: sells.filter((t) => t.pnl <= 0).length,
+      days: dayPnls.length,
+      dayWin: dayPnls.filter((v) => v > 0).length,
+      dayLose: dayPnls.filter((v) => v <= 0).length,
+      months,
+      years,
+    };
+  }, [closed, ledger, period, year]);
+
+  if (!closed || !ledger || !stats)
     return (
       <div className={cn('t-panel items-center justify-center', className)}>
         <Spinner />
       </div>
     );
+  if (closed.length === 0)
+    return (
+      <div className={cn('t-panel', className)}>
+        <EmptyState icon={<ChartPie />} title="No closed trades yet">
+          ROI, trade performance and the daily / monthly breakdown appear once the first position is closed on {account.type.toUpperCase()} {account.loginCode}.
+        </EmptyState>
+      </div>
+    );
   const pf = stats.profitFactor === null ? '—' : stats.profitFactor === Infinity ? '∞' : stats.profitFactor.toFixed(2);
+  const pct = (n: number) => (stats.days ? Math.round((n / stats.days) * 100) : 0);
+  const yearIdx = stats.years.indexOf(year);
+  const maxRoi = Math.max(0.0001, ...stats.months.map((v) => (v === null ? 0 : Math.abs(v))));
   return (
-    <div className={cn('flex min-h-0 flex-col gap-2 overflow-y-auto', className)}>
-      <section className="t-panel shrink-0">
-        <div className="t-bar !pl-4 text-[14px] font-semibold text-white">
-          <ChartPie className="mr-2 h-4 w-4 text-[var(--t-blue)]" /> Account statistics
-          <span className="ml-2 text-[12px] font-normal text-[var(--t-muted)]">
-            {account.type.toUpperCase()} {account.loginCode}
-          </span>
-        </div>
-        {stats.trades === 0 ? (
-          <EmptyState icon={<ChartPie />} title="No closed trades yet">
-            Statistics appear once the first position is closed.
-          </EmptyState>
-        ) : (
-          <div className="grid grid-cols-2 gap-px bg-[var(--t-line)] sm:grid-cols-3 xl:grid-cols-6">
-            <Tile label="Total P/L" value={`${fmtSignedNum(stats.total)} ${account.currency}`} tone={tone(stats.total)} sub={`gross +${fmtNum(stats.grossProfit)} / -${fmtNum(stats.grossLoss)}`} />
-            <Tile label="Trades" value={String(stats.trades)} sub={`${stats.wins} won · ${stats.losses} lost`} />
-            <Tile label="Win rate" value={stats.winRate === null ? '—' : `${stats.winRate.toFixed(1)}%`} tone={stats.winRate === null ? undefined : stats.winRate >= 50 ? 'up' : 'down'} />
-            <Tile label="Profit factor" value={pf} sub="gross profit ÷ gross loss" tone={stats.profitFactor === null ? undefined : stats.profitFactor >= 1 ? 'up' : 'down'} />
-            <Tile label="Best trade" value={stats.best ? fmtSignedNum(stats.best.realizedPnl) : '—'} sub={stats.best ? `${stats.best.side} ${stats.best.lots} ${stats.best.symbol}` : undefined} tone="up" />
-            <Tile label="Worst trade" value={stats.worst ? fmtSignedNum(stats.worst.realizedPnl) : '—'} sub={stats.worst ? `${stats.worst.side} ${stats.worst.lots} ${stats.worst.symbol}` : undefined} tone={tone(stats.worst ? Number(stats.worst.realizedPnl) : null)} />
-            <Tile label="Average holding time" value={stats.avgHoldMs === null ? '—' : fmtDuration(stats.avgHoldMs)} />
-            <Tile label="Balance" value={fmtNum(account.balance)} sub={account.currency} />
-            <Tile label="Equity" value={fmtNum(account.equity)} sub={account.currency} />
-            <Tile label="Credit" value={fmtNum(account.credit)} sub={account.currency} />
-            <Tile label="Free margin" value={fmtNum(account.freeMargin)} sub={account.currency} />
-            <Tile label="Margin level" value={account.marginLevel === null ? '—' : `${fmtNum(account.marginLevel)}%`} />
+    <div className={cn('flex min-h-0 flex-col gap-[18px] overflow-y-auto pr-px', className)}>
+      <div className="grid shrink-0 gap-[18px] lg:grid-cols-[minmax(0,1fr)_340px]">
+        {/* ROI */}
+        <section className="t-panel min-h-[440px] !p-6">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2 text-[22px] font-semibold text-white">
+                ROI: <span className={toneOf(stats.roi)}>{fmtRoi(stats.roi)}</span>
+                <InfoTip text="Return on investment = total realised P/L of the period ÷ the balance at the start of the period (the first funding when the account was funded inside the period)." />
+              </div>
+              <div className={cn('mt-1 text-[15px] font-medium', toneOf(stats.total))}>
+                {fmtNum(stats.total)} {account.currency}
+              </div>
+            </div>
+            <div role="tablist" aria-label="Period" className="t-seg">
+              {PERIODS.map((p) => (
+                <button key={p.value} type="button" role="tab" aria-selected={period === p.value} data-on={period === p.value} onClick={() => setPeriod(p.value)}>
+                  {p.label}
+                </button>
+              ))}
+            </div>
           </div>
-        )}
-      </section>
-      <div className="grid min-h-[300px] shrink-0 gap-2 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-        <section className="t-panel min-h-[300px]">
-          <div className="t-bar !pl-4 text-[13px] font-semibold text-white">Equity curve</div>
-          <div className="min-h-0 flex-1">
-            <EquityCurve ledger={ledger} currency={account.currency} />
+          <div className="relative mt-4 min-h-[300px] flex-1">
+            <RoiChart trades={stats.trades} base={stats.base} />
           </div>
         </section>
-        <section className="t-panel min-h-[300px]">
-          <div className="t-bar !pl-4 text-[13px] font-semibold text-white">By instrument</div>
-          <div className="min-h-0 flex-1 overflow-y-auto">
-            {stats.bySymbol.length === 0 ? (
-              <EmptyState title="No closed trades yet" />
-            ) : (
-              <ul>
-                {stats.bySymbol.map((r) => (
-                  <li key={r.symbol} className="flex items-center gap-3 border-b border-[var(--t-line)] px-4 py-2.5">
-                    <SymbolTile spec={symbols.get(r.symbol)} id={r.symbol} size={24} />
-                    <span className="flex-1 text-[13px] font-semibold text-white">{r.symbol}</span>
-                    <span className="text-[12px] text-[var(--t-muted)]">
-                      {r.trades} trade{r.trades === 1 ? '' : 's'}
-                    </span>
-                    <span className={cn('inline-flex w-28 items-center justify-end gap-1 text-[13px] font-semibold', r.pnl > 0 ? 't-pnl-up' : r.pnl < 0 ? 't-pnl-down' : 'text-white')}>
-                      {r.pnl > 0 ? <TrendingUp className="h-3.5 w-3.5" /> : r.pnl < 0 ? <TrendingDown className="h-3.5 w-3.5" /> : null}
-                      {fmtSignedNum(r.pnl)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
+
+        {/* Trade performance */}
+        <section className="t-panel !p-6">
+          <h2 className="t-h2">Trade performance</h2>
+          <div className="mt-6 flex flex-col gap-3">
+            <PerfCard icon={<TrendingUp />} label="Average Win" usd={stats.avgWin} points={stats.avgWinPts} tone="up" />
+            <PerfCard icon={<TrendingDown />} label="Average Loss" usd={stats.avgLoss} points={stats.avgLossPts} tone="down" />
+            <PerfCard icon={<CirclePlus />} label="Profit Factor" tone="neutral" tip="Gross profit ÷ gross loss of the period. Above 1 means the winners outweigh the losers.">
+              <span className="mt-1.5 block text-[16px] font-semibold text-white">{pf}</span>
+            </PerfCard>
           </div>
         </section>
       </div>
-      {stats.best && (
-        <section className="t-panel shrink-0">
-          <div className="t-bar !pl-4 text-[13px] font-semibold text-white">Recent closed trades</div>
-          <table className="t-table">
-            <thead>
-              <tr>
-                <th>Symbol</th>
-                <th className="text-right">Volume</th>
-                <th className="text-right">Open</th>
-                <th className="text-right">Close</th>
-                <th className="text-right">Closed at</th>
-                <th className="text-right">Profit</th>
-              </tr>
-            </thead>
-            <tbody>
-              {history!.slice(0, 8).map((p) => {
-                const d = symbols.get(p.symbol)?.digits ?? 2;
-                const [d2, t2] = fmtDateTimeParts(p.closeAt);
-                const pnl = Number(p.realizedPnl ?? 0);
-                return (
-                  <tr key={p.id} className="[&>td]:!h-[42px]">
-                    <td className="flex h-[42px] items-center gap-2 font-semibold text-white">
-                      <SymbolTile spec={symbols.get(p.symbol)} id={p.symbol} size={20} /> {p.symbol} <span className="t-side" data-side={p.side}>{p.side === 'buy' ? 'Buy' : 'Sell'}</span>
-                    </td>
-                    <td className="text-right text-white">{p.lots}</td>
-                    <td className="text-right text-white">{Number(p.openPrice).toFixed(d)}</td>
-                    <td className="text-right text-white">{p.closePrice ? Number(p.closePrice).toFixed(d) : '—'}</td>
-                    <td className="text-right text-[var(--t-text-2)]">
-                      {d2} <span className="text-[var(--t-muted)]">{t2}</span>
-                    </td>
-                    <td className={cn('text-right font-semibold', pnl > 0 ? 't-pnl-up' : pnl < 0 ? 't-pnl-down' : 'text-white')}>{fmtSignedNum(pnl)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+
+      <div className="grid shrink-0 gap-[18px] lg:grid-cols-2">
+        {/* Trade summary */}
+        <section className="t-panel !p-6">
+          <h2 className="t-h2">Trade summary</h2>
+          <div className="mt-5 text-[15px] text-[var(--t-text-2)]">
+            Total trades: <span className="font-semibold text-white">{stats.trades.length}</span>
+          </div>
+          <div className="mt-5 flex flex-col gap-6">
+            <SplitRow noun="buys" win={stats.buyWin} lose={stats.buyLose} />
+            <SplitRow noun="sells" win={stats.sellWin} lose={stats.sellLose} />
+          </div>
         </section>
-      )}
+
+        {/* Daily performance */}
+        <section className="t-panel !p-6">
+          <div className="flex flex-wrap items-start justify-between gap-6">
+            <div className="min-w-0">
+              <h2 className="t-h2">Daily performance</h2>
+              <div className="mt-5 text-[15px] text-[var(--t-text-2)]">
+                Total days: <span className="font-semibold text-white">{stats.days}</span>
+              </div>
+              <div className="mt-3 flex items-baseline gap-2 text-[15px]">
+                <span className="rounded bg-[var(--t-raised)] px-1.5 py-px text-[11px] text-[var(--t-text-2)]">Profitable Days</span>
+                <span className="font-semibold t-pnl-up">{stats.dayWin} days</span>
+                <span className="text-[var(--t-text-2)]">({pct(stats.dayWin)}%)</span>
+              </div>
+              <div className="mt-2 flex items-baseline gap-2 text-[15px]">
+                <span className="rounded bg-[var(--t-raised)] px-1.5 py-px text-[11px] text-[var(--t-text-2)]">Losing Days</span>
+                <span className="font-semibold t-pnl-down">{stats.dayLose} days</span>
+                <span className="text-[var(--t-text-2)]">({pct(stats.dayLose)}%)</span>
+              </div>
+            </div>
+            <Donut win={stats.dayWin} lose={stats.dayLose} size={236} />
+          </div>
+        </section>
+      </div>
+
+      {/* Monthly ROI */}
+      <section className="t-panel shrink-0 !p-6">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="t-h2">Monthly ROI</h2>
+          <div className="flex items-center gap-1">
+            <button type="button" onClick={() => setYear(stats.years[yearIdx - 1] ?? year - 1)} disabled={yearIdx <= 0} aria-label="Previous year" className="t-top-btn !h-7 !w-7 !rounded-md disabled:opacity-40">
+              <ChevronLeft className="!h-4 !w-4" />
+            </button>
+            <span className="w-12 text-center text-[13px] font-semibold text-white">{year}</span>
+            <button type="button" onClick={() => setYear(stats.years[yearIdx + 1] ?? year + 1)} disabled={yearIdx === -1 || yearIdx >= stats.years.length - 1} aria-label="Next year" className="t-top-btn !h-7 !w-7 !rounded-md disabled:opacity-40">
+              <ChevronRight className="!h-4 !w-4" />
+            </button>
+          </div>
+        </div>
+        <div className="mt-5 grid grid-cols-4 gap-2 sm:grid-cols-6 lg:grid-cols-12">
+          {stats.months.map((v, i) => (
+            <div key={i} className="t-card flex flex-col items-center !px-2 !py-3">
+              <div className="flex h-16 w-full items-end justify-center">
+                <span className={cn('w-5 rounded-t-sm', v === null ? 'bg-[var(--t-raised-2)]' : v >= 0 ? 'bg-[var(--t-up)]' : 'bg-[var(--t-sell)]')} style={{ height: v === null ? 2 : Math.max(3, (Math.abs(v) / maxRoi) * 60) }} />
+              </div>
+              <span className={cn('mt-2 text-[13px] font-semibold', toneOf(v))}>{fmtRoi(v)}</span>
+              <span className="text-[11px] text-[var(--t-muted)]">{MONTHS[i]}</span>
+            </div>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }

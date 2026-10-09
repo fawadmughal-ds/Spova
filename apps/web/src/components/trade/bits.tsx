@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { Calendar as CalendarIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { SymbolSpec } from './format';
 
@@ -102,5 +103,81 @@ export function EmptyState({ icon, title, children, className }: { icon?: ReactN
       <div className="text-[13px] font-medium text-[var(--t-text-2)]">{title}</div>
       {children && <div className="max-w-sm text-[12px] leading-relaxed text-[var(--t-muted)]">{children}</div>}
     </div>
+  );
+}
+
+/** Red / teal split bar with the two percentages ("49% ——— 51%"), used for market sentiment. */
+export function SplitBar({ sellPct, buyPct, className, labels = true }: { sellPct: number; buyPct: number; className?: string; labels?: boolean }) {
+  return (
+    <span className={cn('flex items-center gap-2', className)}>
+      {labels && <span className="w-9 shrink-0 text-right text-[12px] font-semibold text-[var(--t-sell)]">{Math.round(sellPct)}%</span>}
+      <span className="flex h-[5px] min-w-0 flex-1 gap-[3px]">
+        <span className="h-full rounded-full bg-[var(--t-sell)]" style={{ width: `${sellPct}%` }} />
+        <span className="h-full rounded-full bg-[var(--t-up)]" style={{ width: `${buyPct}%` }} />
+      </span>
+      {labels && <span className="w-9 shrink-0 text-[12px] font-semibold text-[var(--t-up)]">{Math.round(buyPct)}%</span>}
+    </span>
+  );
+}
+
+/** Small round "i" with a hover / focus tooltip (title + explanation). */
+export function InfoTip({ text, className }: { text: string; className?: string }) {
+  return (
+    <span className={cn('group/tip relative inline-flex', className)}>
+      <button type="button" aria-label={text} className="inline-flex h-[18px] w-[18px] items-center justify-center rounded-full bg-[#4b5868] text-[11px] font-bold leading-none text-white">
+        i
+      </button>
+      <span role="tooltip" className="pointer-events-none absolute left-1/2 top-[calc(100%+8px)] z-30 w-64 -translate-x-1/2 rounded-md border border-[#3b434f] bg-[#2a313b] px-3 py-2 text-left text-[11.5px] font-normal leading-relaxed text-[var(--t-text-2)] opacity-0 shadow-lift transition-opacity group-hover/tip:opacity-100 group-focus-within/tip:opacity-100">
+        {text}
+      </span>
+    </span>
+  );
+}
+
+/** Shared "no calendar feed" state used by the Calendar tab and the Explore "Upcoming Events" card. */
+export function CalendarEmpty({ className }: { className?: string }) {
+  return (
+    <EmptyState icon={<CalendarIcon />} title="Economic calendar feed not connected" className={className}>
+      Scheduled releases (time, country, previous and forecast values) appear here once a calendar provider is configured for this broker.
+    </EmptyState>
+  );
+}
+
+/** Row of the economic calendar (flag · time · title / PV · Prev · Forecast · impact). Rendered per event once a feed exists. */
+export interface CalendarEvent {
+  id: string;
+  /** ISO 3166-1 alpha-2 of the issuing country */
+  country: string;
+  /** "12:30" UTC */
+  time: string;
+  title: string;
+  previous: string | null;
+  forecast: string | null;
+  actual: string | null;
+  impact: 1 | 2 | 3;
+}
+export function CalendarRow({ e }: { e: CalendarEvent }) {
+  return (
+    <li className="flex items-center gap-3 border-b border-[var(--t-line)] px-3 py-2.5">
+      <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-sm bg-[var(--t-raised)] text-[9px] font-bold text-white" aria-label={e.country}>
+        {e.country}
+      </span>
+      <span className="min-w-0 flex-1 leading-tight">
+        <span className="flex items-baseline gap-2 text-[14px] font-semibold text-white">
+          <span>{e.time}</span>
+          <span className="truncate">{e.title}</span>
+        </span>
+        <span className="mt-0.5 flex gap-3 text-[11px] text-[var(--t-muted)]">
+          <span>PV: {e.actual ?? '-'}</span>
+          <span>Prev: {e.previous ?? '-'}</span>
+          <span>Forecast: {e.forecast ?? '-'}</span>
+        </span>
+      </span>
+      <span className="flex h-8 w-8 shrink-0 items-end justify-center gap-[2px] rounded-md bg-[var(--t-raised)] pb-2" aria-label={`Impact ${e.impact} of 3`}>
+        {[1, 2, 3].map((n) => (
+          <span key={n} className={cn('w-[3px] rounded-sm', n === 1 ? 'h-[6px]' : n === 2 ? 'h-[9px]' : 'h-[12px]', n <= e.impact ? 'bg-[var(--t-sell)]' : 'bg-[#4b5868]')} />
+        ))}
+      </span>
+    </li>
   );
 }
