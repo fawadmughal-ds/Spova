@@ -45,7 +45,7 @@ export function createLocalStore<T extends object>(key: string, defaults: T) {
   return { get, set, patch, subscribe, use };
 }
 
-export type ChartType = 'candles' | 'bars' | 'line';
+export type ChartType = 'candles' | 'bars' | 'line' | 'area';
 export interface TerminalSettings {
   /** ask before sending one-click market orders (MatchTrader default: off) */
   confirmOrders: boolean;

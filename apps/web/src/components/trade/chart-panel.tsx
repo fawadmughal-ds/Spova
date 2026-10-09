@@ -1,8 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { AlarmClock, Bell, ChartCandlestick, ChartColumn, ChartLine, Check, Clock3, Cloud, Crosshair, Eye, Layers, Magnet, Maximize, Minimize2, Minus, PencilLine, Ruler, Save, Settings, Spline, Square, SquareFunction, Trash2, Type, Volume2, X, ZoomIn, ZoomOut } from 'lucide-react';
+import { AlarmClock, Bell, ChartArea, ChartCandlestick, ChartColumn, ChartLine, Check, Clock3, Cloud, Crosshair, Eye, Layers, Magnet, Maximize, Minimize2, Minus, PencilLine, Ruler, Save, Settings, Spline, Square, SquareFunction, Trash2, Type, Volume2, X, ZoomIn, ZoomOut } from 'lucide-react';
 import {
+  AreaSeries,
   BarSeries,
   CandlestickSeries,
   ColorType,
@@ -51,7 +52,7 @@ type Tool = 'crosshair' | 'measure' | 'hline';
 type MainSeries = ISeriesApi<SeriesType>;
 
 const toBar = (c: CandleDto): Bar => ({ time: c.t as UTCTimestamp, open: Number(c.o), high: Number(c.h), low: Number(c.l), close: Number(c.c), volume: Number(c.v ?? 0) });
-const mainData = (bars: Bar[], type: ChartType) => (type === 'line' ? bars.map((b) => ({ time: b.time, value: b.close })) : bars.map(({ time, open, high, low, close }) => ({ time, open, high, low, close })));
+const mainData = (bars: Bar[], type: ChartType) => (type === 'line' || type === 'area' ? bars.map((b) => ({ time: b.time, value: b.close })) : bars.map(({ time, open, high, low, close }) => ({ time, open, high, low, close })));
 const volPoint = (b: Bar) => ({ time: b.time, value: b.volume, color: b.close >= b.open ? VOL_UP : VOL_DOWN });
 
 const sma = (bars: Bar[], n: number) => {
@@ -332,6 +333,7 @@ export function ChartPanel({ spec, positions, className, footer }: ChartPanelPro
     const common = { priceFormat, priceLineColor: BLUE, priceLineWidth: 1 as const, priceLineStyle: LineStyle.Solid, lastValueVisible: true };
     let s: MainSeries;
     if (chartType === 'line') s = c.addSeries(LineSeries, { ...common, color: BLUE, lineWidth: 2, crosshairMarkerVisible: true });
+    else if (chartType === 'area') s = c.addSeries(AreaSeries, { ...common, lineColor: BLUE, lineWidth: 2, topColor: 'rgba(42, 195, 237, 0.28)', bottomColor: 'rgba(42, 195, 237, 0.02)', crosshairMarkerVisible: true });
     else if (chartType === 'bars') s = c.addSeries(BarSeries, { ...common, upColor: UP, downColor: DOWN, thinBars: false });
     else s = c.addSeries(CandlestickSeries, { ...common, upColor: UP, downColor: DOWN, borderVisible: false, wickUpColor: UP, wickDownColor: DOWN });
     main.current = s;
@@ -420,7 +422,7 @@ export function ChartPanel({ spec, positions, className, footer }: ChartPanelPro
       if (prev && bar.time < prev.time) return;
       if (prev && prev.time === bar.time) data[data.length - 1] = bar;
       else data.push(bar);
-      s.update((settingsStore.get().chartType === 'line' ? { time: bar.time, value: bar.close } : { time: bar.time, open: bar.open, high: bar.high, low: bar.low, close: bar.close }) as never);
+      s.update((['line', 'area'].includes(settingsStore.get().chartType) ? { time: bar.time, value: bar.close } : { time: bar.time, open: bar.open, high: bar.high, low: bar.low, close: bar.close }) as never);
       vol.current?.update(volPoint(bar));
       const n = data.length;
       if (ind.current.ma20 && n >= 20) ind.current.ma20.update(last(sma(data.slice(n - 20), 20)));
@@ -603,13 +605,14 @@ export function ChartPanel({ spec, positions, className, footer }: ChartPanelPro
             </div>
           )}
         </Dropdown>
-        <Dropdown title="Chart type" buttonClassName="t-icon-btn" button={() => (chartType === 'line' ? <ChartLine /> : chartType === 'bars' ? <ChartColumn /> : <ChartCandlestick />)}>
+        <Dropdown title="Chart type" buttonClassName="t-icon-btn" button={() => (chartType === 'line' ? <ChartLine /> : chartType === 'area' ? <ChartArea /> : chartType === 'bars' ? <ChartColumn /> : <ChartCandlestick />)}>
           {(close) =>
             (
               [
                 ['candles', 'Candles', <ChartCandlestick key="c" />],
                 ['bars', 'Bars', <ChartColumn key="b" />],
                 ['line', 'Line', <ChartLine key="l" />],
+                ['area', 'Area', <ChartArea key="a" />],
               ] as [ChartType, string, ReactNode][]
             ).map(([v, label, icon]) => (
               <button
