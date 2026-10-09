@@ -7,7 +7,7 @@ import { ArrowDownToLine, ArrowRight, ArrowUpFromLine, BadgeCheck, ChevronLeft, 
 import { depositRequestSchema, withdrawRequestSchema, WS_EVENTS, type AccountDto, type Paginated, type PaymentKind, type PaymentMethodDto, type PaymentRequestDto, type WsPaymentStatus } from '@spova/shared';
 import { useAuth } from '@/lib/auth-context';
 import { useAccounts } from '@/lib/use-accounts';
-import { get, post } from '@/lib/api';
+import { get, post, upload } from '@/lib/api';
 import { useUserEvent } from '@/lib/ws';
 import { buttonClass } from '@/lib/button';
 import { cn, fmtMoney } from '@/lib/utils';
@@ -17,6 +17,7 @@ import { Alert, Button, Empty, Input, Skeleton } from '@/components/ui';
 import { SlidingTabs } from '@/components/portal/sliding-tabs';
 import { AccountPicker } from '@/components/portal/account-picker';
 import { MethodCards, methodIcon } from '@/components/portal/method-cards';
+import { PayToPanel, ProofPicker } from '@/components/portal/deposit-channel';
 import { PaymentRow, shortId } from '@/components/portal/payment-row';
 import { fmtLogin } from '@/components/portal/account-plate';
 import { availableFrom, friendlyError, type FriendlyError } from '@/components/portal/api-error';
@@ -258,7 +259,11 @@ function RequestDone({ req, method, onAgain, onHistory }: { req: PaymentRequestD
   const withdraw = req.kind === 'withdraw';
   const steps = withdraw
     ? ['Our back office checks the destination belongs to you and that funds are free of open-position margin.', `The payout is sent by ${method?.label ?? req.method}; typical time ${method?.eta ?? 'a few business days'}.`, 'Your balance updates the moment the request is approved. You can cancel while it is still pending.']
-    : [`Send the funds by ${method?.label ?? req.method}${req.reference ? ` quoting your reference ${req.reference}` : ''}, if you have not already.`, `Our back office matches the incoming payment; typical time ${method?.eta ?? 'a few business days'}.`, 'Your balance updates instantly on approval and you are notified here and by email.'];
+    : [
+        `Send the funds by ${method?.label ?? req.method}${req.reference ? ` quoting your reference ${req.reference}` : ''}, if you have not already.`,
+        req.proof ? `Your payment proof (${req.proof.name}) is attached. Our back office matches it with the incoming payment; typical time ${method?.eta ?? 'a few business days'}.` : `Our back office matches the incoming payment; typical time ${method?.eta ?? 'a few business days'}. You can attach the slip from your history.`,
+        'Your balance updates instantly on approval and you are notified here and by email.',
+      ];
   return (
     <section className="card corners animate-pop-in mx-auto max-w-2xl overflow-hidden p-6 text-center sm:p-10" style={{ '--corner': 'rgb(var(--up-rgb) / 0.4)' } as React.CSSProperties}>
       <span className="relative mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-up text-ink-950 shadow-[0_0_0_8px_rgb(var(--up-rgb)/0.12)]">
@@ -302,12 +307,15 @@ function DepositForm({ accounts, methods, onCreated, onHistory }: { accounts: Ac
   const [method, setMethod] = useState<string | null>(usable[0]?.id ?? null);
   const [amount, setAmount] = useState('');
   const [reference, setReference] = useState('');
+  const [proof, setProof] = useState<File | null>(null);
   const [fieldErr, setFieldErr] = useState<Record<string, string>>({});
   const [error, setError] = useState<FriendlyError | null>(null);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<PaymentRequestDto | null>(null);
 
   const m = methods.find((x) => x.id === method);
+  const channel = m?.deposit;
+  const proofRequired = channel?.proofRequired ?? false;
   const account = accounts.find((a) => a.id === accountId);
   const Icon = methodIcon(method ?? '');
 
@@ -315,18 +323,32 @@ function DepositForm({ accounts, methods, onCreated, onHistory }: { accounts: Ac
     e.preventDefault();
     setError(null);
     const parsed = depositRequestSchema.safeParse({ accountId: accountId ?? '', amount, method: method ?? '', reference: reference.trim() || undefined });
+    const errs: Record<string, string> = {};
     if (!parsed.success) {
-      const errs: Record<string, string> = {};
       for (const i of parsed.error.issues) errs[String(i.path[0])] ??= i.message;
       if (errs.accountId) errs.accountId = 'Choose a live account';
       if (errs.method) errs.method = 'Choose a method';
+    }
+    if (proofRequired && !proof) errs.proof = 'Attach the payment slip or screenshot so we can match your transfer.';
+    if (!parsed.success || Object.keys(errs).length) {
       setFieldErr(errs);
       return;
     }
     setFieldErr({});
     setBusy(true);
     try {
-      const req = await post<PaymentRequestDto>('/me/payments/deposit', parsed.data);
+      let req = await post<PaymentRequestDto>('/me/payments/deposit', parsed.data);
+      if (proof) {
+        try {
+          const fd = new FormData();
+          fd.set('file', proof, proof.name);
+          req = await upload<PaymentRequestDto>(`/me/payments/${req.id}/proof`, fd);
+        } catch (err) {
+          // the request exists; the slip can still be added from History
+          const f = friendlyError(err);
+          toast({ title: 'Request sent, but the proof did not upload', body: `${f.title}. Attach it from your payment history.`, level: 'warning' });
+        }
+      }
       toast({ title: 'Deposit request sent', body: `${fmtMoney(req.amount)} ${req.currency} · #${shortId(req.id)}`, level: 'success' });
       setDone(req);
       onCreated();
@@ -348,6 +370,7 @@ function DepositForm({ accounts, methods, onCreated, onHistory }: { accounts: Ac
           setDone(null);
           setAmount('');
           setReference('');
+          setProof(null);
         }}
         onHistory={onHistory}
       />
@@ -370,9 +393,37 @@ function DepositForm({ accounts, methods, onCreated, onHistory }: { accounts: Ac
           <StepTitle n={3}>Amount</StepTitle>
           <div className="grid gap-4 sm:grid-cols-2">
             <AmountField value={amount} onChange={setAmount} error={fieldErr.amount} hint={m ? <>Min {fmtMoney(m.minDeposit)} · Max {fmtMoney(m.maxDeposit)} USD by {m.label}</> : 'Pick a method to see the limits'} />
-            <Input label="Reference (optional)" name="reference" value={reference} onChange={(e) => setReference(e.target.value)} placeholder={method === 'crypto_usdt' ? 'Transaction hash' : 'Bank transfer reference'} maxLength={120} hint="Helps us match your transfer faster." />
+            <Input
+              label="Reference (optional)"
+              name="reference"
+              value={reference}
+              onChange={(e) => setReference(e.target.value)}
+              placeholder={method === 'crypto_usdt' ? 'Transaction hash' : method === 'upi' ? 'UPI transaction ID (UTR)' : method === 'binance' ? 'Binance order / transaction ID' : 'Bank transfer reference'}
+              maxLength={120}
+              hint="Helps us match your transfer faster."
+            />
           </div>
         </section>
+        {channel && (
+          <section>
+            <StepTitle n={4}>Pay to</StepTitle>
+            <PayToPanel channel={channel} amount={amount} />
+          </section>
+        )}
+        {channel && (
+          <section>
+            <StepTitle n={5}>Payment proof</StepTitle>
+            <ProofPicker
+              file={proof}
+              required={proofRequired}
+              error={fieldErr.proof}
+              onChange={(f) => {
+                setProof(f);
+                setFieldErr((e) => ({ ...e, proof: '' }));
+              }}
+            />
+          </section>
+        )}
       </div>
 
       <aside className="min-w-0 lg:sticky lg:top-24 lg:self-start">
@@ -396,7 +447,7 @@ function DepositForm({ accounts, methods, onCreated, onHistory }: { accounts: Ac
           <Button type="submit" size="lg" className="mt-4 w-full" loading={busy} disabled={!accountId || !method}>
             <ArrowDownToLine className="h-4 w-4" /> Submit deposit request
           </Button>
-          <p className="mt-3 text-center text-[11px] leading-relaxed text-ink-500">Nothing is charged automatically. You transfer the funds; we credit the account once they arrive.</p>
+          <p className="mt-3 text-center text-[11px] leading-relaxed text-ink-500">Nothing is charged automatically. You transfer the funds and attach the slip; we credit the account once the payment is matched.</p>
         </div>
       </aside>
     </form>

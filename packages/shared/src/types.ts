@@ -162,6 +162,25 @@ export interface AdminKycRowDto extends KycDocumentDto {
   user: { id: string; email: string; firstName: string | null; lastName: string | null; countryCode: string | null };
 }
 
+/** One line of "pay to" details (account number, UPI id, wallet address...). */
+export interface DepositChannelField {
+  label: string;
+  value: string;
+  /** show a copy button */
+  copy?: boolean;
+}
+/** Public projection of a deposit channel: what the client sees in the deposit form. */
+export interface DepositChannelDto {
+  title: string;
+  fields: DepositChannelField[];
+  /** QR payload (UPI URI, wallet address, Binance Pay link); null = no QR for this channel */
+  qr: string | null;
+  /** `upi`: the amount is appended to the URI client-side (`am=`), so the app pre-fills it */
+  qrKind: 'upi' | 'address' | 'link' | null;
+  note: string;
+  /** a payment slip / screenshot must be attached to the request */
+  proofRequired: boolean;
+}
 export interface PaymentMethodDto {
   id: string;
   label: string;
@@ -172,6 +191,8 @@ export interface PaymentMethodDto {
   minWithdraw: string;
   maxWithdraw: string;
   eta: string;
+  /** present for deposit-capable methods: where to send the money */
+  deposit?: DepositChannelDto;
 }
 
 export interface PaymentRequestDto {
@@ -184,6 +205,8 @@ export interface PaymentRequestDto {
   method: string;
   destination: { label: string; details: string } | null;
   reference: string | null;
+  /** payment slip / screenshot attached by the client (file streams from /me/payments/:id/proof) */
+  proof: { name: string; mime: string } | null;
   status: PaymentStatus;
   adminNote: string | null;
   decidedAt: string | null;

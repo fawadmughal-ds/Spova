@@ -179,8 +179,10 @@ export type KycReviewInput = z.infer<typeof kycReviewSchema>;
 /** Payment methods offered in v1. Card stays visible but disabled until a PSP is connected (Phase 5). */
 export const PAYMENT_METHODS = [
   { id: 'bank', label: 'Bank transfer', kinds: ['deposit', 'withdraw'], enabled: true, minDeposit: '200', maxDeposit: '100000', minWithdraw: '50', maxWithdraw: '100000', eta: '1-3 business days' },
+  { id: 'upi', label: 'UPI', kinds: ['deposit'], enabled: true, minDeposit: '200', maxDeposit: '20000', minWithdraw: '0', maxWithdraw: '0', eta: 'Within hours' },
+  { id: 'binance', label: 'Binance Pay', kinds: ['deposit', 'withdraw'], enabled: true, minDeposit: '200', maxDeposit: '100000', minWithdraw: '50', maxWithdraw: '100000', eta: 'Same day' },
   { id: 'crypto_usdt', label: 'Crypto (USDT)', kinds: ['deposit', 'withdraw'], enabled: true, minDeposit: '200', maxDeposit: '100000', minWithdraw: '50', maxWithdraw: '100000', eta: 'Same day' },
-  { id: 'card', label: 'Card', kinds: ['deposit'], enabled: false, minDeposit: '200', maxDeposit: '5000', minWithdraw: '0', maxWithdraw: '0', eta: 'Coming soon' },
+  { id: 'card', label: 'Card', kinds: ['deposit'], enabled: false, minDeposit: '200', maxDeposit: '5000', minWithdraw: '0', maxWithdraw: '0', eta: 'Payment link' },
 ] as const;
 export type PaymentMethodId = (typeof PAYMENT_METHODS)[number]['id'];
 export const PAYMENT_METHOD_IDS = PAYMENT_METHODS.map((m) => m.id) as [PaymentMethodId, ...PaymentMethodId[]];
@@ -206,6 +208,28 @@ export const withdrawRequestSchema = z.object({
   reason: z.string().trim().max(200).optional(),
 });
 export type WithdrawRequestInput = z.infer<typeof withdrawRequestSchema>;
+
+/**
+ * Where clients send their deposits, per method. Edited by admins in the back office (stored as the
+ * `deposit_channels` app setting); clients only ever see the public projection (`DepositChannelDto`).
+ */
+const note = z.string().trim().max(300).default('');
+export const depositChannelsSchema = z.object({
+  bank: z.object({ enabled: z.boolean(), bankName: z.string().trim().max(80).default(''), accountName: z.string().trim().max(80).default(''), accountNumber: z.string().trim().max(40).default(''), ifsc: z.string().trim().max(20).default(''), swift: z.string().trim().max(20).default(''), note }),
+  upi: z.object({ enabled: z.boolean(), vpa: z.string().trim().max(80).default(''), payeeName: z.string().trim().max(80).default(''), note }),
+  binance: z.object({ enabled: z.boolean(), payId: z.string().trim().max(40).default(''), email: z.string().trim().max(120).default(''), qrLink: z.string().trim().max(300).default(''), note }),
+  crypto_usdt: z.object({ enabled: z.boolean(), address: z.string().trim().max(120).default(''), network: z.string().trim().max(40).default('TRC20'), note }),
+  card: z.object({ enabled: z.boolean(), note }),
+});
+export type DepositChannels = z.infer<typeof depositChannelsSchema>;
+
+export const DEFAULT_DEPOSIT_CHANNELS: DepositChannels = {
+  bank: { enabled: true, bankName: 'HDFC Bank', accountName: 'XYZ Markets Ltd', accountNumber: '50200012345678', ifsc: 'HDFC0001234', swift: 'HDFCINBB', note: 'Use your account login as the transfer remark. INR transfers are converted at the rate of the day.' },
+  upi: { enabled: true, vpa: 'xyzmarkets@hdfcbank', payeeName: 'XYZ Markets', note: 'Scan the QR with any UPI app (GPay, PhonePe, Paytm) or pay to the UPI ID. Keep the screenshot of the success screen.' },
+  binance: { enabled: true, payId: '123456789', email: 'pay@xyz.local', qrLink: '', note: 'Binance app → Pay → Send → enter the Pay ID (or scan). Send USDT. Zero fee inside Binance.' },
+  crypto_usdt: { enabled: true, address: 'TXYZ1111111111111111111111111111111', network: 'TRC20', note: 'Send USDT on the TRC20 network only. Transfers on another network cannot be recovered.' },
+  card: { enabled: false, note: 'After you submit, our team emails you a secure card payment link within business hours.' },
+};
 
 export const paymentDecisionSchema = z
   .object({ status: z.enum(['approved', 'declined']), note: z.string().trim().max(300).optional() })

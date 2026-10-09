@@ -183,6 +183,56 @@ describe('phase 2: kyc -> live account -> payments -> tickets', () => {
     assert.ok(audit.data.items.some((a: any) => a.action === 'payment.approve'));
   });
 
+  it('deposit channels: methods carry pay-to details; proof slip uploads and streams to owner + admin; admin edits channels', async () => {
+    const methods = await client.json('GET', '/me/payments/methods');
+    const bank = methods.data.find((m: any) => m.id === 'bank');
+    assert.ok(bank.deposit && bank.deposit.fields.some((f: any) => f.label === 'Account number'), 'bank pay-to details');
+    const upi = methods.data.find((m: any) => m.id === 'upi');
+    assert.ok(upi.enabled && upi.deposit.qr?.startsWith('upi://pay?pa='), 'upi QR payload');
+
+    const dep = await client.json('POST', '/me/payments/deposit', { accountId: liveAccountId, amount: '250', method: 'upi', reference: 'UTR-42' });
+    assert.ok([200, 201].includes(dep.status), JSON.stringify(dep.data));
+    assert.equal(dep.data.proof, null);
+    assert.equal((await client.json('GET', `/me/payments/${dep.data.id}/proof`)).status, 404, 'no proof yet');
+
+    const fd = new FormData();
+    fd.set('file', new Blob([PNG], { type: 'image/png' }), 'upi-success.png');
+    const up = await client.json('POST', `/me/payments/${dep.data.id}/proof`, fd);
+    assert.ok([200, 201].includes(up.status), JSON.stringify(up.data));
+    assert.equal(up.data.proof.name, 'upi-success.png');
+    assert.equal(up.data.proof.mime, 'image/png');
+    const bad = new FormData();
+    bad.set('file', new Blob([Buffer.from('MZ nope')], { type: 'image/png' }), 'x.png');
+    assert.equal((await client.json('POST', `/me/payments/${dep.data.id}/proof`, bad)).status, 400);
+
+    const mine = await client.raw('GET', `/me/payments/${dep.data.id}/proof`);
+    assert.equal(mine.status, 200);
+    assert.equal(mine.headers.get('content-type'), 'image/png');
+    assert.equal((await other.raw('GET', `/me/payments/${dep.data.id}/proof`)).status, 404, 'not the owner');
+    const theirs = await admin.raw('GET', `/admin/payments/${dep.data.id}/proof`);
+    assert.equal(theirs.status, 200);
+    const queued = await admin.json('GET', '/admin/payments?status=pending&kind=deposit');
+    assert.ok(queued.data.items.some((r: any) => r.id === dep.data.id && r.proof?.name === 'upi-success.png'));
+    assert.equal((await client.json('POST', `/me/payments/${dep.data.id}/cancel`)).data.status, 'cancelled');
+    assert.equal((await client.json('POST', `/me/payments/${dep.data.id}/proof`, fd)).status, 409, 'no proof on a decided request');
+
+    const cfg = await admin.json('GET', '/admin/payments/channels');
+    assert.equal(cfg.status, 200);
+    assert.equal(cfg.data.card.enabled, false);
+    const saved = await admin.json('PUT', '/admin/payments/channels', { ...cfg.data, card: { ...cfg.data.card, enabled: true }, upi: { ...cfg.data.upi, vpa: 'broker@upi' } });
+    assert.equal(saved.status, 200, JSON.stringify(saved.data));
+    const after = await client.json('GET', '/me/payments/methods');
+    assert.ok(after.data.find((m: any) => m.id === 'card').enabled, 'card switched on by the admin');
+    assert.ok(after.data.find((m: any) => m.id === 'upi').deposit.fields.some((f: any) => f.value === 'broker@upi'));
+    const cardDep = await client.json('POST', '/me/payments/deposit', { accountId: liveAccountId, amount: '300', method: 'card' });
+    assert.ok([200, 201].includes(cardDep.status), JSON.stringify(cardDep.data));
+    await client.json('POST', `/me/payments/${cardDep.data.id}/cancel`);
+    const restored = await admin.json('PUT', '/admin/payments/channels', cfg.data);
+    assert.equal(restored.status, 200);
+    assert.equal((await client.json('POST', '/me/payments/deposit', { accountId: liveAccountId, amount: '300', method: 'card' })).data.code, 'method_unavailable');
+    assert.equal((await client.json('PUT', '/admin/payments/channels', cfg.data)).status, 403, 'clients cannot edit channels');
+  });
+
   it('withdrawals: pending amounts reserve funds, cancel, approve, decline', async () => {
     const w1 = await client.json('POST', '/me/payments/withdraw', { accountId: liveAccountId, amount: '100', method: 'bank', destination: { label: 'My bank', details: 'AE07 0331 2345 6789 0123 456' } });
     assert.ok([200, 201].includes(w1.status), JSON.stringify(w1.data));

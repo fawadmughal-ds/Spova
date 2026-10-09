@@ -293,6 +293,9 @@ model PaymentRequest {
   method        String
   destination   Json?
   reference     String?
+  proofKey      String?       @map("proof_key")
+  proofName     String?       @map("proof_name")
+  proofMime     String?       @map("proof_mime")
   status        PaymentStatus @default(pending)
   adminNote     String?       @map("admin_note")
   decidedBy     String?       @map("decided_by") @db.Uuid
@@ -596,4 +599,14 @@ model NewsletterSubscriber {
   unsubscribedAt DateTime? @map("unsubscribed_at") @db.Timestamptz
 
   @@map("newsletter_subscribers")
+}
+
+/// Small key/value store for back-office editable configuration (deposit channels, ...).
+model AppSetting {
+  key       String   @id
+  value     Json
+  updatedBy String?  @map("updated_by") @db.Uuid
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("app_settings")
 }

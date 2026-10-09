@@ -1,8 +1,16 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PaymentKind, PaymentRequest, PaymentStatus, Prisma, TradingAccount } from '@prisma/client';
+import { randomUUID } from 'node:crypto';
 import {
+  DEFAULT_DEPOSIT_CHANNELS,
+  KYC_MAX_BYTES,
+  KYC_MIME_TYPES,
   PAYMENT_METHODS,
   WS_EVENTS,
+  depositChannelPublic,
+  depositChannelsSchema,
+  depositEnabled,
+  type DepositChannels,
   type AdminPaymentRowDto,
   type DepositRequestInput,
   type Paginated,
@@ -15,6 +23,9 @@ import {
 import { PrismaService } from '../../infra/prisma.service';
 import { MailService } from '../../infra/mail.service';
 import { RedisService } from '../../infra/redis.service';
+import { StorageService } from '../../infra/storage.service';
+import { SettingsService } from '../../infra/settings.service';
+import { EXT, sniff } from '../kyc/kyc.service';
 import { LedgerService } from '../ledger/ledger.service';
 import { AccountsService } from '../accounts/accounts.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
@@ -39,6 +50,7 @@ export const paymentToDto = (p: PaymentWithAccount): PaymentRequestDto => ({
   method: p.method,
   destination: (p.destination as { label: string; details: string } | null) ?? null,
   reference: p.reference,
+  proof: p.proofKey ? { name: p.proofName ?? 'proof', mime: p.proofMime ?? 'application/octet-stream' } : null,
   status: p.status,
   adminNote: p.adminNote,
   decidedAt: p.decidedAt?.toISOString() ?? null,
@@ -47,6 +59,7 @@ export const paymentToDto = (p: PaymentWithAccount): PaymentRequestDto => ({
 });
 
 const methodOf = (id: string) => PAYMENT_METHODS.find((m) => m.id === id);
+export const DEPOSIT_CHANNELS_KEY = 'deposit_channels';
 
 /** Deposit / withdrawal request queue (ARCHITECTURE §07). Money moves only when an admin approves, through LedgerService. */
 @Injectable()
@@ -60,10 +73,35 @@ export class PaymentsService {
     private readonly mail: MailService,
     private readonly redis: RedisService,
     private readonly ws: RealtimeGateway,
+    private readonly storage: StorageService,
+    private readonly settings: SettingsService,
   ) {}
 
-  methods(): PaymentMethodDto[] {
-    return PAYMENT_METHODS.map((m) => ({ ...m, kinds: [...m.kinds] as PaymentMethodDto['kinds'] }));
+  /** Admin-edited deposit channels, falling back to the defaults field by field. */
+  async channels(): Promise<DepositChannels> {
+    const stored = await this.settings.get<Partial<DepositChannels>>(DEPOSIT_CHANNELS_KEY, {});
+    const merged = Object.fromEntries(Object.entries(DEFAULT_DEPOSIT_CHANNELS).map(([k, v]) => [k, { ...v, ...(stored[k as keyof DepositChannels] ?? {}) }]));
+    const parsed = depositChannelsSchema.safeParse(merged);
+    return parsed.success ? parsed.data : DEFAULT_DEPOSIT_CHANNELS;
+  }
+
+  async setChannels(actor: Actor, input: DepositChannels) {
+    const before = await this.channels();
+    await this.settings.set(DEPOSIT_CHANNELS_KEY, input, actor.id);
+    await this.prisma.adminAudit.create({ data: { actorId: actor.id, action: 'payments.channels.update', targetType: 'app_setting', before, after: input, ip: actor.ip } });
+    return input;
+  }
+
+  /** Methods with the deposit side switched by the admin's channels and the public "pay to" details attached. */
+  async methods(): Promise<PaymentMethodDto[]> {
+    const cfg = await this.channels();
+    return PAYMENT_METHODS.map((m) => {
+      const canDeposit = (m.kinds as readonly string[]).includes('deposit');
+      const depositOn = canDeposit && depositEnabled(m.id, cfg);
+      const kinds = [...m.kinds].filter((k) => k !== 'deposit' || depositOn) as PaymentMethodDto['kinds'];
+      const withdrawOn = kinds.includes('withdraw') && m.enabled;
+      return { ...m, kinds, enabled: depositOn || withdrawOn, ...(depositOn && { deposit: depositChannelPublic(m.id, cfg, env.BRAND_NAME) }) };
+    });
   }
 
   // ---------------------------------------------------------------- client
@@ -95,7 +133,8 @@ export class PaymentsService {
     const user = await this.guardUser(userId);
     const acc = await this.liveAccount(userId, input.accountId);
     const method = methodOf(input.method);
-    if (!method || !method.enabled || !(method.kinds as readonly string[]).includes('deposit')) throw ApiError.badRequest('method_unavailable', 'This deposit method is not available');
+    const cfg = await this.channels();
+    if (!method || !(method.kinds as readonly string[]).includes('deposit') || !depositEnabled(method.id, cfg)) throw ApiError.badRequest('method_unavailable', 'This deposit method is not available');
     const amount = D(input.amount);
     if (amount.lt(method.minDeposit)) throw ApiError.badRequest('amount_min', `Minimum deposit by ${method.label} is ${method.minDeposit} USD`);
     if (amount.gt(method.maxDeposit)) throw ApiError.badRequest('amount_max', `Maximum deposit by ${method.label} is ${method.maxDeposit} USD`);
@@ -134,6 +173,34 @@ export class PaymentsService {
     });
     this.afterNew(row, user.email);
     return paymentToDto(row);
+  }
+
+  /** Payment slip / screenshot for a pending request (replaces an earlier one). Same file rules as KYC. */
+  async attachProof(userId: string, id: string, file: { buffer: Buffer; originalname: string; size: number }) {
+    if (!(await this.redis.allow(`payments:proof:${userId}`, 30, 3600))) throw ApiError.tooMany('Too many uploads. Try again later.');
+    if (file.size > KYC_MAX_BYTES) throw ApiError.badRequest('file_too_large', 'File is larger than 10 MB');
+    const sniffed = sniff(file.buffer);
+    if (!sniffed || !(KYC_MIME_TYPES as readonly string[]).includes(sniffed)) throw ApiError.badRequest('file_type', 'Only JPG, PNG, WEBP or PDF files are accepted');
+    const row = await this.prisma.paymentRequest.findFirst({ where: { id, userId } });
+    if (!row) throw ApiError.notFound('payment_not_found', 'Request not found');
+    if (row.status !== 'pending') throw ApiError.conflict('not_pending', `Request is already ${row.status}`);
+    const key = `proof/${userId}/${randomUUID()}.${EXT[sniffed]}`;
+    await this.storage.put(key, file.buffer, sniffed);
+    const updated = await this.prisma.paymentRequest.update({
+      where: { id },
+      data: { proofKey: key, proofName: file.originalname.slice(0, 200) || `proof.${EXT[sniffed]}`, proofMime: sniffed },
+      include: { account: { select: { loginCode: true } } },
+    });
+    this.ws.admin(WS_EVENTS.ADMIN_PAYMENT_NEW, { id: updated.id, userId, kind: updated.kind, amount: money(updated.amount), method: updated.method, email: '', createdAt: updated.createdAt.toISOString(), proof: true });
+    return paymentToDto(updated);
+  }
+
+  /** Owner or admin may read the slip; it streams through the API so storage stays private. */
+  async proof(id: string, requester: { id: string; isAdmin: boolean }) {
+    const row = await this.prisma.paymentRequest.findUnique({ where: { id } });
+    if (!row || (!requester.isAdmin && row.userId !== requester.id) || !row.proofKey) throw ApiError.notFound('proof_not_found', 'No payment proof on this request');
+    const stored = await this.storage.get(row.proofKey);
+    return { name: row.proofName ?? 'proof', mime: row.proofMime ?? 'application/octet-stream', stored };
   }
 
   /** Clients may withdraw a request only while it is still pending. */

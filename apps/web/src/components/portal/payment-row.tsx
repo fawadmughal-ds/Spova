@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
-import { ArrowRight, Ban, MessageSquareText } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { ArrowRight, Ban, MessageSquareText, Paperclip } from 'lucide-react';
+import { KYC_MIME_TYPES } from '@spova/shared';
 import type { PaymentMethodDto, PaymentRequestDto } from '@spova/shared';
-import { post } from '@/lib/api';
+import { fileUrl, post, upload } from '@/lib/api';
 import { cn, fmtDate, fmtMoney } from '@/lib/utils';
 import { Button } from '@/components/ui';
 import { useToast } from '@/components/toast';
@@ -20,7 +21,25 @@ export function PaymentRow({ p, methods, index = 0, onChanged, compact }: { p: P
   const toast = useToast();
   const [confirm, setConfirm] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInput = useRef<HTMLInputElement>(null);
   const withdraw = p.kind === 'withdraw';
+
+  const attach = async (file: File) => {
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.set('file', file, file.name);
+      const updated = await upload<PaymentRequestDto>(`/me/payments/${p.id}/proof`, fd);
+      toast({ title: 'Payment proof attached', body: file.name, level: 'success' });
+      onChanged?.(updated);
+    } catch (e) {
+      const f = friendlyError(e);
+      toast({ title: f.title, body: f.body, level: 'danger' });
+    } finally {
+      setUploading(false);
+    }
+  };
   const method = methods?.find((m) => m.id === p.method)?.label ?? p.method;
 
   const cancel = async () => {
@@ -75,6 +94,23 @@ export function PaymentRow({ p, methods, index = 0, onChanged, compact }: { p: P
           {!compact && p.reference && (
             <div className="mt-1 text-xs text-ink-400">
               {withdraw ? 'Reason' : 'Reference'}: <span className="font-mono text-ink-300">{p.reference}</span>
+            </div>
+          )}
+          {!compact && !withdraw && (
+            <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs">
+              {p.proof ? (
+                <a href={fileUrl(`/me/payments/${p.id}/proof`)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-full border border-up/30 bg-up/[0.06] px-2.5 py-0.5 text-up transition-colors hover:bg-up/10">
+                  <Paperclip className="h-3 w-3" /> Proof: <span className="max-w-[180px] truncate font-mono">{p.proof.name}</span>
+                </a>
+              ) : p.status === 'pending' && onChanged ? (
+                <>
+                  <input ref={fileInput} type="file" accept={KYC_MIME_TYPES.join(',')} className="sr-only" tabIndex={-1} onChange={(e) => e.target.files?.[0] && void attach(e.target.files[0])} />
+                  <button type="button" disabled={uploading} onClick={() => fileInput.current?.click()} className="inline-flex items-center gap-1.5 rounded-full border border-gold/40 bg-gold/[0.08] px-2.5 py-0.5 text-gold transition-colors hover:bg-gold/15 disabled:opacity-60">
+                    <Paperclip className="h-3 w-3" /> {uploading ? 'Uploading…' : 'Attach payment proof'}
+                  </button>
+                  <span className="text-ink-500">No slip attached yet</span>
+                </>
+              ) : null}
             </div>
           )}
           {p.adminNote && (

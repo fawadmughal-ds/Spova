@@ -1,17 +1,24 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Put, Query, Res, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import type { Response } from 'express';
+import { memoryStorage } from 'multer';
 import { z } from 'zod';
 import {
+  KYC_MAX_BYTES,
+  depositChannelsSchema,
   depositRequestSchema,
   paginationSchema,
   paymentDecisionSchema,
   withdrawRequestSchema,
+  type DepositChannels,
   type DepositRequestInput,
   type PaymentDecisionInput,
   type WithdrawRequestInput,
 } from '@spova/shared';
 import { PaymentsService } from './payments.service';
 import { ClientIp, CurrentUser, Roles } from '../../common/auth/decorators';
-import type { AuthUser } from '../../common/auth/auth.types';
+import { ADMIN_ROLES, type AuthUser } from '../../common/auth/auth.types';
+import { ApiError } from '../../common/errors';
 import { ZodPipe } from '../../common/pipes/zod.pipe';
 
 const listQuery = paginationSchema.extend({
@@ -19,6 +26,17 @@ const listQuery = paginationSchema.extend({
   status: z.enum(['pending', 'approved', 'declined', 'cancelled']).optional(),
 });
 const adminQuery = listQuery.extend({ userId: z.string().uuid().optional() });
+
+/** Streams a payment slip with headers that stop the browser from executing it. */
+async function streamProof(res: Response, svc: PaymentsService, id: string, requester: { id: string; isAdmin: boolean }) {
+  const { name, mime, stored } = await svc.proof(id, requester);
+  res.setHeader('Content-Type', mime);
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Cache-Control', 'private, no-store');
+  res.setHeader('Content-Disposition', `inline; filename="${name.replace(/[^\w.\- ]/g, '_')}"`);
+  if (stored.size) res.setHeader('Content-Length', String(stored.size));
+  stored.body.pipe(res);
+}
 
 @Controller('me/payments')
 export class PaymentsController {
@@ -48,6 +66,19 @@ export class PaymentsController {
   cancel(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.payments.cancel(user.id, id);
   }
+
+  /** multipart/form-data with one `file` (jpg/png/webp/pdf, max 10 MB): the payment slip / screenshot. */
+  @Post(':id/proof')
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: KYC_MAX_BYTES, files: 1 } }))
+  proof(@CurrentUser() user: AuthUser, @Param('id') id: string, @UploadedFile() file?: Express.Multer.File) {
+    if (!file) throw ApiError.badRequest('file_missing', 'Attach a file');
+    return this.payments.attachProof(user.id, id, file);
+  }
+
+  @Get(':id/proof')
+  proofFile(@CurrentUser() user: AuthUser, @Param('id') id: string, @Res() res: Response) {
+    return streamProof(res, this.payments, id, { id: user.id, isAdmin: ADMIN_ROLES.includes(user.role) });
+  }
 }
 
 @Controller('admin/payments')
@@ -58,6 +89,22 @@ export class PaymentsAdminController {
   @Get()
   queue(@Query(new ZodPipe(adminQuery)) q: z.infer<typeof adminQuery>) {
     return this.payments.queue(q);
+  }
+
+  /** Deposit channels (bank / UPI / Binance Pay / USDT / card) shown to clients. */
+  @Get('channels')
+  channels() {
+    return this.payments.channels();
+  }
+
+  @Put('channels')
+  setChannels(@CurrentUser() actor: AuthUser, @ClientIp() ip: string, @Body(new ZodPipe(depositChannelsSchema)) body: DepositChannels) {
+    return this.payments.setChannels({ id: actor.id, ip }, body);
+  }
+
+  @Get(':id/proof')
+  proofFile(@CurrentUser() user: AuthUser, @Param('id') id: string, @Res() res: Response) {
+    return streamProof(res, this.payments, id, { id: user.id, isAdmin: true });
   }
 
   @Patch(':id')

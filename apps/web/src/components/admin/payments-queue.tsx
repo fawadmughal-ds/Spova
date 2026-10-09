@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ArrowDownToLine, ArrowUpFromLine, Landmark } from 'lucide-react';
+import { ArrowDownToLine, ArrowUpFromLine, Landmark, Paperclip } from 'lucide-react';
 import { PAYMENT_METHODS, WS_EVENTS, paymentDecisionSchema, type AdminPaymentRowDto, type Paginated, type PaymentKind, type PaymentRequestDto, type PaymentStatus } from '@spova/shared';
-import { get, patch, ApiError } from '@/lib/api';
+import { fileUrl, get, patch, ApiError } from '@/lib/api';
 import { useUserEvent } from '@/lib/ws';
 import { cn, fmtMoney } from '@/lib/utils';
 import { AnimatedNumber } from '@/components/motion';
@@ -294,7 +294,14 @@ export function PaymentsQueue({ userId, compact, onChanged }: { userId?: string;
                           {p.reference}
                         </div>
                       )}
-                      {!p.destination && !p.reference && <span className="text-ink-500">—</span>}
+                      {p.proof ? (
+                        <a href={fileUrl(`/admin/payments/${p.id}/proof`)} target="_blank" rel="noreferrer" title={p.proof.name} className="mt-0.5 inline-flex max-w-full items-center gap-1 rounded-full border border-up/30 bg-up/[0.06] px-2 py-0.5 text-[11px] text-up hover:bg-up/10">
+                          <Paperclip className="h-3 w-3 shrink-0" /> <span className="truncate">proof slip</span>
+                        </a>
+                      ) : deposit && p.status === 'pending' ? (
+                        <div className="mt-0.5 text-[11px] text-gold">no proof attached</div>
+                      ) : null}
+                      {!p.destination && !p.reference && !p.proof && !(deposit && p.status === 'pending') && <span className="text-ink-500">—</span>}
                     </td>
                     <td className="py-2.5 pr-4 text-xs text-ink-400">
                       <TimeAgo iso={p.createdAt} />

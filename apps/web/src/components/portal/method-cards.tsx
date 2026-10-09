@@ -1,17 +1,17 @@
 'use client';
 
-import { Bitcoin, Check, CreditCard, Landmark, Timer, Wallet, type LucideIcon } from 'lucide-react';
+import { Bitcoin, Check, CreditCard, Landmark, Smartphone, Timer, Wallet, type LucideIcon } from 'lucide-react';
 import type { PaymentKind, PaymentMethodDto } from '@spova/shared';
 import { cn, fmtMoney } from '@/lib/utils';
 
-const ICONS: Record<string, LucideIcon> = { bank: Landmark, crypto_usdt: Bitcoin, card: CreditCard };
+const ICONS: Record<string, LucideIcon> = { bank: Landmark, crypto_usdt: Bitcoin, binance: Wallet, upi: Smartphone, card: CreditCard };
 export const methodIcon = (id: string) => ICONS[id] ?? Wallet;
 
 /** Payment methods as pickable tiles. Disabled methods stay visible with a "Coming soon" tag. */
 export function MethodCards({ methods, kind, value, onChange }: { methods: PaymentMethodDto[]; kind: PaymentKind; value: string | null; onChange: (id: string) => void }) {
   const list = methods.filter((m) => m.kinds.includes(kind));
   return (
-    <div role="radiogroup" aria-label="Payment method" className="grid gap-2.5 sm:grid-cols-3">
+    <div role="radiogroup" aria-label="Payment method" className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
       {list.map((m, i) => {
         const Icon = methodIcon(m.id);
         const selected = m.id === value;
