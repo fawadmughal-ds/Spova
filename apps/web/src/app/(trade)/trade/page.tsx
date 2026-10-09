@@ -1,44 +1,54 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type PointerEvent, type ReactNode } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { CandlestickChart } from 'lucide-react';
-import { WS_EVENTS, type AccountDto, type PlaceOrderResult, type QuoteDto, type Timeframe, type WsNotice, type WsTick } from '@spova/shared';
-import { RequireAuth } from '@/lib/auth-context';
+import { ChartCandlestick, ChartNoAxesColumn, ChartPie, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ClipboardList, Compass, Ellipsis, Wallet } from 'lucide-react';
+import { WS_EVENTS, type AccountDto, type OrderSide, type PlaceOrderResult, type QuoteDto, type WsNotice, type WsTick, type CandleDto } from '@spova/shared';
+import { RequireAuth, useAuth } from '@/lib/auth-context';
 import { get } from '@/lib/api';
 import { useAccounts } from '@/lib/use-accounts';
 import { useAccountStream, useSocket } from '@/lib/ws';
 import { BRAND, cn } from '@/lib/utils';
 import { useToast } from '@/components/toast';
-import { SlidingTabs } from '@/components/portal/sliding-tabs';
 import { Skeleton, Spinner } from '@/components/ui';
-import { TerminalHeader } from '@/components/trade/terminal-header';
-import { Watchlist } from '@/components/trade/watchlist';
+import { TopBar, type NoticeItem, type TerminalView } from '@/components/trade/top-bar';
+import { InfoPanel, MarketPanel, QuickTrade } from '@/components/trade/market-panel';
 import { ChartPanel } from '@/components/trade/chart-panel';
 import { OrderTicket } from '@/components/trade/order-ticket';
-import { BottomPanel } from '@/components/trade/bottom-panel';
+import { BottomPanel, type BottomTab } from '@/components/trade/bottom-panel';
+import { AnalyticsView } from '@/components/trade/analytics-view';
+import { ExploreView } from '@/components/trade/explore-view';
 import { MarginCallStrip, StopOutCard, TradingBlockedBanner } from '@/components/trade/notices';
+import { Modal } from '@/components/trade/bits';
 import { quoteStore } from '@/components/trade/quote-store';
 import { useTradingData } from '@/components/trade/use-trading-data';
-import type { SymbolSpec } from '@/components/trade/format';
+import { useTradeEvents } from '@/components/trade/use-trade-events';
+import { fmtPrice, fmtSignedNum, type SymbolSpec } from '@/components/trade/format';
+import { alertsStore, settingsStore, useSettings } from '@/components/trade/settings';
+import { playSound, primeAudio } from '@/components/trade/sounds';
+import { groupSessions, type SessionRow } from '@/components/trade/sessions';
 
-type MobileTab = 'chart' | 'trade' | 'positions' | 'watch';
-const MOBILE_TABS: { value: MobileTab; label: string }[] = [
-  { value: 'chart', label: 'Chart' },
-  { value: 'trade', label: 'Trade' },
-  { value: 'positions', label: 'Positions' },
-  { value: 'watch', label: 'Watchlist' },
+type MobileTab = 'trade' | 'chart' | 'positions' | 'more';
+const MOBILE_TABS: { value: MobileTab; label: string; icon: typeof Compass }[] = [
+  { value: 'trade', label: 'Trade', icon: ChartNoAxesColumn },
+  { value: 'chart', label: 'Chart', icon: ChartCandlestick },
+  { value: 'positions', label: 'Positions', icon: ClipboardList },
+  { value: 'more', label: 'More', icon: Ellipsis },
 ];
 const QUOTE_POLL_MS = 15_000;
 const DEFAULT_SYMBOL = 'BTCUSD';
-const DEFAULT_TF: Timeframe = 'm1';
 const EMPTY: never[] = [];
+const MIN_BOTTOM = 43;
+
+let noticeSeq = 1;
 
 function Terminal() {
   const params = useSearchParams();
   const toast = useToast();
+  const { me, logout } = useAuth();
   const { socket, connected } = useSocket();
   const { all, data: accData, reload: reloadAccounts } = useAccounts();
+  const settings = useSettings();
 
   // ---------------------------------------------------------------- account
   const [accountId, setAccountId] = useState<string | null>(params.get('acc'));
@@ -72,11 +82,11 @@ function Terminal() {
     [reloadAccounts],
   );
 
-  // ---------------------------------------------------------------- symbols + quotes
+  // ---------------------------------------------------------------- symbols, sessions, quotes
   const [symbols, setSymbols] = useState<SymbolSpec[] | null>(null);
   const [symbolsError, setSymbolsError] = useState(false);
   const [selected, setSelected] = useState<string | null>(params.get('s'));
-  const [tf, setTf] = useState<Timeframe>(DEFAULT_TF);
+  const [sessions, setSessions] = useState<Map<string, SessionRow[]>>(() => new Map());
   useEffect(() => {
     let alive = true;
     get<SymbolSpec[]>('/market/symbols')
@@ -85,8 +95,29 @@ function Terminal() {
         list.forEach((s) => s.quote && quoteStore.seed(s.id, { ...s.quote, open: s.isOpen }));
         setSymbols(list);
         setSelected((cur) => (cur && list.some((s) => s.id === cur) ? cur : list.some((s) => s.id === DEFAULT_SYMBOL) ? DEFAULT_SYMBOL : (list.find((s) => s.featured) ?? list[0])?.id ?? null));
+        // previous daily close of every instrument -> base of the "Daily" column (a few requests at a time)
+        const ids = list.map((s) => s.id);
+        const run = async () => {
+          for (let i = 0; i < ids.length && alive; i += 6) {
+            await Promise.all(
+              ids.slice(i, i + 6).map((id) =>
+                get<CandleDto[]>(`/market/candles/${id}?tf=d1&limit=2`)
+                  .then((rows) => {
+                    if (!alive || rows.length === 0) return;
+                    const ref = rows.length >= 2 ? Number(rows[rows.length - 2].c) : Number(rows[0].o);
+                    if (Number.isFinite(ref) && ref > 0) quoteStore.setRef(id, ref);
+                  })
+                  .catch(() => {}),
+              ),
+            );
+          }
+        };
+        void run();
       })
       .catch(() => alive && setSymbolsError(true));
+    get<SessionRow[]>('/market/sessions')
+      .then((rows) => alive && setSessions(groupSessions(rows)))
+      .catch(() => {});
     return () => {
       alive = false;
     };
@@ -95,7 +126,6 @@ function Terminal() {
   const symbolMap = useMemo(() => new Map((symbols ?? []).map((s) => [s.id, s])), [symbols]);
   const spec = selected ? symbolMap.get(selected) : undefined;
 
-  // ticks for every listed instrument (conversion pairs included), re-sent on every reconnect
   useEffect(() => {
     if (!socket || !symbolIds) return;
     const sub = () => socket.emit(WS_EVENTS.SUBSCRIBE, { symbols: symbolIds.split(',') });
@@ -122,8 +152,6 @@ function Terminal() {
       socket.off(WS_EVENTS.TICK, onTick);
     };
   }, [socket]);
-
-  // session open/closed + stale flags come from REST, polled
   useEffect(() => {
     if (!symbolIds) return;
     let alive = true;
@@ -156,10 +184,81 @@ function Terminal() {
       clearInterval(t);
     };
   }, [symbolIds]);
-
   useEffect(() => {
     document.title = `${selected ?? 'Terminal'} · ${BRAND} WebTrader`;
   }, [selected]);
+  useEffect(() => {
+    primeAudio();
+  }, []);
+
+  // ---------------------------------------------------------------- notices, sounds, ledger version
+  const [notices, setNotices] = useState<NoticeItem[]>([]);
+  const note = useCallback((n: Omit<NoticeItem, 'id' | 'at'>) => setNotices((xs) => [{ ...n, id: noticeSeq++, at: Date.now() }, ...xs].slice(0, 50)), []);
+  const [ledgerVersion, setLedgerVersion] = useState(0);
+  const played = useRef(new Map<string, number>());
+  const once = (key: string) => {
+    const now = Date.now();
+    played.current.forEach((t, k) => now - t > 5000 && played.current.delete(k));
+    if (played.current.has(key)) return false;
+    played.current.set(key, now);
+    return true;
+  };
+  useTradeEvents({
+    onPositionOpened: (p) => {
+      if (p.accountId !== accountId) return;
+      if (once(`open:${p.id}`)) playSound('open');
+      note({ level: 'success', title: `${p.side === 'buy' ? 'Buy' : 'Sell'} ${p.lots} ${p.symbol} opened`, body: `at ${fmtPrice(p.openPrice, symbolMap.get(p.symbol)?.digits ?? 2)}` });
+    },
+    onPositionUpdated: (p) => {
+      if (p.accountId !== accountId) return;
+      if (p.closedLots) {
+        if (once(`close:${p.id}:${p.lots}`)) playSound('close');
+        setLedgerVersion((v) => v + 1);
+        note({ level: 'info', title: `${p.symbol}: ${p.closedLots} lots closed`, body: `P/L ${fmtSignedNum(p.closedPnl)} USD` });
+      }
+    },
+    onPositionClosed: (p) => {
+      if (p.accountId !== accountId) return;
+      if (once(`close:${p.id}`)) playSound('close');
+      setLedgerVersion((v) => v + 1);
+      const pnl = Number(p.closedPnl ?? p.realizedPnl ?? 0);
+      note({ level: p.closeReason === 'stopout' ? 'danger' : pnl >= 0 ? 'success' : 'warning', title: `${p.side === 'buy' ? 'Buy' : 'Sell'} ${p.closedLots ?? p.lots} ${p.symbol} closed (${p.closeReason ?? 'closed'})`, body: `P/L ${fmtSignedNum(pnl)} USD` });
+    },
+    onOrderFilled: (o) => {
+      if (o.accountId !== accountId) return;
+      if (o.positionId && once(`open:${o.positionId}`)) playSound('open');
+      if (o.type !== 'market') note({ level: 'success', title: `${o.side === 'buy' ? 'Buy' : 'Sell'} ${o.type} ${o.lots} ${o.symbol} filled`, body: o.filledPrice ? `at ${o.filledPrice}` : undefined });
+    },
+    onOrderCancelled: (o) => o.accountId === accountId && note({ level: 'info', title: `${o.side === 'buy' ? 'Buy' : 'Sell'} ${o.type} ${o.lots} ${o.symbol} cancelled` }),
+    onOrderRejected: (o) => o.accountId === accountId && note({ level: 'danger', title: `Order rejected: ${o.side} ${o.type} ${o.lots} ${o.symbol}`, body: o.rejectReason ?? undefined }),
+  });
+
+  // one-shot price alerts: fire when the mid crosses the level
+  const lastMid = useRef(new Map<string, number>());
+  useEffect(() => {
+    return quoteStore.subscribeAll(() => {
+      const items = alertsStore.get().items;
+      if (items.length === 0) return;
+      for (const s of new Set(items.map((a) => a.symbol))) {
+        const q = quoteStore.get(s);
+        if (!q || !q.bid || !q.ask) continue;
+        const mid = (Number(q.bid) + Number(q.ask)) / 2;
+        const prev = lastMid.current.get(s);
+        lastMid.current.set(s, mid);
+        if (prev === undefined) continue;
+        for (const a of items.filter((x) => x.symbol === s)) {
+          const lvl = Number(a.price);
+          if ((prev < lvl && mid >= lvl) || (prev > lvl && mid <= lvl)) {
+            alertsStore.set({ items: alertsStore.get().items.filter((x) => x.id !== a.id) });
+            playSound('alert');
+            const digits = symbolMap.get(s)?.digits ?? 2;
+            toast({ level: 'warning', title: `${s} reached ${fmtPrice(lvl, digits)}`, body: `Now ${fmtPrice(mid, digits)}` });
+            note({ level: 'warning', title: `Alert: ${s} reached ${fmtPrice(lvl, digits)}` });
+          }
+        }
+      }
+    });
+  }, [symbolMap, toast, note]);
 
   // ---------------------------------------------------------------- positions, orders, notices
   const data = useTradingData(accountId);
@@ -168,6 +267,8 @@ function Terminal() {
     (s) => setOverride((o) => (o && o.id === s.accountId ? null : o)),
     (n) => {
       toast({ level: n.level, title: n.title, body: n.body });
+      note({ level: n.level, title: n.title, body: n.body });
+      if (n.type === 'ledger' || n.type === 'payment') setLedgerVersion((v) => v + 1);
       if (n.type === 'stop_out') {
         setStopOut(n);
         void data.reload();
@@ -181,76 +282,178 @@ function Terminal() {
       if (r.position) {
         data.markOwn(r.position.id);
         data.upsertPosition(r.position);
+        if (once(`open:${r.position.id}`)) playSound('open');
       } else data.addOrder(r.order);
       onAccount(r.account);
     },
-    [data, onAccount],
+    [data, onAccount], // eslint-disable-line react-hooks/exhaustive-deps
   );
   const openPositions = data.positions ?? EMPTY;
   const level = account?.marginLevel === null || account?.marginLevel === undefined ? null : Number(account.marginLevel);
   const marginCall = level !== null && Number.isFinite(level) && level <= 100 && openPositions.length > 0;
 
   // ---------------------------------------------------------------- layout
+  const [view, setView] = useState<TerminalView>('trade');
   const [mtab, setMtab] = useState<MobileTab>('chart');
+  const [bottomTab, setBottomTab] = useState<BottomTab>('positions');
+  const [ticket, setTicket] = useState<{ spec: SymbolSpec; side: OrderSide; lots: string } | null>(null);
+  const [sidebar, setSidebar] = useState(true);
   const pick = useCallback((id: string) => {
     setSelected(id);
     setMtab('chart');
+    setView('trade');
   }, []);
   const show = (on: boolean) => (on ? 'flex' : 'hidden');
 
+  // bottom panel drag handle
+  const dragging = useRef<{ y: number; h: number } | null>(null);
+  const onDragStart = (e: PointerEvent) => {
+    dragging.current = { y: e.clientY, h: settings.bottomCollapsed ? MIN_BOTTOM : settings.bottomHeight };
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  };
+  const onDrag = (e: PointerEvent) => {
+    if (!dragging.current) return;
+    const h = Math.max(MIN_BOTTOM, Math.min(window.innerHeight - 260, dragging.current.h - (e.clientY - dragging.current.y)));
+    settingsStore.patch({ bottomHeight: h, bottomCollapsed: h <= MIN_BOTTOM + 4 });
+  };
+  const onDragEnd = () => {
+    dragging.current = null;
+  };
+  const bottomHeight = settings.bottomCollapsed ? MIN_BOTTOM : settings.bottomHeight;
+
+  const panelSkeleton = (cls: string) => (
+    <div className={cn('t-panel gap-2 p-3', cls)}>
+      <Skeleton className="h-6 w-48" />
+      <Skeleton className="h-5" />
+      <Skeleton className="h-5" />
+    </div>
+  );
+
   return (
-    <div className="flex h-dvh flex-col overflow-hidden bg-ink-950 text-ink-100">
-      <TerminalHeader accounts={all} account={account} onSelect={selectAccount} connected={connected} />
+    <div className="terminal flex h-dvh flex-col overflow-hidden">
+      <TopBar accounts={all} account={account} onSelectAccount={selectAccount} connected={connected} view={view} onView={setView} positions={openPositions} symbols={symbolMap} notices={notices} email={me?.email} onLogout={() => void logout()} />
       {account?.tradingBlocked && <TradingBlockedBanner />}
       {marginCall && level !== null && <MarginCallStrip level={level} />}
       {stopOut && <StopOutCard notice={stopOut} onDismiss={() => setStopOut(null)} />}
-      <div className="shrink-0 border-b border-white/[0.07] bg-paper px-1 lg:hidden">
-        <SlidingTabs items={MOBILE_TABS} value={mtab} onChange={setMtab} variant="underline" className="!border-b-0 [&_button]:!px-3 [&_button]:!py-2 [&_button]:!text-xs" />
-      </div>
 
-      <div className="flex min-h-0 flex-1 flex-col lg:grid lg:grid-cols-[236px_minmax(0,1fr)_304px] xl:grid-cols-[256px_minmax(0,1fr)_320px]">
-        <Watchlist symbols={symbolsError ? [] : symbols} selected={selected} onSelect={pick} className={cn('min-h-0 flex-1', show(mtab === 'watch'), 'lg:flex lg:border-r lg:border-white/[0.07]')} />
+      <main className={cn('relative flex min-h-0 flex-1 flex-col px-2 pb-2 lg:grid lg:gap-x-[14px] lg:px-[3px] lg:pb-[6px]', view === 'trade' ? (sidebar ? 'lg:grid-cols-[388px_minmax(0,1fr)]' : 'lg:grid-cols-[0px_minmax(0,1fr)]') : 'lg:grid-cols-1')}>
+        {view === 'trade' ? (
+          <>
+            <aside className={cn('relative min-h-0 flex-col gap-2', show(mtab === 'trade'), 'lg:flex', !sidebar && 'lg:invisible')}>
+              <MarketPanel symbols={symbolsError ? [] : symbols} selected={selected} onSelect={pick} account={account} onPlaced={onPlaced} onAdvanced={(s, side, lots) => setTicket({ spec: s, side, lots })} sessions={sessions} className="min-h-0 flex-1" />
+              {symbols && <InfoPanel symbols={symbols} spec={spec} sessions={sessions} className="hidden h-[270px] shrink-0 lg:flex" />}
+            </aside>
+            {/* sidebar collapse handle (desktop) */}
+            <button type="button" onClick={() => setSidebar((v) => !v)} aria-label={sidebar ? 'Collapse the instrument panel' : 'Expand the instrument panel'} className={cn('absolute top-1/2 z-20 hidden h-9 w-[14px] -translate-y-1/2 items-center justify-center rounded-md bg-[var(--t-raised)] text-[var(--t-text-2)] hover:text-white lg:flex', sidebar ? 'left-[385px]' : 'left-[3px]')}>
+              {sidebar ? <ChevronLeft className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+            </button>
 
-        <div className={cn('min-h-0 min-w-0 flex-1 flex-col', show(mtab === 'chart' || mtab === 'positions'), 'lg:flex')}>
-          {spec ? (
-            <ChartPanel spec={spec} tf={tf} onTf={setTf} positions={openPositions} className={cn('min-h-0 flex-1', show(mtab === 'chart'), 'lg:flex')} />
-          ) : (
-            <div className={cn('min-h-0 flex-1 items-center justify-center bg-paper', show(mtab === 'chart'), 'lg:flex')}>
-              {symbolsError ? (
-                <div className="flex flex-col items-center gap-2 text-center">
-                  <CandlestickChart className="h-5 w-5 text-down" />
-                  <div className="text-sm font-semibold text-ink-200">Could not load the instrument list</div>
-                  <div className="text-xs text-ink-500">Refresh the page to try again.</div>
-                </div>
+            <div className={cn('min-h-0 min-w-0 flex-1 flex-col', show(mtab === 'chart' || mtab === 'positions'), 'lg:flex')}>
+              {spec ? (
+                <ChartPanel
+                  spec={spec}
+                  positions={openPositions}
+                  className={cn('min-h-0 flex-1', show(mtab === 'chart'), 'lg:flex')}
+                  footer={
+                    <div className="shrink-0 border-t border-[var(--t-line)] lg:hidden">
+                      <QuickTrade spec={spec} account={account} onPlaced={onPlaced} onAdvanced={(side, lots) => setTicket({ spec, side, lots })} />
+                    </div>
+                  }
+                />
               ) : (
-                <Spinner />
+                <div className={cn('t-panel min-h-0 flex-1 items-center justify-center', show(mtab === 'chart'), 'lg:flex')}>
+                  {symbolsError ? (
+                    <div className="flex flex-col items-center gap-2 text-center">
+                      <ChartCandlestick className="h-5 w-5 text-[var(--t-sell)]" />
+                      <div className="text-sm font-semibold text-white">Could not load the instrument list</div>
+                      <div className="text-xs text-[var(--t-muted)]">Refresh the page to try again.</div>
+                    </div>
+                  ) : (
+                    <Spinner />
+                  )}
+                </div>
+              )}
+              <div className="t-drag hidden lg:flex" onPointerDown={onDragStart} onPointerMove={onDrag} onPointerUp={onDragEnd} onPointerCancel={onDragEnd} role="separator" aria-orientation="horizontal" aria-label="Resize the positions panel">
+                <span onClick={() => settingsStore.patch({ bottomCollapsed: !settings.bottomCollapsed })} title={settings.bottomCollapsed ? 'Expand' : 'Collapse'}>
+                  {settings.bottomCollapsed ? <ChevronUp /> : <ChevronDown />}
+                </span>
+              </div>
+              {account ? (
+                <BottomPanel account={account} symbols={symbolMap} data={data} onAccount={onAccount} ledgerVersion={ledgerVersion} tab={bottomTab} onTab={setBottomTab} className={cn('min-h-0 flex-1', show(mtab === 'positions'), 'lg:flex lg:h-[var(--bh)] lg:flex-none')} style={{ ['--bh' as string]: `${bottomHeight}px` }} />
+              ) : (
+                panelSkeleton(cn('min-h-0 flex-1', show(mtab === 'positions'), 'lg:flex lg:h-[330px] lg:flex-none'))
               )}
             </div>
-          )}
-          {account ? (
-            <BottomPanel account={account} symbols={symbolMap} data={data} onAccount={onAccount} className={cn('min-h-0 flex-1', show(mtab === 'positions'), 'lg:flex lg:h-[272px] lg:flex-none lg:border-t lg:border-white/[0.07]')} />
+          </>
+        ) : view === 'analytics' ? (
+          account ? (
+            <AnalyticsView account={account} history={data.history} loadHistory={data.loadHistory} symbols={symbolMap} ledgerVersion={ledgerVersion} className="min-h-0 flex-1" />
           ) : (
-            <div className={cn('min-h-0 flex-1 flex-col gap-2 bg-paper p-3', show(mtab === 'positions'), 'lg:flex lg:h-[272px] lg:flex-none lg:border-t lg:border-white/[0.07]')}>
-              <Skeleton className="h-6 w-64" />
-              <Skeleton className="h-5" />
-              <Skeleton className="h-5" />
-            </div>
-          )}
-        </div>
-
-        {spec && account ? (
-          <OrderTicket spec={spec} account={account} onPlaced={onPlaced} className={cn('min-h-0 flex-1', show(mtab === 'trade'), 'lg:flex lg:border-l lg:border-white/[0.07]')} />
+            panelSkeleton('min-h-0 flex-1')
+          )
         ) : (
-          <div className={cn('min-h-0 flex-1 flex-col gap-3 bg-paper p-3', show(mtab === 'trade'), 'lg:flex lg:border-l lg:border-white/[0.07]')}>
-            <Skeleton className="h-4 w-24" />
-            <Skeleton className="h-12" />
-            <Skeleton className="h-8" />
-            <Skeleton className="h-9" />
-            <Skeleton className="h-9" />
-            <Skeleton className="h-20" />
-          </div>
+          <ExploreView symbols={symbolsError ? [] : symbols} onTrade={pick} className="min-h-0 flex-1" />
         )}
-      </div>
+
+        {/* mobile "More" */}
+        {mtab === 'more' && view === 'trade' && (
+          <section className="t-panel min-h-0 flex-1 lg:hidden" aria-label="More">
+            <div className="t-bar !pl-4 text-[14px] font-semibold text-white">More</div>
+            <ul className="p-2">
+              {(
+                [
+                  ['Analytics', 'Statistics and equity curve', <ChartPie key="a" />, () => setView('analytics')],
+                  ['Explore', 'All instruments by market', <Compass key="e" />, () => setView('explore')],
+                  [
+                    'Finance',
+                    'Balance, margin and ledger',
+                    <Wallet key="f" />,
+                    () => {
+                      setBottomTab('finance');
+                      setMtab('positions');
+                    },
+                  ],
+                ] as [string, string, ReactNode, () => void][]
+              ).map(([label, sub, icon, go]) => (
+                <li key={label}>
+                  <button type="button" onClick={go} className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-white/[0.04]">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-md bg-[var(--t-raised)] text-[var(--t-blue)] [&>svg]:h-4 [&>svg]:w-4">{icon}</span>
+                    <span className="leading-tight">
+                      <span className="block text-[14px] font-semibold text-white">{label}</span>
+                      <span className="block text-[12px] text-[var(--t-muted)]">{sub}</span>
+                    </span>
+                    <ChevronRight className="ml-auto h-4 w-4 text-[var(--t-muted)]" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+      </main>
+
+      {/* mobile bottom tab bar */}
+      <nav className="flex h-14 shrink-0 border-t border-[var(--t-line)] bg-[var(--t-bg)] pb-[env(safe-area-inset-bottom)] lg:hidden" aria-label="Terminal sections">
+        {MOBILE_TABS.map((t) => (
+          <button
+            key={t.value}
+            type="button"
+            data-on={mtab === t.value && (t.value === 'more' || view === 'trade')}
+            onClick={() => {
+              setMtab(t.value);
+              if (t.value !== 'more') setView('trade');
+            }}
+            className="t-mobile-tab"
+          >
+            <t.icon /> {t.label}
+          </button>
+        ))}
+      </nav>
+
+      {ticket && account && (
+        <Modal onClose={() => setTicket(null)} label="Advanced order">
+          <OrderTicket spec={symbolMap.get(ticket.spec.id) ?? ticket.spec} account={account} onPlaced={onPlaced} initialSide={ticket.side} initialLots={ticket.lots} confirmOrders={settings.confirmOrders} onClose={() => setTicket(null)} className="max-h-[92dvh]" />
+        </Modal>
+      )}
     </div>
   );
 }
@@ -260,7 +463,7 @@ export default function TradePage() {
     <RequireAuth>
       <Suspense
         fallback={
-          <div className="flex h-dvh items-center justify-center bg-ink-950">
+          <div className="terminal flex h-dvh items-center justify-center">
             <Spinner />
           </div>
         }

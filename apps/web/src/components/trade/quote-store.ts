@@ -30,6 +30,8 @@ class QuoteStore {
   private all = new Set<Listener>();
   private version = 0;
   private timer: ReturnType<typeof setInterval> | null = null;
+  /** previous daily closes, kept apart so they apply even when the quote arrives later */
+  private refs = new Map<string, number>();
 
   private emit(s: string) {
     this.version++;
@@ -57,7 +59,7 @@ class QuoteStore {
     const bid = Number(t.bid);
     const dir: LiveQuote['dir'] = !prev ? 'flat' : bid > Number(prev.bid) ? 'up' : bid < Number(prev.bid) ? 'down' : prev.dir;
     const mid = (bid + Number(t.ask)) / 2;
-    this.quotes.set(t.s, { s: t.s, bid: t.bid, ask: t.ask, ts: t.ts, dir, stale: isStale(t), open: prev?.open, ref: prev?.ref ?? mid, n: (prev?.n ?? 0) + 1 });
+    this.quotes.set(t.s, { s: t.s, bid: t.bid, ask: t.ask, ts: t.ts, dir, stale: isStale(t), open: prev?.open, ref: this.refs.get(t.s) ?? prev?.ref ?? mid, n: (prev?.n ?? 0) + 1 });
     this.emit(t.s);
   }
 
@@ -73,12 +75,13 @@ class QuoteStore {
       return;
     }
     const mid = hasPrice ? (Number(q.bid) + Number(q.ask)) / 2 : null;
-    this.quotes.set(s, { s, bid: q.bid, ask: q.ask, ts: q.ts, dir: 'flat', stale: isStale(hasPrice ? q : undefined), open: q.open ?? prev?.open, ref: prev?.ref ?? mid, n: (prev?.n ?? 0) + 1 });
+    this.quotes.set(s, { s, bid: q.bid, ask: q.ask, ts: q.ts, dir: 'flat', stale: isStale(hasPrice ? q : undefined), open: q.open ?? prev?.open, ref: this.refs.get(s) ?? prev?.ref ?? mid, n: (prev?.n ?? 0) + 1 });
     this.emit(s);
   }
 
   /** Base for the % change (previous daily close when the chart knows it). */
   setRef(s: string, ref: number) {
+    this.refs.set(s, ref);
     const prev = this.quotes.get(s);
     if (!prev || prev.ref === ref) return;
     this.quotes.set(s, { ...prev, ref });
@@ -104,6 +107,11 @@ class QuoteStore {
 
   getVersion() {
     return this.version;
+  }
+
+  /** Every symbol currently in the store. */
+  symbols() {
+    return Array.from(this.quotes.keys());
   }
 
   /** Once a second, flip quotes that aged past the freshness window (no tick arrives to tell us). */

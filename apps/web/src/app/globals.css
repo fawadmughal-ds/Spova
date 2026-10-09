@@ -900,6 +900,511 @@
   }
 }
 
+/* ------------------------------------------------------------ web terminal (/trade)
+   The terminal is the only dark surface of the site. Every colour token the utilities read is
+   re-pointed under `.terminal`, so the shared primitives (Spinner, Skeleton, Badge, notices)
+   render on the dark palette without touching the global theme. */
+/* the terminal is the only dark surface; body:has() lets portalled toasts next to it pick up the same tokens */
+.terminal,
+body:has(.terminal) {
+  color-scheme: dark;
+  --color-white: #ffffff;
+  --color-paper: #20252c;
+  --color-ink-950: #20252c;
+  --color-ink-900: #272d36;
+  --color-ink-800: #2d343e;
+  --color-ink-700: #323944;
+  --color-ink-600: #4b5868;
+  --color-ink-500: #858c99;
+  --color-ink-400: #9ea7b5;
+  --color-ink-300: #bac3d2;
+  --color-ink-200: #d6dce6;
+  --color-ink-100: #f3f5f8;
+  --color-ink-50: #ffffff;
+  --color-brand-100: #0f3f52;
+  --color-brand-200: #1d7694;
+  --color-brand-300: #5fd3f3;
+  --color-brand-400: #2ac3ed;
+  --color-brand-500: #2ac3ed;
+  --color-brand-600: #1ea5cb;
+  --color-brand-700: #1d7694;
+  --color-volt: #2ac3ed;
+  --color-up: #1ca89f;
+  --color-down: #ef556d;
+  --color-gold: #e8b339;
+  --tint: 255 255 255;
+  --paper-rgb: 32 37 44;
+  --brand-rgb: 42 195 237;
+  --up-rgb: 28 168 159;
+  --down-rgb: 239 85 109;
+  --gold-rgb: 232 179 57;
+  --shadow-lift: 0 18px 40px -16px rgb(0 0 0 / 0.6), 0 0 0 1px rgb(255 255 255 / 0.06);
+  /* terminal-only tokens (sampled from the reference) */
+  --t-bg: #20252c;
+  --t-raised: #323944;
+  --t-raised-2: #3b434f;
+  --t-line: #323944;
+  --t-line-soft: #2a313b;
+  --t-text: #f3f5f8;
+  --t-text-2: #bac3d2;
+  --t-muted: #858c99;
+  --t-dim: #5c636d;
+  --t-buy: #1ca89f;
+  --t-sell: #ef556d;
+  --t-up: #41d0c1;
+  --t-down: #f0556d;
+  --t-sl: #c251bf;
+  --t-tp: #80c251;
+  --t-blue: #2ac3ed;
+  --t-blue-deep: #1d7694;
+  --t-alert: #f5a524;
+  background: var(--t-bg);
+  color: var(--t-text);
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+  -webkit-font-smoothing: antialiased;
+}
+.terminal ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.terminal ::-webkit-scrollbar-thumb {
+  background: #3f4753;
+  border: 2px solid var(--t-bg);
+}
+.terminal ::-webkit-scrollbar-thumb:hover {
+  background: #4b5868;
+}
+.terminal ::selection {
+  background: rgb(42 195 237 / 0.35);
+}
+@layer components {
+  .t-panel {
+    display: flex;
+    min-height: 0;
+    min-width: 0;
+    flex-direction: column;
+    overflow: hidden;
+    border-radius: 8px;
+    border: 1px solid var(--t-line);
+    background: var(--t-bg);
+  }
+  /* raised 43px bar holding tabs / toolbars */
+  .t-bar {
+    display: flex;
+    height: 43px;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 2px;
+    padding: 0 6px;
+    background: var(--t-raised);
+  }
+  .t-tab {
+    display: inline-flex;
+    height: 33px;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 7px;
+    border-radius: 6px;
+    padding: 0 14px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--t-text-2);
+    white-space: nowrap;
+    transition:
+      background-color 0.15s ease,
+      color 0.15s ease;
+  }
+  .t-tab:hover {
+    color: var(--t-text);
+  }
+  .t-tab[data-on='true'] {
+    background: var(--t-bg);
+    color: #f9fafb;
+  }
+  .t-tab svg {
+    width: 15px;
+    height: 15px;
+  }
+  .t-icon-btn {
+    display: inline-flex;
+    height: 32px;
+    width: 32px;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    color: var(--t-text-2);
+    transition:
+      background-color 0.15s ease,
+      color 0.15s ease;
+  }
+  .t-icon-btn:hover:not(:disabled) {
+    background: rgb(255 255 255 / 0.08);
+    color: #fff;
+  }
+  .t-icon-btn[data-on='true'] {
+    background: var(--t-bg);
+    color: #fff;
+  }
+  .t-icon-btn:disabled {
+    cursor: not-allowed;
+    color: var(--t-dim);
+  }
+  .t-icon-btn svg {
+    width: 17px;
+    height: 17px;
+  }
+  /* top-bar square buttons (wifi / bell / user) */
+  .t-top-btn {
+    display: inline-flex;
+    height: 38px;
+    width: 38px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    background: var(--t-raised);
+    color: #cdd3dd;
+    transition: background-color 0.15s ease;
+  }
+  .t-top-btn:hover {
+    background: var(--t-raised-2);
+  }
+  .t-top-btn svg {
+    width: 18px;
+    height: 18px;
+  }
+  @media (max-width: 480px) {
+    .t-top-btn {
+      height: 34px;
+      width: 34px;
+    }
+  }
+  .t-menu {
+    position: absolute;
+    z-index: 60;
+    min-width: 11rem;
+    border-radius: 8px;
+    border: 1px solid #3b434f;
+    background: #2a313b;
+    padding: 4px;
+    box-shadow: 0 18px 40px -16px rgb(0 0 0 / 0.7);
+    animation: pop-in 0.25s var(--ease-spring) both;
+  }
+  .t-menu-item {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: 9px;
+    border-radius: 6px;
+    padding: 7px 10px;
+    text-align: left;
+    font-size: 13px;
+    color: var(--t-text-2);
+    transition: background-color 0.12s ease;
+  }
+  .t-menu-item:hover:not(:disabled) {
+    background: rgb(255 255 255 / 0.07);
+    color: #fff;
+  }
+  .t-menu-item[data-on='true'] {
+    color: #fff;
+    background: rgb(42 195 237 / 0.12);
+  }
+  .t-menu-item:disabled {
+    color: var(--t-dim);
+    cursor: not-allowed;
+  }
+  .t-menu-item svg {
+    width: 15px;
+    height: 15px;
+    flex-shrink: 0;
+  }
+  .t-menu-label {
+    padding: 6px 10px 4px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--t-muted);
+  }
+  /* square symbol tile with the first letter */
+  .t-tile {
+    display: inline-flex;
+    height: 26px;
+    width: 26px;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    border-radius: 5px;
+    background: #fff;
+    font-size: 13px;
+    font-weight: 700;
+    color: #1c2128;
+  }
+  .t-input {
+    height: 32px;
+    width: 100%;
+    border-radius: 6px;
+    border: 1px solid #3b434f;
+    background: var(--t-bg);
+    padding: 0 10px;
+    font-size: 13px;
+    color: var(--t-text);
+    transition: border-color 0.15s ease;
+  }
+  .t-input::placeholder {
+    color: var(--t-dim);
+  }
+  .t-input:focus {
+    outline: none;
+    border-color: var(--t-blue);
+  }
+  .t-input[aria-invalid='true'] {
+    border-color: var(--t-sell);
+  }
+  .t-btn {
+    display: inline-flex;
+    height: 32px;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border-radius: 6px;
+    padding: 0 12px;
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+    transition:
+      filter 0.15s ease,
+      background-color 0.15s ease,
+      opacity 0.15s ease;
+  }
+  .t-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
+  .t-btn:hover:not(:disabled) {
+    filter: brightness(1.08);
+  }
+  .t-btn-buy {
+    background: var(--t-buy);
+    color: #fff;
+  }
+  .t-btn-sell {
+    background: var(--t-sell);
+    color: #fff;
+  }
+  .t-btn-blue {
+    background: var(--t-blue-deep);
+    color: #fff;
+  }
+  .t-btn-ghost {
+    border: 1px solid #3b434f;
+    color: var(--t-text-2);
+  }
+  .t-btn-ghost:hover:not(:disabled) {
+    background: rgb(255 255 255 / 0.06);
+    color: #fff;
+  }
+  /* quick-trade: big SELL / BUY blocks in the expanded watchlist row */
+  .t-quick {
+    display: flex;
+    height: 66px;
+    flex: 1;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    color: #fff;
+    line-height: 1.1;
+    transition: filter 0.15s ease;
+  }
+  .t-quick:hover:not(:disabled) {
+    filter: brightness(1.08);
+  }
+  .t-quick:disabled {
+    cursor: not-allowed;
+    filter: saturate(0.3) brightness(0.75);
+  }
+  .t-check {
+    height: 15px;
+    width: 15px;
+    flex-shrink: 0;
+    appearance: none;
+    border-radius: 3px;
+    border: 1.5px solid #6b7382;
+    background: transparent;
+    display: inline-grid;
+    place-content: center;
+    cursor: pointer;
+    transition:
+      background-color 0.12s ease,
+      border-color 0.12s ease;
+  }
+  .t-check::before {
+    content: '';
+    width: 9px;
+    height: 9px;
+    transform: scale(0);
+    transition: transform 0.12s ease;
+    background: #fff;
+    clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+  }
+  .t-check:checked {
+    border-color: var(--t-blue);
+    background: var(--t-blue-deep);
+  }
+  .t-check:checked::before {
+    transform: scale(1);
+  }
+  /* tables under the chart */
+  .t-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 13px;
+  }
+  .t-table th {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    height: 35px;
+    background: var(--t-bg);
+    padding: 0 10px;
+    text-align: left;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--t-muted);
+    white-space: nowrap;
+    border-bottom: 1px solid var(--t-line);
+  }
+  .t-table td {
+    height: 51px;
+    padding: 0 10px;
+    vertical-align: middle;
+    white-space: nowrap;
+    border-bottom: 1px solid var(--t-line);
+  }
+  .t-table tbody tr:hover > td {
+    background: rgb(255 255 255 / 0.025);
+  }
+  .t-table th:first-child,
+  .t-table td:first-child {
+    padding-left: 14px;
+  }
+  .t-table th:last-child,
+  .t-table td:last-child {
+    padding-right: 14px;
+  }
+  .t-side {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-size: 10.5px;
+    font-weight: 600;
+    line-height: 1.5;
+  }
+  .t-side[data-side='buy'] {
+    background: rgb(28 168 159 / 0.18);
+    color: var(--t-up);
+  }
+  .t-side[data-side='sell'] {
+    background: rgb(239 85 109 / 0.16);
+    color: var(--t-sell);
+  }
+  .t-row-btn {
+    display: inline-flex;
+    height: 26px;
+    width: 26px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: var(--t-raised);
+    color: #bac3d2;
+    transition:
+      background-color 0.12s ease,
+      color 0.12s ease;
+  }
+  .t-row-btn:hover:not(:disabled) {
+    background: var(--t-raised-2);
+    color: #fff;
+  }
+  .t-row-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+  .t-row-btn svg {
+    width: 13px;
+    height: 13px;
+  }
+  .t-pnl-up {
+    color: var(--t-up);
+  }
+  .t-pnl-down {
+    color: var(--t-down);
+  }
+  .t-mobile-tab {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    font-size: 10.5px;
+    font-weight: 500;
+    color: var(--t-muted);
+  }
+  .t-mobile-tab[data-on='true'] {
+    color: var(--t-blue);
+  }
+  .t-mobile-tab svg {
+    width: 19px;
+    height: 19px;
+  }
+  .t-drag {
+    display: flex;
+    height: 10px;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    cursor: row-resize;
+  }
+  .t-drag > span {
+    display: inline-flex;
+    height: 14px;
+    width: 38px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: var(--t-raised);
+    color: var(--t-muted);
+  }
+  .t-drag svg {
+    width: 11px;
+    height: 11px;
+  }
+  .t-flash-up {
+    animation: t-flash-up 0.4s ease-out;
+  }
+  .t-flash-down {
+    animation: t-flash-down 0.4s ease-out;
+  }
+}
+@keyframes t-flash-up {
+  0% {
+    color: #a7ece4;
+  }
+}
+@keyframes t-flash-down {
+  0% {
+    color: #ffb3bf;
+  }
+}
+.terminal .t-menu-item[data-on='true'] {
+  background: rgb(42 195 237 / 0.12);
+}
 
 /* === page-specific styles: client portal === */
 @layer components {
