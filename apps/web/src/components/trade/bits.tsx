@@ -1,18 +1,22 @@
 'use client';
 
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { Calendar as CalendarIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { SymbolSpec } from './format';
 
-/** Closes on outside click / Esc. Returns [open, setOpen, ref]. */
+/** Closes on outside click / Esc. Returns [open, setOpen, ref, extraRef]; a click inside either ref keeps it open. */
 export function useDismiss<T extends HTMLElement>() {
   const [open, setOpen] = useState(false);
   const ref = useRef<T>(null);
+  const extra = useRef<HTMLElement | null>(null);
   useEffect(() => {
     if (!open) return;
     const onDoc = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      const t = e.target as Node;
+      if (ref.current?.contains(t) || extra.current?.contains(t)) return;
+      setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
     document.addEventListener('mousedown', onDoc);
@@ -22,27 +26,56 @@ export function useDismiss<T extends HTMLElement>() {
       document.removeEventListener('keydown', onKey);
     };
   }, [open]);
-  return [open, setOpen, ref] as const;
+  return [open, setOpen, ref, extra] as const;
 }
 
-/** Button + anchored dropdown. `render(close)` draws the menu body. */
+/**
+ * Button + anchored dropdown. `render(close)` draws the menu body.
+ * The menu is portaled to <body> with fixed coordinates so toolbars with `overflow-x-auto`
+ * (the chart toolbar on small screens) cannot clip it; it follows the button on resize/scroll.
+ */
 export function Dropdown({ button, buttonClassName, children, align = 'left', className, menuClassName, title, onOpenChange }: { button: (open: boolean) => ReactNode; /** classes of the trigger <button> itself */ buttonClassName?: string; children: (close: () => void) => ReactNode; align?: 'left' | 'right'; className?: string; menuClassName?: string; title?: string; onOpenChange?: (open: boolean) => void }) {
-  const [open, setOpen, ref] = useDismiss<HTMLDivElement>();
+  const [open, setOpen, ref, menuRef] = useDismiss<HTMLDivElement>();
+  const [pos, setPos] = useState<CSSProperties | null>(null);
   const onChange = useRef(onOpenChange);
   onChange.current = onOpenChange;
   useEffect(() => {
     onChange.current?.(open);
   }, [open]);
+  useEffect(() => {
+    if (!open) {
+      setPos(null);
+      return;
+    }
+    const place = () => {
+      const r = ref.current?.getBoundingClientRect();
+      if (!r) return;
+      const top = r.bottom + 6;
+      const style: CSSProperties = { position: 'fixed', top, maxHeight: `calc(100vh - ${top + 8}px)`, overflowY: 'auto' };
+      if (align === 'right') style.right = Math.max(4, window.innerWidth - r.right);
+      else style.left = Math.max(4, Math.min(r.left, window.innerWidth - 8 - 176));
+      setPos(style);
+    };
+    place();
+    window.addEventListener('resize', place);
+    window.addEventListener('scroll', place, true);
+    return () => {
+      window.removeEventListener('resize', place);
+      window.removeEventListener('scroll', place, true);
+    };
+  }, [open, align, ref]);
+  const menu =
+    open && pos ? (
+      <div ref={(el) => void (menuRef.current = el)} role="menu" style={pos} className={cn('t-menu', menuClassName)}>
+        {children(() => setOpen(false))}
+      </div>
+    ) : null;
   return (
     <div ref={ref} className={cn('relative', className)}>
       <button type="button" title={title} aria-label={title} aria-haspopup="menu" aria-expanded={open} data-open={open} onClick={() => setOpen((v) => !v)} className={buttonClassName}>
         {button(open)}
       </button>
-      {open && (
-        <div role="menu" className={cn('t-menu top-[calc(100%+6px)]', align === 'right' ? 'right-0' : 'left-0', menuClassName)}>
-          {children(() => setOpen(false))}
-        </div>
-      )}
+      {menu && createPortal(menu, document.body)}
     </div>
   );
 }

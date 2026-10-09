@@ -1,13 +1,13 @@
 'use client';
 
 import { useSyncExternalStore } from 'react';
-import type { Timeframe } from '@spova/shared';
+import { TIMEFRAMES, type Timeframe } from '@spova/shared';
 
 /**
  * Tiny persisted stores (localStorage) with a useSyncExternalStore hook. Each store holds one JSON
  * value; `set` replaces it, `patch` merges. Writes are guarded so a blocked storage never throws.
  */
-export function createLocalStore<T extends object>(key: string, defaults: T) {
+export function createLocalStore<T extends object>(key: string, defaults: T, sanitize: (v: T) => T = (v) => v) {
   let value: T = defaults;
   let loaded = false;
   const listeners = new Set<() => void>();
@@ -16,7 +16,7 @@ export function createLocalStore<T extends object>(key: string, defaults: T) {
     loaded = true;
     try {
       const raw = localStorage.getItem(key);
-      if (raw) value = { ...defaults, ...(JSON.parse(raw) as Partial<T>) };
+      if (raw) value = sanitize({ ...defaults, ...(JSON.parse(raw) as Partial<T>) });
     } catch {
       /* keep defaults */
     }
@@ -77,7 +77,15 @@ export const DEFAULT_SETTINGS: TerminalSettings = {
   bottomCollapsed: false,
   infoTall: false,
 };
-export const settingsStore = createLocalStore<TerminalSettings>('wt-settings', DEFAULT_SETTINGS);
+const CHART_TYPES: ChartType[] = ['candles', 'bars', 'line', 'area'];
+/** A stale / hand-edited localStorage value must never blank the chart: fall back per field. */
+const sanitizeSettings = (v: TerminalSettings): TerminalSettings => ({
+  ...v,
+  chartType: CHART_TYPES.includes(v.chartType) ? v.chartType : DEFAULT_SETTINGS.chartType,
+  tf: (TIMEFRAMES as readonly string[]).includes(v.tf) ? v.tf : DEFAULT_SETTINGS.tf,
+  bottomHeight: Number.isFinite(v.bottomHeight) && v.bottomHeight > 0 ? v.bottomHeight : DEFAULT_SETTINGS.bottomHeight,
+});
+export const settingsStore = createLocalStore<TerminalSettings>('wt-settings', DEFAULT_SETTINGS, sanitizeSettings);
 export const useSettings = settingsStore.use;
 
 export interface FavouritesState {

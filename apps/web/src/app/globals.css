@@ -1121,6 +1121,15 @@ body:has(.terminal) {
     height: 15px;
     flex-shrink: 0;
   }
+  /* sentence-case menu heading with a divider (MatchTrader "Chart type") */
+  .t-menu-head {
+    margin: 0 -4px 4px;
+    padding: 6px 14px 8px;
+    border-bottom: 1px solid #3b434f;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--t-muted);
+  }
   .t-menu-label {
     padding: 6px 10px 4px;
     font-size: 10px;

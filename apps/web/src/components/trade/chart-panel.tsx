@@ -52,6 +52,15 @@ type Tool = 'crosshair' | 'measure' | 'hline';
 type MainSeries = ISeriesApi<SeriesType>;
 
 const toBar = (c: CandleDto): Bar => ({ time: c.t as UTCTimestamp, open: Number(c.o), high: Number(c.h), low: Number(c.l), close: Number(c.c), volume: Number(c.v ?? 0) });
+/** OHLC bar icon (lucide only has column/candle charts): vertical bar, open tick left, close tick right. */
+function OhlcBarsIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M8 3v18M5 9h3M8 15h3M16 5v16M13 11h3M16 17h3" />
+    </svg>
+  );
+}
+
 const mainData = (bars: Bar[], type: ChartType) => (type === 'line' || type === 'area' ? bars.map((b) => ({ time: b.time, value: b.close })) : bars.map(({ time, open, high, low, close }) => ({ time, open, high, low, close })));
 const volPoint = (b: Bar) => ({ time: b.time, value: b.volume, color: b.close >= b.open ? VOL_UP : VOL_DOWN });
 
@@ -605,30 +614,33 @@ export function ChartPanel({ spec, positions, className, footer }: ChartPanelPro
             </div>
           )}
         </Dropdown>
-        <Dropdown title="Chart type" buttonClassName="t-icon-btn" button={() => (chartType === 'line' ? <ChartLine /> : chartType === 'area' ? <ChartArea /> : chartType === 'bars' ? <ChartColumn /> : <ChartCandlestick />)}>
-          {(close) =>
-            (
-              [
-                ['candles', 'Candles', <ChartCandlestick key="c" />],
-                ['bars', 'Bars', <ChartColumn key="b" />],
-                ['line', 'Line', <ChartLine key="l" />],
-                ['area', 'Area', <ChartArea key="a" />],
-              ] as [ChartType, string, ReactNode][]
-            ).map(([v, label, icon]) => (
-              <button
-                key={v}
-                type="button"
-                data-on={chartType === v}
-                onClick={() => {
-                  settingsStore.patch({ chartType: v });
-                  close();
-                }}
-                className="t-menu-item w-36"
-              >
-                {icon} {label}
-              </button>
-            ))
-          }
+        <Dropdown title="Chart type" buttonClassName="t-icon-btn" menuClassName="!min-w-0" button={() => (chartType === 'line' ? <ChartLine /> : chartType === 'area' ? <ChartArea /> : chartType === 'bars' ? <OhlcBarsIcon /> : <ChartCandlestick />)}>
+          {(close) => (
+            <div className="w-32">
+              <div className="t-menu-head">Chart type</div>
+              {(
+                [
+                  ['candles', 'Candles', <ChartCandlestick key="c" />],
+                  ['bars', 'Bars', <OhlcBarsIcon key="b" />],
+                  ['line', 'Line', <ChartLine key="l" />],
+                  ['area', 'Area', <ChartArea key="a" />],
+                ] as [ChartType, string, ReactNode][]
+              ).map(([v, label, icon]) => (
+                <button
+                  key={v}
+                  type="button"
+                  data-on={chartType === v}
+                  onClick={() => {
+                    settingsStore.patch({ chartType: v });
+                    close();
+                  }}
+                  className={cn('t-menu-item', chartType === v && 'font-semibold')}
+                >
+                  {icon} {label}
+                </button>
+              ))}
+            </div>
+          )}
         </Dropdown>
         <span className="mx-1 h-5 w-px bg-[#454d5a]" />
         <ToolbarBtn icon={<ZoomIn />} title="Zoom in" onClick={() => zoom(1)} />
