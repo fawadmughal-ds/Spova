@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type PointerEvent, type ReactNode } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { ChartCandlestick, ChartNoAxesColumn, ChartPie, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ChevronsUpDown, ClipboardList, Compass, Ellipsis, LayoutDashboard, LogOut, Moon, Sun, Wallet, X } from 'lucide-react';
+import { ChartCandlestick, ChartNoAxesColumn, ChartPie, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ChevronsUpDown, ClipboardList, BookOpen, Compass, Ellipsis, LayoutDashboard, LogOut, Moon, Sun, Wallet, X } from 'lucide-react';
 import { WS_EVENTS, type AccountDto, type OrderSide, type PlaceOrderResult, type QuoteDto, type WsNotice, type WsTick, type CandleDto } from '@spova/shared';
 import { RequireAuth, useAuth } from '@/lib/auth-context';
 import { get } from '@/lib/api';
@@ -14,6 +14,8 @@ import { useToast } from '@/components/toast';
 import { Skeleton, Spinner } from '@/components/ui';
 import { TopBar, type NoticeItem, type TerminalView } from '@/components/trade/top-bar';
 import { ClientRail, railLinks, type RailPanel } from '@/components/trade/client-rail';
+import { DepositBanner, MobileHeader, MobileStats } from '@/components/trade/mobile-home';
+import { BellMenu } from '@/components/trade/top-bar';
 import { DocumentsPanel } from '@/components/portal/documents-panel';
 import { PaymentsView } from '@/components/portal/payments-view';
 import { AccountsView } from '@/components/portal/accounts-view';
@@ -37,13 +39,27 @@ import { alertsStore, settingsStore, useSettings } from '@/components/trade/sett
 import { playSound, primeAudio } from '@/components/trade/sounds';
 import { groupSessions, type SessionRow } from '@/components/trade/sessions';
 
-type MobileTab = 'trade' | 'chart' | 'positions' | 'more';
+/** Phone sections (reference: Trade · Portfolio · Explore · Analytics · More); the chart opens when an instrument is tapped. */
+type MobileTab = 'trade' | 'chart' | 'portfolio' | 'explore' | 'analytics' | 'more';
 const MOBILE_TABS: { value: MobileTab; label: StringKey; icon: typeof Compass }[] = [
   { value: 'trade', label: 'trade', icon: ChartNoAxesColumn },
-  { value: 'chart', label: 'chart', icon: ChartCandlestick },
-  { value: 'positions', label: 'positions', icon: ClipboardList },
+  { value: 'portfolio', label: 'portfolio', icon: BookOpen },
+  { value: 'explore', label: 'explore', icon: Compass },
+  { value: 'analytics', label: 'analytics', icon: ChartPie },
   { value: 'more', label: 'more', icon: Ellipsis },
 ];
+/** `lg` breakpoint: the desktop grid vs the phone tabs decide which view is live */
+function useIsDesktop() {
+  const [desktop, setDesktop] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1024px)');
+    const on = () => setDesktop(mq.matches);
+    on();
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, []);
+  return desktop;
+}
 const QUOTE_POLL_MS = 15_000;
 const DEFAULT_SYMBOL = 'BTCUSD';
 const EMPTY: never[] = [];
@@ -305,7 +321,11 @@ function Terminal() {
   const [view, setView] = useState<TerminalView>('trade');
   const [panel, setPanel] = useState<RailPanel | null>(null);
   const t = useT();
-  const [mtab, setMtab] = useState<MobileTab>('chart');
+  const [mtab, setMtab] = useState<MobileTab>('trade');
+  const [calOpen, setCalOpen] = useState(true);
+  const desktop = useIsDesktop();
+  // phones drive Analytics / Explore from the tab bar, desktop from the top bar
+  const activeView: TerminalView = desktop ? view : mtab === 'analytics' ? 'analytics' : mtab === 'explore' ? 'explore' : 'trade';
   const [bottomTab, setBottomTab] = useState<BottomTab>('positions');
   const [ticket, setTicket] = useState<{ spec: SymbolSpec; side: OrderSide; lots: string } | null>(null);
   const [sidebar, setSidebar] = useState(true);
@@ -346,15 +366,31 @@ function Terminal() {
       <ClientRail accounts={all} account={account} onSelectAccount={selectAccount} me={me} onLogout={() => void logout()} onOpen={setPanel} className="hidden lg:flex" />
       {panel && <RailOverlay panel={panel} accountId={account?.id} onClose={() => setPanel(null)} />}
       <div className="terminal flex h-dvh min-w-0 flex-1 flex-col overflow-hidden" data-theme={settings.theme}>
-      <TopBar accounts={all} account={account} onSelectAccount={selectAccount} connected={connected} view={view} onView={setView} positions={openPositions} symbols={symbolMap} notices={notices} email={me?.email} onLogout={() => void logout()} />
+      <div className="hidden lg:block">
+        <TopBar accounts={all} account={account} onSelectAccount={selectAccount} connected={connected} view={view} onView={setView} positions={openPositions} symbols={symbolMap} notices={notices} email={me?.email} onLogout={() => void logout()} />
+      </div>
+      <MobileHeader className="lg:hidden" accounts={all} account={account} onSelectAccount={selectAccount} onDeposit={() => setPanel('deposit')} onMenu={() => setMtab('more')} bell={<BellMenu notices={notices} />} />
       {account?.tradingBlocked && <TradingBlockedBanner />}
       {marginCall && level !== null && <MarginCallStrip level={level} />}
       {stopOut && <StopOutCard notice={stopOut} onDismiss={() => setStopOut(null)} />}
 
-      <main className={cn('relative flex min-h-0 flex-1 flex-col px-2 pb-2 lg:grid lg:gap-x-[14px] lg:px-[3px] lg:pb-[6px]', view === 'trade' ? (sidebar ? 'lg:grid-cols-[388px_minmax(0,1fr)]' : 'lg:grid-cols-[0px_minmax(0,1fr)]') : 'lg:grid-cols-1')}>
-        {view === 'trade' ? (
+      <main className={cn('relative flex min-h-0 flex-1 flex-col px-2 pb-2 lg:grid lg:gap-x-[14px] lg:px-[3px] lg:pb-[6px]', activeView === 'trade' ? (sidebar ? 'lg:grid-cols-[388px_minmax(0,1fr)]' : 'lg:grid-cols-[0px_minmax(0,1fr)]') : 'lg:grid-cols-1')}>
+        {activeView === 'trade' ? (
           <>
             <aside className={cn('relative min-h-0 flex-col gap-2', show(mtab === 'trade'), 'lg:flex', !sidebar && 'lg:invisible')}>
+              {/* phone: banner, figures and the collapsible calendar sit above the watchlist (reference layout) */}
+              <div className="flex shrink-0 flex-col gap-2 pt-2 lg:hidden">
+                <DepositBanner onClick={() => setPanel('deposit')} />
+                <MobileStats account={account} positions={openPositions} symbols={symbolMap} />
+                {symbols && (
+                  <div className="relative">
+                    <InfoPanel spec={spec} account={account} className={cn('shrink-0 overflow-hidden transition-[height] duration-300', calOpen ? 'h-[300px]' : 'h-[46px]')} />
+                    <button type="button" onClick={() => setCalOpen((v) => !v)} aria-label={calOpen ? 'Collapse the calendar' : 'Expand the calendar'} className="absolute -bottom-[7px] left-1/2 z-10 flex h-[14px] w-[38px] -translate-x-1/2 items-center justify-center rounded-full bg-[var(--t-raised-2)] text-[var(--t-text-2)]">
+                      <ChevronsUpDown className="h-3 w-3" />
+                    </button>
+                  </div>
+                )}
+              </div>
               <MarketPanel symbols={symbolsError ? [] : symbols} selected={selected} onSelect={pick} account={account} onPlaced={onPlaced} onAdvanced={(s, side, lots) => setTicket({ spec: s, side, lots })} sessions={sessions} className="min-h-0 flex-1" />
               {/* handle: swap the space between the instrument list and the info panel */}
               <button type="button" onClick={() => settingsStore.patch({ infoTall: !settings.infoTall })} aria-label={settings.infoTall ? 'Shrink the information panel' : 'Expand the information panel'} className="absolute left-1/2 z-10 hidden h-[14px] w-[38px] -translate-x-1/2 items-center justify-center rounded-full bg-[var(--t-raised)] text-[var(--t-muted)] hover:text-white lg:flex" style={{ bottom: (settings.infoTall ? 520 : 270) + 1 }}>
@@ -367,7 +403,7 @@ function Terminal() {
               {sidebar ? <ChevronLeft className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
             </button>
 
-            <div className={cn('min-h-0 min-w-0 flex-1 flex-col', show(mtab === 'chart' || mtab === 'positions'), 'lg:flex')}>
+            <div className={cn('min-h-0 min-w-0 flex-1 flex-col', show(mtab === 'chart' || mtab === 'portfolio'), 'lg:flex')}>
               {spec ? (
                 <ChartPanel
                   spec={spec}
@@ -398,13 +434,13 @@ function Terminal() {
                 </span>
               </div>
               {account ? (
-                <BottomPanel account={account} symbols={symbolMap} data={data} onAccount={onAccount} ledgerVersion={ledgerVersion} tab={bottomTab} onTab={setBottomTab} className={cn('min-h-0 flex-1', show(mtab === 'positions'), 'lg:flex lg:h-[var(--bh)] lg:flex-none')} style={{ ['--bh' as string]: `${bottomHeight}px` }} />
+                <BottomPanel account={account} symbols={symbolMap} data={data} onAccount={onAccount} ledgerVersion={ledgerVersion} tab={bottomTab} onTab={setBottomTab} className={cn('min-h-0 flex-1', show(mtab === 'portfolio'), 'lg:flex lg:h-[var(--bh)] lg:flex-none')} style={{ ['--bh' as string]: `${bottomHeight}px` }} />
               ) : (
-                panelSkeleton(cn('min-h-0 flex-1', show(mtab === 'positions'), 'lg:flex lg:h-[330px] lg:flex-none'))
+                panelSkeleton(cn('min-h-0 flex-1', show(mtab === 'portfolio'), 'lg:flex lg:h-[330px] lg:flex-none'))
               )}
             </div>
           </>
-        ) : view === 'analytics' ? (
+        ) : activeView === 'analytics' ? (
           account ? (
             <AnalyticsView account={account} history={data.history} loadHistory={data.loadHistory} symbols={symbolMap} ledgerVersion={ledgerVersion} className="min-h-0 flex-1" />
           ) : (
@@ -415,7 +451,7 @@ function Terminal() {
         )}
 
         {/* mobile "More" */}
-        {mtab === 'more' && view === 'trade' && (
+        {mtab === 'more' && (
           <section className="t-panel min-h-0 flex-1 lg:hidden" aria-label="More">
             <div className="t-bar !pl-4 text-[14px] font-semibold text-white">{t('more')}</div>
             <ul className="p-2">
@@ -442,15 +478,13 @@ function Terminal() {
               </li>
               {(
                 [
-                  [t('analytics'), 'Statistics and equity curve', <ChartPie key="a" />, () => setView('analytics')],
-                  [t('explore'), 'All instruments by market', <Compass key="e" />, () => setView('explore')],
                   [
                     t('finance'),
                     'Balance, margin and ledger',
                     <Wallet key="f" />,
                     () => {
                       setBottomTab('finance');
-                      setMtab('positions');
+                      setMtab('portfolio');
                     },
                   ],
                 ] as [string, string, ReactNode, () => void][]
@@ -498,11 +532,8 @@ function Terminal() {
           <button
             key={m.value}
             type="button"
-            data-on={mtab === m.value && (m.value === 'more' || view === 'trade')}
-            onClick={() => {
-              setMtab(m.value);
-              if (m.value !== 'more') setView('trade');
-            }}
+            data-on={mtab === m.value || (m.value === 'trade' && mtab === 'chart')}
+            onClick={() => setMtab(m.value)}
             className="t-mobile-tab"
           >
             <m.icon /> {t(m.label)}

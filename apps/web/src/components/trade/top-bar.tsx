@@ -175,7 +175,7 @@ function ProfitBlock({ account, positions, symbols, compact }: { account: Accoun
   );
 }
 
-function BellMenu({ notices }: { notices: NoticeItem[] }) {
+export function BellMenu({ notices }: { notices: NoticeItem[] }) {
   const s = useSettings();
   const [seen, setSeen] = useState(0);
   const unread = notices.filter((n) => n.at > seen).length;

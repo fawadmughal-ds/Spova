@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { CalendarX2 } from 'lucide-react';
+import { Binoculars, CalendarX2 } from 'lucide-react';
 import type { CalendarEventDto } from '@spova/shared';
 import { get } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -79,7 +79,13 @@ export function CalendarTab({ className }: { className?: string }) {
       ) : failed && events.length === 0 ? (
         <EmptyState icon={<CalendarX2 />} title={t('calendarDown')} />
       ) : groups.length === 0 ? (
-        <EmptyState icon={<CalendarX2 />} title={t('noEvents')} />
+        <div className="flex h-full min-h-[220px] flex-col items-center justify-center gap-5 p-6 text-center">
+          <span className="flex h-[150px] w-[150px] items-center justify-center rounded-full bg-[var(--t-blue)]/15 text-[var(--t-blue)]">
+            <Binoculars className="h-16 w-16" strokeWidth={1.6} />
+          </span>
+          <div className="text-[20px] font-semibold text-[var(--t-text)]">No calendar events</div>
+          <div className="-mt-3 text-[12px] text-[var(--t-muted)]">{t('noEvents')}</div>
+        </div>
       ) : (
         <ul className="min-h-0 flex-1 overflow-y-auto">
           {groups.map((g) => (

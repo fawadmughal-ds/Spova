@@ -62,6 +62,7 @@ const STRINGS = {
   pendingOrders: { en: 'Pending Orders', hi: 'लंबित ऑर्डर', ur: 'زیر التواء آرڈرز', ar: 'الأوامر المعلقة', es: 'Órdenes pendientes', pt: 'Ordens pendentes', fr: 'Ordres en attente', de: 'Offene Orders', ru: 'Отложенные ордера', zh: '挂单' },
   closedPositions: { en: 'Closed Positions', hi: 'बंद पोज़िशन', ur: 'بند پوزیشنز', ar: 'الصفقات المغلقة', es: 'Posiciones cerradas', pt: 'Posições fechadas', fr: 'Positions clôturées', de: 'Geschlossene Positionen', ru: 'Закрытые позиции', zh: '历史持仓' },
   finance: { en: 'Finance', hi: 'वित्त', ur: 'فنانس', ar: 'المالية', es: 'Finanzas', pt: 'Finanças', fr: 'Finances', de: 'Finanzen', ru: 'Финансы', zh: '资金' },
+  portfolio: { en: 'Portfolio', hi: 'पोर्टफोलियो', ur: 'پورٹ فولیو', ar: 'المحفظة', es: 'Cartera', pt: 'Carteira', fr: 'Portefeuille', de: 'Portfolio', ru: 'Портфель', zh: '投资组合' },
   chart: { en: 'Chart', hi: 'चार्ट', ur: 'چارٹ', ar: 'الرسم البياني', es: 'Gráfico', pt: 'Gráfico', fr: 'Graphique', de: 'Chart', ru: 'График', zh: '图表' },
   positions: { en: 'Positions', hi: 'पोज़िशन', ur: 'پوزیشنز', ar: 'الصفقات', es: 'Posiciones', pt: 'Posições', fr: 'Positions', de: 'Positionen', ru: 'Позиции', zh: '持仓' },
   more: { en: 'More', hi: 'और', ur: 'مزید', ar: 'المزيد', es: 'Más', pt: 'Mais', fr: 'Plus', de: 'Mehr', ru: 'Ещё', zh: '更多' },
