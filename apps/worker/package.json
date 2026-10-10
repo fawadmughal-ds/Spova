@@ -7,7 +7,7 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/main.js",
     "typecheck": "tsc --noEmit -p tsconfig.typecheck.json",
-    "test": "tsx --test src/candles/aggregator.test.ts src/feeds/sessions.test.ts src/feeds/throttle.test.ts src/risk/engine.test.ts src/risk/guards.test.ts src/internal-client.test.ts src/candles/backfill.test.ts",
+    "test": "tsx --test src/candles/aggregator.test.ts src/feeds/sessions.test.ts src/feeds/throttle.test.ts src/feeds/oanda.test.ts src/risk/engine.test.ts src/risk/guards.test.ts src/internal-client.test.ts src/candles/backfill.test.ts",
     "prisma:generate": "prisma generate --schema ../api/prisma/schema.prisma",
     "lint": "echo \"(lint) worker: skipped\""
   },

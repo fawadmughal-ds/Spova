@@ -11,6 +11,7 @@ import type { Ingest } from './ingest';
 export class FeedHealth {
   private timer?: NodeJS.Timeout;
   private binanceUp = false;
+  private oandaUp = false;
   private readonly startedAt = Date.now();
 
   constructor(
@@ -18,13 +19,20 @@ export class FeedHealth {
     private readonly symbols: SymbolRegistry,
     private readonly ingest: Ingest,
     private readonly log: Logger,
-    private readonly enabled: { binance: boolean; synthetic: boolean },
+    private readonly enabled: { binance: boolean; synthetic: boolean; oanda?: boolean },
+    /** synthetic-source symbols currently quoted by OANDA instead */
+    private readonly oandaSymbols: Set<string> = new Set(),
     private readonly staleMs = 60_000,
   ) {}
 
   setBinanceSocket(up: boolean) {
     this.binanceUp = up;
     void this.write('binance', up ? 'up' : 'down');
+  }
+
+  setOandaSocket(up: boolean) {
+    this.oandaUp = up;
+    void this.write('oanda', up ? 'up' : 'down');
   }
 
   start(intervalMs = 10_000) {
@@ -51,9 +59,20 @@ export class FeedHealth {
       if (stale.length) this.log.warn({ stale, socket: this.binanceUp ? 'up' : 'down' }, 'binance: symbols without ticks for 60s');
       await this.write('binance', status);
     }
+    if (this.enabled.oanda) {
+      const stale: string[] = [];
+      for (const id of this.oandaSymbols) {
+        if (!this.symbols.isOpen(id)) continue;
+        const last = this.ingest.lastTick(id);
+        if (last === undefined ? !bootGrace : now - last > this.staleMs) stale.push(id);
+      }
+      const status = this.oandaUp && stale.length === 0 ? 'up' : 'down';
+      if (stale.length) this.log.warn({ stale, socket: this.oandaUp ? 'up' : 'down' }, 'oanda: open symbols without ticks for 60s');
+      await this.write('oanda', status);
+    }
     if (this.enabled.synthetic) {
       const stale: string[] = [];
-      for (const s of this.symbols.enabled().filter((x) => x.feedSource === 'synthetic')) {
+      for (const s of this.symbols.enabled().filter((x) => x.feedSource === 'synthetic' && !this.oandaSymbols.has(x.id))) {
         if (!this.symbols.isOpen(s.id)) continue;
         const last = this.ingest.lastTick(s.id);
         if (last === undefined ? !bootGrace : now - last > this.staleMs) stale.push(s.id);

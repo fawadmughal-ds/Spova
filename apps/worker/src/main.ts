@@ -6,6 +6,7 @@ import { SymbolRegistry } from './symbols';
 import { Ingest } from './feeds/ingest';
 import { BinanceFeed } from './feeds/binance';
 import { SyntheticFeed } from './feeds/synthetic';
+import { OANDA_INSTRUMENTS, OandaFeed } from './feeds/oanda';
 import { FeedHealth } from './feeds/health';
 import { CandleService } from './candles/service';
 import { CandleBackfill } from './candles/backfill';
@@ -72,7 +73,19 @@ async function main() {
 
   // ---- feeds
   const feeds: FeedAdapter[] = [];
-  const health = new FeedHealth(redis, symbols, ingest, log, { binance: cfg.FEED_BINANCE, synthetic: cfg.FEED_SYNTHETIC });
+  // OANDA takes over every synthetic symbol it can quote; the rest (shares) stay synthetic
+  const oandaOn = cfg.FEED_OANDA && !!cfg.OANDA_TOKEN && !!cfg.OANDA_ACCOUNT_ID;
+  if (cfg.FEED_OANDA && !oandaOn) log.error('FEED_OANDA=on but OANDA_TOKEN / OANDA_ACCOUNT_ID missing; staying on the synthetic feed');
+  const oandaSymbols = new Set(oandaOn ? symbols.enabled().filter((s) => s.feedSource === 'synthetic' && OANDA_INSTRUMENTS[s.id]).map((s) => s.id) : []);
+  const health = new FeedHealth(redis, symbols, ingest, log, { binance: cfg.FEED_BINANCE, synthetic: cfg.FEED_SYNTHETIC, oanda: oandaOn }, oandaSymbols);
+  if (oandaOn) {
+    const oanda = new OandaFeed(log, { token: cfg.OANDA_TOKEN, accountId: cfg.OANDA_ACCOUNT_ID, env: cfg.OANDA_ENV });
+    oanda.onStatus = (s) => health.setOandaSocket(s === 'up');
+    const map = Object.fromEntries([...oandaSymbols].map((id) => [OANDA_INSTRUMENTS[id], id]));
+    await oanda.connect(map, (t) => ingest.handle(t));
+    feeds.push(oanda);
+    log.info({ symbols: [...oandaSymbols] }, 'oanda: real prices replace the synthetic feed for these symbols');
+  }
   if (cfg.FEED_BINANCE) {
     const binance = new BinanceFeed(log);
     binance.onStatus = (s) => health.setBinanceSocket(s === 'up');
@@ -82,13 +95,14 @@ async function main() {
   if (cfg.FEED_SYNTHETIC) {
     const infos = symbols
       .enabled()
-      .filter((s) => s.feedSource === 'synthetic')
+      .filter((s) => s.feedSource === 'synthetic' && !oandaSymbols.has(s.id))
       .map((s) => {
         const q = ingest.book[s.id];
         return { id: s.id, assetClass: s.assetClass, digits: s.digits, startPrice: q ? (Number(q.bid) + Number(q.ask)) / 2 : undefined };
       });
     const synthetic = new SyntheticFeed(log, infos, (id, now) => symbols.isOpen(id, now));
-    await synthetic.connect(symbols.feedMap('synthetic'), (t) => ingest.handle(t));
+    const synthMap = Object.fromEntries(Object.entries(symbols.feedMap('synthetic')).filter(([, id]) => !oandaSymbols.has(id)));
+    await synthetic.connect(synthMap, (t) => ingest.handle(t));
     feeds.push(synthetic);
   }
   health.start();

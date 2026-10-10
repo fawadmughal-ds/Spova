@@ -274,6 +274,7 @@ export function ChartPanel({ spec, positions, className, footer }: ChartPanelPro
   const [drawnCount, setDrawnCount] = useState(0);
   const [state, setState] = useState<'loading' | 'empty' | 'ready' | 'error'>('loading');
   const [hover, setHover] = useState<Bar | null>(null);
+  const [offLive, setOffLive] = useState(false);
   const [tool, setTool] = useState<Tool>('crosshair');
   const toolRef = useRef<Tool>('crosshair');
   toolRef.current = tool;
@@ -298,12 +299,14 @@ export function ChartPanel({ spec, positions, className, footer }: ChartPanelPro
         horzLine: { color: 'rgba(186,195,210,0.4)', labelBackgroundColor: '#4b5868', width: 1, style: LineStyle.Dashed },
       },
       rightPriceScale: { borderColor: 'rgba(255,255,255,0.08)', scaleMargins: { top: 0.08, bottom: 0.22 } },
-      timeScale: { borderColor: 'rgba(255,255,255,0.08)', timeVisible: true, secondsVisible: false, rightOffset: 6, barSpacing: 7, tickMarkFormatter },
+      timeScale: { borderColor: 'rgba(255,255,255,0.08)', timeVisible: true, secondsVisible: false, rightOffset: 6, barSpacing: 7, rightBarStaysOnScroll: true, shiftVisibleRangeOnNewBar: true, tickMarkFormatter },
       handleScroll: true,
       handleScale: true,
       localization: { locale: 'en-GB' },
     });
     chart.current = c;
+    const onRange = () => setOffLive(c.timeScale().scrollPosition() < -2);
+    c.timeScale().subscribeVisibleLogicalRangeChange(onRange);
     const ro = new ResizeObserver(() => {
       if (el.clientWidth > 0 && el.clientHeight > 0) c.applyOptions({ width: el.clientWidth, height: el.clientHeight });
     });
@@ -322,6 +325,7 @@ export function ChartPanel({ spec, positions, className, footer }: ChartPanelPro
     return () => {
       c.unsubscribeCrosshairMove(onMove);
       ro.disconnect();
+      c.timeScale().unsubscribeVisibleLogicalRangeChange(onRange);
       c.remove();
       chart.current = null;
       main.current = null;
@@ -429,8 +433,11 @@ export function ChartPanel({ spec, positions, className, footer }: ChartPanelPro
       const data = bars.current;
       const prev = last(data);
       if (prev && bar.time < prev.time) return;
-      if (prev && prev.time === bar.time) data[data.length - 1] = bar;
+      const newBar = !prev || prev.time !== bar.time;
+      if (!newBar) data[data.length - 1] = bar;
       else data.push(bar);
+      const ts = chart.current?.timeScale();
+      const wasLive = ts ? ts.scrollPosition() >= -1 : false;
       s.update((['line', 'area'].includes(settingsStore.get().chartType) ? { time: bar.time, value: bar.close } : { time: bar.time, open: bar.open, high: bar.high, low: bar.low, close: bar.close }) as never);
       vol.current?.update(volPoint(bar));
       const n = data.length;
@@ -442,6 +449,7 @@ export function ChartPanel({ spec, positions, className, footer }: ChartPanelPro
         ind.current.bbM?.update(last(b.mid));
         ind.current.bbL?.update(last(b.lower));
       }
+      if (newBar && wasLive && ts) ts.scrollToRealTime();
       setState((st) => (st === 'empty' || st === 'loading' ? 'ready' : st));
       setHover((h) => (h && h.time === bar.time ? bar : h));
     };
@@ -551,8 +559,12 @@ export function ChartPanel({ spec, positions, className, footer }: ChartPanelPro
     const ts = chart.current?.timeScale();
     if (!ts) return;
     const bs = ts.options().barSpacing;
+    const following = ts.scrollPosition() >= -1;
     ts.applyOptions({ barSpacing: Math.min(60, Math.max(1.5, dir > 0 ? bs * 1.35 : bs / 1.35)) });
+    // zooming must not detach the chart from the live edge
+    if (following) ts.scrollToRealTime();
   };
+  const goLive = () => chart.current?.timeScale().scrollToRealTime();
   const toggleFull = useCallback(() => {
     const el = section.current;
     if (!el) return;
@@ -646,6 +658,11 @@ export function ChartPanel({ spec, positions, className, footer }: ChartPanelPro
         <ToolbarBtn icon={<ZoomIn />} title="Zoom in" onClick={() => zoom(1)} />
         <ToolbarBtn icon={<ZoomOut />} title="Zoom out" onClick={() => zoom(-1)} />
         <ToolbarBtn icon={full ? <Minimize2 /> : <Maximize />} title={full ? 'Exit full screen' : 'Full screen'} onClick={toggleFull} on={full} />
+        {offLive && (
+          <button type="button" onClick={goLive} title="Jump to the latest price" className="animate-pop-in ml-1 inline-flex h-7 items-center gap-1.5 rounded-md bg-[var(--t-blue-deep)] px-2.5 text-[11px] font-semibold text-white hover:brightness-110">
+            <span className="live-dot !h-1.5 !w-1.5" /> Live
+          </button>
+        )}
         <span className="mx-1 h-5 w-px bg-[#454d5a]" />
         <Dropdown title="Indicators" buttonClassName={cn('t-icon-btn', (ma20 || ma50 || bb) && '!text-[var(--t-blue)]')} button={() => <SquareFunction />}>
           {() => (

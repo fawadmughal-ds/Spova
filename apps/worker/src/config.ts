@@ -25,6 +25,11 @@ const schema = z.object({
   INTERNAL_TOKEN: z.string().min(1),
   FEED_BINANCE: onOff,
   FEED_SYNTHETIC: onOff,
+  /** real forex / metals / index / energy prices from OANDA v20 (free practice account); off = synthetic demo feed */
+  FEED_OANDA: z.enum(['on', 'off']).default('off').transform((v) => v === 'on'),
+  OANDA_TOKEN: z.string().optional().default(''),
+  OANDA_ACCOUNT_ID: z.string().optional().default(''),
+  OANDA_ENV: z.enum(['practice', 'live']).default('practice'),
   /** backfill candle history on boot (Binance klines / synthetic history) */
   CANDLE_BACKFILL: onOff,
   /** a (symbol, tf) with fewer closed bars than this gets backfilled */
