@@ -19,6 +19,7 @@ export function depositChannelPublic(id: string, cfg: DepositChannels, brand: st
         qrKind: null,
         note: c.note,
         proofRequired: true,
+        currency: c.currency || 'INR',
       };
     }
     case 'upi': {
@@ -34,6 +35,7 @@ export function depositChannelPublic(id: string, cfg: DepositChannels, brand: st
         qrKind: 'upi',
         note: c.note,
         proofRequired: true,
+        currency: c.currency || 'INR',
       };
     }
     case 'binance': {
@@ -48,6 +50,7 @@ export function depositChannelPublic(id: string, cfg: DepositChannels, brand: st
         qrKind: c.qrLink ? 'link' : 'address',
         note: c.note,
         proofRequired: true,
+        currency: 'USDT',
       };
     }
     case 'crypto_usdt': {
@@ -63,10 +66,11 @@ export function depositChannelPublic(id: string, cfg: DepositChannels, brand: st
         qrKind: 'address',
         note: c.note,
         proofRequired: true,
+        currency: 'USDT',
       };
     }
     case 'card':
-      return { title: 'Card payment link', fields: [], qr: null, qrKind: null, note: cfg.card.note, proofRequired: false };
+      return { title: 'Credit or Debit Card', fields: [], qr: null, qrKind: null, note: cfg.card.note, proofRequired: false, currency: 'USD' };
     default:
       return undefined;
   }

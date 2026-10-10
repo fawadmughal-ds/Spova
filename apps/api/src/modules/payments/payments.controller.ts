@@ -1,22 +1,25 @@
-import { Body, Controller, Get, Param, Patch, Post, Put, Query, Res, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Param, Patch, Post, Put, Query, Req, Res, UploadedFile, UseInterceptors, type RawBodyRequest } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import { memoryStorage } from 'multer';
 import { z } from 'zod';
 import {
   KYC_MAX_BYTES,
+  cardIntentSchema,
   depositChannelsSchema,
   depositRequestSchema,
   paginationSchema,
   paymentDecisionSchema,
   withdrawRequestSchema,
+  type CardIntentInput,
   type DepositChannels,
   type DepositRequestInput,
   type PaymentDecisionInput,
   type WithdrawRequestInput,
 } from '@spova/shared';
 import { PaymentsService } from './payments.service';
-import { ClientIp, CurrentUser, Roles } from '../../common/auth/decorators';
+import { StripeService } from './stripe.service';
+import { ClientIp, CurrentUser, Public, Roles } from '../../common/auth/decorators';
 import { ADMIN_ROLES, type AuthUser } from '../../common/auth/auth.types';
 import { ApiError } from '../../common/errors';
 import { ZodPipe } from '../../common/pipes/zod.pipe';
@@ -40,11 +43,26 @@ async function streamProof(res: Response, svc: PaymentsService, id: string, requ
 
 @Controller('me/payments')
 export class PaymentsController {
-  constructor(private readonly payments: PaymentsService) {}
+  constructor(
+    private readonly payments: PaymentsService,
+    private readonly stripe: StripeService,
+  ) {}
 
   @Get('methods')
   methods() {
-    return this.payments.methods();
+    return this.payments.methods(this.stripe.configured ? { provider: 'stripe', publishableKey: this.stripe.publishableKey } : null);
+  }
+
+  /** Legal footer + USD -> local currency rates for the cashier. */
+  @Get('cashier')
+  cashier() {
+    return this.payments.cashierInfo();
+  }
+
+  /** Card deposit: opens the request and returns the gateway client secret for the browser to confirm the card. */
+  @Post('card/intent')
+  cardIntent(@CurrentUser() user: AuthUser, @Body(new ZodPipe(cardIntentSchema)) body: CardIntentInput) {
+    return this.stripe.createIntent(user.id, body);
   }
 
   @Get()
@@ -78,6 +96,18 @@ export class PaymentsController {
   @Get(':id/proof')
   proofFile(@CurrentUser() user: AuthUser, @Param('id') id: string, @Res() res: Response) {
     return streamProof(res, this.payments, id, { id: user.id, isAdmin: ADMIN_ROLES.includes(user.role) });
+  }
+}
+
+/** Gateway callbacks. No session: authenticity comes from the provider's signature over the raw body. */
+@Controller('payments/webhooks')
+@Public()
+export class PaymentsWebhookController {
+  constructor(private readonly stripe: StripeService) {}
+
+  @Post('stripe')
+  stripeHook(@Req() req: RawBodyRequest<Request>, @Headers('stripe-signature') signature?: string) {
+    return this.stripe.handleWebhook(req.rawBody ?? Buffer.from(''), signature);
   }
 }
 

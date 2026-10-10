@@ -32,4 +32,8 @@ export class ApiError extends HttpException {
   static tooMany(message = 'Too many requests') {
     return new ApiError(HttpStatus.TOO_MANY_REQUESTS, 'rate_limited', message);
   }
+  /** 503: a dependency (payment gateway, feed) is not configured or not answering */
+  static unavailable(code: string, message: string) {
+    return new ApiError(HttpStatus.SERVICE_UNAVAILABLE, code, message);
+  }
 }

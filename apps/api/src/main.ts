@@ -8,7 +8,7 @@ import { env } from './config/env';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  const app = await NestFactory.create(AppModule, { bufferLogs: true, rawBody: true });
   app.useLogger(app.get(Logger));
   app.setGlobalPrefix('v1', { exclude: ['health', 'health/ready'] });
   app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));

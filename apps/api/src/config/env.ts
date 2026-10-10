@@ -50,6 +50,10 @@ const schema = z.object({
   KYC_REQUIRED_FOR_WITHDRAW: z.string().optional().default('true').transform((v) => v !== 'false'),
   /** back-office inbox for new KYC / payment / ticket alerts (empty = no mail) */
   ADMIN_NOTIFY_EMAIL: z.string().optional().default(''),
+  /** card gateway (Stripe): secret key + webhook signing secret; empty = cards stay on the manual payment-link flow */
+  STRIPE_SECRET_KEY: z.string().optional().default(''),
+  STRIPE_WEBHOOK_SECRET: z.string().optional().default(''),
+  STRIPE_PUBLISHABLE_KEY: z.string().optional().default(''),
   /** shared secret for /internal/trading/* (worker -> api) */
   INTERNAL_TOKEN: z.string().min(24),
   SEED_ADMIN_EMAIL: z.string().email().optional(),

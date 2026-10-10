@@ -10,7 +10,7 @@ import { Button, Input, Skeleton, Switch } from '@/components/ui';
 import { Textarea } from './queue-bits';
 import { friendlyError } from '@/components/portal/api-error';
 
-type Key = keyof DepositChannels;
+type Key = Exclude<keyof DepositChannels, 'cashier'>;
 const TITLES: Record<Key, string> = { bank: 'Bank transfer', upi: 'UPI', binance: 'Binance Pay', crypto_usdt: 'Crypto (USDT)', card: 'Card' };
 const FIELDS: Record<Key, { name: string; label: string; placeholder?: string }[]> = {
   bank: [
@@ -19,10 +19,12 @@ const FIELDS: Record<Key, { name: string; label: string; placeholder?: string }[
     { name: 'accountNumber', label: 'Account number' },
     { name: 'ifsc', label: 'IFSC' },
     { name: 'swift', label: 'SWIFT (international)' },
+    { name: 'currency', label: 'Currency the client pays in', placeholder: 'INR' },
   ],
   upi: [
     { name: 'vpa', label: 'UPI ID (VPA)', placeholder: 'name@bank' },
     { name: 'payeeName', label: 'Payee name' },
+    { name: 'currency', label: 'Currency the client pays in', placeholder: 'INR' },
   ],
   binance: [
     { name: 'payId', label: 'Binance Pay ID' },
@@ -50,7 +52,7 @@ export function DepositChannelsEditor({ className }: { className?: string }) {
       .catch(() => setCfg(DEFAULT_DEPOSIT_CHANNELS));
   }, []);
 
-  const patch = <K extends Key>(k: K, p: Partial<DepositChannels[K]>) => setCfg((c) => (c ? { ...c, [k]: { ...c[k], ...p } } : c));
+  const patch = <K extends keyof DepositChannels>(k: K, p: Partial<DepositChannels[K]>) => setCfg((c) => (c ? { ...c, [k]: { ...c[k], ...p } } : c));
 
   const save = async () => {
     if (!cfg) return;
@@ -81,7 +83,7 @@ export function DepositChannelsEditor({ className }: { className?: string }) {
         </span>
         <span className="min-w-0 flex-1">
           <span className="block text-base font-semibold text-white">Deposit channels</span>
-          <span className="block text-xs text-ink-400">Bank account, UPI ID, Binance Pay ID and USDT wallet that clients pay into. {cfg ? `${(Object.keys(cfg) as Key[]).filter((k) => cfg[k].enabled).map((k) => TITLES[k]).join(', ')} enabled.` : ''}</span>
+          <span className="block text-xs text-ink-400">Bank account, UPI ID, Binance Pay ID and USDT wallet that clients pay into. {cfg ? `${(Object.keys(TITLES) as Key[]).filter((k) => cfg[k].enabled).map((k) => TITLES[k]).join(', ')} enabled.` : ''}</span>
         </span>
         <ChevronDown className={cn('h-5 w-5 text-ink-400 transition-transform', open && 'rotate-180')} />
       </button>
@@ -112,6 +114,13 @@ export function DepositChannelsEditor({ className }: { className?: string }) {
                   <Textarea className="mt-3" label="Note shown to the client" name={`${k}-note`} rows={2} value={cfg[k].note} onChange={(e) => patch(k, { note: e.target.value } as Partial<DepositChannels[typeof k]>)} />
                 </div>
               ))}
+            </div>
+          )}
+          {cfg && (
+            <div className="mt-5 rounded-2xl border border-white/[0.1] bg-white/[0.02] p-4">
+              <div className="text-sm font-semibold text-white">Cashier footer (company information)</div>
+              <p className="mt-1 text-xs text-ink-400">Shown under the deposit cashier: legal name, regulator, licence number, address. Use [BRAND] for the brand name.</p>
+              <Textarea className="mt-3" label="Footer text" name="cashier-footer" rows={3} value={cfg.cashier.footer} onChange={(e) => patch('cashier', { footer: e.target.value })} />
             </div>
           )}
           {errors && <p className="mt-3 text-xs text-down">{errors}</p>}

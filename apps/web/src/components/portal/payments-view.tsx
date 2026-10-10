@@ -4,10 +4,10 @@ import { useCallback, useEffect, useMemo, useReducer, useState, type ReactNode }
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowDownToLine, ArrowRight, ArrowUpFromLine, BadgeCheck, ChevronLeft, ChevronRight, FileCheck2, History, Lock, Plus, Receipt, ShieldCheck, Wallet } from 'lucide-react';
-import { depositRequestSchema, withdrawRequestSchema, WS_EVENTS, type AccountDto, type Paginated, type PaymentKind, type PaymentMethodDto, type PaymentRequestDto, type WsPaymentStatus } from '@spova/shared';
+import { withdrawRequestSchema, WS_EVENTS, type AccountDto, type Paginated, type PaymentKind, type PaymentMethodDto, type PaymentRequestDto, type WsPaymentStatus } from '@spova/shared';
 import { useAuth } from '@/lib/auth-context';
 import { useAccounts } from '@/lib/use-accounts';
-import { get, post, upload } from '@/lib/api';
+import { get, post } from '@/lib/api';
 import { useUserEvent } from '@/lib/ws';
 import { buttonClass } from '@/lib/button';
 import { cn, fmtMoney } from '@/lib/utils';
@@ -17,7 +17,8 @@ import { Alert, Button, Empty, Input, Skeleton } from '@/components/ui';
 import { SlidingTabs } from '@/components/portal/sliding-tabs';
 import { AccountPicker } from '@/components/portal/account-picker';
 import { MethodCards, methodIcon } from '@/components/portal/method-cards';
-import { PayToPanel, ProofPicker } from '@/components/portal/deposit-channel';
+import { CashierDeposit } from '@/components/portal/cashier-deposit';
+import { RequestDone } from '@/components/portal/request-done';
 import { PaymentRow, shortId } from '@/components/portal/payment-row';
 import { fmtLogin } from '@/components/portal/account-plate';
 import { availableFrom, friendlyError, type FriendlyError } from '@/components/portal/api-error';
@@ -87,7 +88,7 @@ export function PaymentsView({ embedded = false, initialTab = 'deposit' }: { emb
       ) : (
         <div key={tab} className="animate-page-in">
           {tab === 'deposit' &&
-            (live.length === 0 ? <NoLiveAccount kycDone={kycDone} demo={data.demo} /> : <DepositForm accounts={all} methods={methods} onCreated={bump} onHistory={() => setTab('history')} />)}
+            (live.length === 0 ? <NoLiveAccount kycDone={kycDone} demo={data.demo} /> : <CashierDeposit accounts={all} methods={methods} onCreated={bump} onHistory={() => setTab('history')} />)}
           {tab === 'withdraw' &&
             (!kycDone ? <KycGate /> : live.length === 0 ? <NoLiveAccount kycDone demo={data.demo} /> : <WithdrawForm accounts={all} methods={methods} onCreated={bump} onHistory={() => setTab('history')} />)}
           {tab === 'history' && <HistoryList methods={methods} version={version} onChanged={bump} />}
@@ -254,205 +255,6 @@ function SummaryRow({ label, children }: { label: string; children: ReactNode })
 }
 
 /** Confirmation after a request was accepted by the server. */
-function RequestDone({ req, method, onAgain, onHistory }: { req: PaymentRequestDto; method?: PaymentMethodDto; onAgain: () => void; onHistory: () => void }) {
-  const withdraw = req.kind === 'withdraw';
-  const steps = withdraw
-    ? ['Our back office checks the destination belongs to you and that funds are free of open-position margin.', `The payout is sent by ${method?.label ?? req.method}; typical time ${method?.eta ?? 'a few business days'}.`, 'Your balance updates the moment the request is approved. You can cancel while it is still pending.']
-    : [
-        `Send the funds by ${method?.label ?? req.method}${req.reference ? ` quoting your reference ${req.reference}` : ''}, if you have not already.`,
-        req.proof ? `Your payment proof (${req.proof.name}) is attached. Our back office matches it with the incoming payment; typical time ${method?.eta ?? 'a few business days'}.` : `Our back office matches the incoming payment; typical time ${method?.eta ?? 'a few business days'}. You can attach the slip from your history.`,
-        'Your balance updates instantly on approval and you are notified here and by email.',
-      ];
-  return (
-    <section className="card corners animate-pop-in mx-auto max-w-2xl overflow-hidden p-6 text-center sm:p-10" style={{ '--corner': 'rgb(var(--up-rgb) / 0.4)' } as React.CSSProperties}>
-      <span className="relative mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-up text-ink-950 shadow-[0_0_0_8px_rgb(var(--up-rgb)/0.12)]">
-        <span className="absolute inset-0 animate-pulse-ring rounded-full border border-up/60" />
-        <BadgeCheck className="h-8 w-8" />
-      </span>
-      <div className="label mt-6 !text-up">{withdraw ? 'Withdrawal' : 'Deposit'} request received</div>
-      <div className="tabular mt-2 font-display text-4xl font-bold tracking-tight sm:text-5xl">
-        {fmtMoney(req.amount)} <span className="font-mono text-base font-medium text-ink-400">{req.currency}</span>
-      </div>
-      <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 font-mono text-xs text-ink-300">
-        Request <span className="font-semibold text-white">#{shortId(req.id)}</span> · account {fmtLogin(req.accountLogin)}
-      </div>
-      <ol className="mx-auto mt-8 max-w-md space-y-3 text-left">
-        {steps.map((t, i) => (
-          <li key={i} className="animate-page-in flex gap-3 text-sm text-ink-300" style={{ animationDelay: `${200 + i * 90}ms` }}>
-            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-white/[0.05] font-mono text-[11px] text-ink-200 ring-1 ring-inset ring-white/10">{i + 1}</span>
-            {t}
-          </li>
-        ))}
-      </ol>
-      <div className="mt-8 flex flex-wrap justify-center gap-2">
-        <Button onClick={onHistory}>
-          <History className="h-4 w-4" /> View history
-        </Button>
-        <Button variant="outline" onClick={onAgain}>
-          <Plus className="h-4 w-4" /> New request
-        </Button>
-      </div>
-    </section>
-  );
-}
-
-// ---------------------------------------------------------------- deposit
-
-function DepositForm({ accounts, methods, onCreated, onHistory }: { accounts: AccountDto[]; methods: PaymentMethodDto[]; onCreated: () => void; onHistory: () => void }) {
-  const toast = useToast();
-  const live = accounts.filter((a) => a.type === 'live' && a.status === 'enabled');
-  const usable = methods.filter((m) => m.enabled && m.kinds.includes('deposit'));
-  const [accountId, setAccountId] = useState<string | null>(live[0]?.id ?? null);
-  const [method, setMethod] = useState<string | null>(usable[0]?.id ?? null);
-  const [amount, setAmount] = useState('');
-  const [reference, setReference] = useState('');
-  const [proof, setProof] = useState<File | null>(null);
-  const [fieldErr, setFieldErr] = useState<Record<string, string>>({});
-  const [error, setError] = useState<FriendlyError | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [done, setDone] = useState<PaymentRequestDto | null>(null);
-
-  const m = methods.find((x) => x.id === method);
-  const channel = m?.deposit;
-  const proofRequired = channel?.proofRequired ?? false;
-  const account = accounts.find((a) => a.id === accountId);
-  const Icon = methodIcon(method ?? '');
-
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    const parsed = depositRequestSchema.safeParse({ accountId: accountId ?? '', amount, method: method ?? '', reference: reference.trim() || undefined });
-    const errs: Record<string, string> = {};
-    if (!parsed.success) {
-      for (const i of parsed.error.issues) errs[String(i.path[0])] ??= i.message;
-      if (errs.accountId) errs.accountId = 'Choose a live account';
-      if (errs.method) errs.method = 'Choose a method';
-    }
-    if (proofRequired && !proof) errs.proof = 'Attach the payment slip or screenshot so we can match your transfer.';
-    if (!parsed.success || Object.keys(errs).length) {
-      setFieldErr(errs);
-      return;
-    }
-    setFieldErr({});
-    setBusy(true);
-    try {
-      let req = await post<PaymentRequestDto>('/me/payments/deposit', parsed.data);
-      if (proof) {
-        try {
-          const fd = new FormData();
-          fd.set('file', proof, proof.name);
-          req = await upload<PaymentRequestDto>(`/me/payments/${req.id}/proof`, fd);
-        } catch (err) {
-          // the request exists; the slip can still be added from History
-          const f = friendlyError(err);
-          toast({ title: 'Request sent, but the proof did not upload', body: `${f.title}. Attach it from your payment history.`, level: 'warning' });
-        }
-      }
-      toast({ title: 'Deposit request sent', body: `${fmtMoney(req.amount)} ${req.currency} · #${shortId(req.id)}`, level: 'success' });
-      setDone(req);
-      onCreated();
-    } catch (err) {
-      const f = friendlyError(err);
-      setError(f);
-      if (f.code === 'amount_min' || f.code === 'amount_max') setFieldErr({ amount: f.body ?? f.title });
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  if (done)
-    return (
-      <RequestDone
-        req={done}
-        method={methods.find((x) => x.id === done.method)}
-        onAgain={() => {
-          setDone(null);
-          setAmount('');
-          setReference('');
-          setProof(null);
-        }}
-        onHistory={onHistory}
-      />
-    );
-
-  return (
-    <form onSubmit={submit} noValidate className="grid gap-5 lg:grid-cols-[1fr_320px]">
-      <div className="card min-w-0 space-y-7 p-5 sm:p-6">
-        <section>
-          <StepTitle n={1}>Account to fund</StepTitle>
-          <AccountPicker name="deposit-account" accounts={accounts} value={accountId} onChange={setAccountId} />
-          {fieldErr.accountId && <p className="animate-pop-in mt-1.5 text-xs text-down">{fieldErr.accountId}</p>}
-        </section>
-        <section>
-          <StepTitle n={2}>Method</StepTitle>
-          <MethodCards methods={methods} kind="deposit" value={method} onChange={setMethod} />
-          {fieldErr.method && <p className="animate-pop-in mt-1.5 text-xs text-down">{fieldErr.method}</p>}
-        </section>
-        <section>
-          <StepTitle n={3}>Amount</StepTitle>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <AmountField value={amount} onChange={setAmount} error={fieldErr.amount} hint={m ? <>Min {fmtMoney(m.minDeposit)} · Max {fmtMoney(m.maxDeposit)} USD by {m.label}</> : 'Pick a method to see the limits'} />
-            <Input
-              label="Reference (optional)"
-              name="reference"
-              value={reference}
-              onChange={(e) => setReference(e.target.value)}
-              placeholder={method === 'crypto_usdt' ? 'Transaction hash' : method === 'upi' ? 'UPI transaction ID (UTR)' : method === 'binance' ? 'Binance order / transaction ID' : 'Bank transfer reference'}
-              maxLength={120}
-              hint="Helps us match your transfer faster."
-            />
-          </div>
-        </section>
-        {channel && (
-          <section>
-            <StepTitle n={4}>Pay to</StepTitle>
-            <PayToPanel channel={channel} amount={amount} />
-          </section>
-        )}
-        {channel && (
-          <section>
-            <StepTitle n={5}>Payment proof</StepTitle>
-            <ProofPicker
-              file={proof}
-              required={proofRequired}
-              error={fieldErr.proof}
-              onChange={(f) => {
-                setProof(f);
-                setFieldErr((e) => ({ ...e, proof: '' }));
-              }}
-            />
-          </section>
-        )}
-      </div>
-
-      <aside className="min-w-0 lg:sticky lg:top-24 lg:self-start">
-        <div className="card p-5">
-          <div className="label">Summary</div>
-          <div className="mt-4 flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-up/10 text-up ring-1 ring-inset ring-up/25">
-              <Icon className="h-5 w-5" />
-            </span>
-            <div className="tabular font-display text-2xl font-bold tracking-tight">{amount && !Number.isNaN(Number(amount)) ? fmtMoney(amount) : '0.00'} <span className="font-mono text-sm font-medium text-ink-400">USD</span></div>
-          </div>
-          <div className="mt-5 space-y-2.5 border-t border-white/[0.06] pt-4">
-            <SummaryRow label="To account">{account ? <span className="tabular font-mono">{fmtLogin(account.loginCode)}</span> : '—'}</SummaryRow>
-            <SummaryRow label="Method">{m?.label ?? '—'}</SummaryRow>
-            <SummaryRow label="Processing">{m?.eta ?? '—'}</SummaryRow>
-            <SummaryRow label="Fee">None from us</SummaryRow>
-          </div>
-          <div className="mt-5">
-            <ErrorBanner error={error} />
-          </div>
-          <Button type="submit" size="lg" className="mt-4 w-full" loading={busy} disabled={!accountId || !method}>
-            <ArrowDownToLine className="h-4 w-4" /> Submit deposit request
-          </Button>
-          <p className="mt-3 text-center text-[11px] leading-relaxed text-ink-500">Nothing is charged automatically. You transfer the funds and attach the slip; we credit the account once the payment is matched.</p>
-        </div>
-      </aside>
-    </form>
-  );
-}
-
 // ---------------------------------------------------------------- withdraw
 
 function WithdrawForm({ accounts, methods, onCreated, onHistory }: { accounts: AccountDto[]; methods: PaymentMethodDto[]; onCreated: () => void; onHistory: () => void }) {

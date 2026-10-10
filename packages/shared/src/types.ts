@@ -180,6 +180,8 @@ export interface DepositChannelDto {
   note: string;
   /** a payment slip / screenshot must be attached to the request */
   proofRequired: boolean;
+  /** currency the client actually pays in (the cashier shows the converted amount) */
+  currency: string;
 }
 /** Economic calendar release (public feed, cached by the API). */
 export interface CalendarEventDto {
@@ -209,6 +211,20 @@ export interface PaymentMethodDto {
   eta: string;
   /** present for deposit-capable methods: where to send the money */
   deposit?: DepositChannelDto;
+  /** card: the gateway the browser talks to (publishable key only) */
+  gateway?: { provider: 'stripe'; publishableKey: string };
+}
+
+/** Cashier page extras: legal footer and USD -> currency rates for the "charged by" line. */
+export interface CashierInfoDto {
+  footer: string;
+  fx: Record<string, number>;
+}
+
+export interface CardIntentDto {
+  requestId: string;
+  provider: 'stripe';
+  clientSecret: string;
 }
 
 export interface PaymentRequestDto {

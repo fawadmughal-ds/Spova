@@ -12,6 +12,8 @@ import {
   depositEnabled,
   type DepositChannels,
   type AdminPaymentRowDto,
+  type CardIntentInput,
+  type CashierInfoDto,
   type DepositRequestInput,
   type Paginated,
   type PaymentDecisionInput,
@@ -60,6 +62,8 @@ export const paymentToDto = (p: PaymentWithAccount): PaymentRequestDto => ({
 
 const methodOf = (id: string) => PAYMENT_METHODS.find((m) => m.id === id);
 export const DEPOSIT_CHANNELS_KEY = 'deposit_channels';
+const FX_URL = 'https://open.er-api.com/v6/latest/USD';
+const FX_KEY = 'fx:usd';
 
 /** Deposit / withdrawal request queue (ARCHITECTURE §07). Money moves only when an admin approves, through LedgerService. */
 @Injectable()
@@ -92,15 +96,38 @@ export class PaymentsService {
     return input;
   }
 
+  /** USD -> other currencies (free public rates, cached one hour) for the cashier's "charged by" line. */
+  async fxRates(): Promise<Record<string, number>> {
+    const cached = await this.redis.client.get(FX_KEY);
+    if (cached) return JSON.parse(cached) as Record<string, number>;
+    try {
+      const res = await fetch(FX_URL, { signal: AbortSignal.timeout(8000) });
+      const body = (await res.json()) as { result?: string; rates?: Record<string, number> };
+      if (body.result !== 'success' || !body.rates) throw new Error('bad fx payload');
+      const rates = { USD: 1, USDT: 1, INR: body.rates.INR, PKR: body.rates.PKR, EUR: body.rates.EUR, GBP: body.rates.GBP, AED: body.rates.AED };
+      await this.redis.client.set(FX_KEY, JSON.stringify(rates), 'EX', 3600);
+      return rates;
+    } catch (e) {
+      this.log.warn({ err: (e as Error).message }, 'fx rates unavailable');
+      return { USD: 1, USDT: 1 };
+    }
+  }
+
+  async cashierInfo(): Promise<CashierInfoDto> {
+    const cfg = await this.channels();
+    return { footer: cfg.cashier.footer.replace('[BRAND]', env.BRAND_NAME), fx: await this.fxRates() };
+  }
+
   /** Methods with the deposit side switched by the admin's channels and the public "pay to" details attached. */
-  async methods(): Promise<PaymentMethodDto[]> {
+  async methods(gateway?: { provider: 'stripe'; publishableKey: string } | null): Promise<PaymentMethodDto[]> {
     const cfg = await this.channels();
     return PAYMENT_METHODS.map((m) => {
       const canDeposit = (m.kinds as readonly string[]).includes('deposit');
-      const depositOn = canDeposit && depositEnabled(m.id, cfg);
+      // a connected card gateway switches the card method on by itself
+      const depositOn = canDeposit && (depositEnabled(m.id, cfg) || (m.id === 'card' && !!gateway));
       const kinds = [...m.kinds].filter((k) => k !== 'deposit' || depositOn) as PaymentMethodDto['kinds'];
       const withdrawOn = kinds.includes('withdraw') && m.enabled;
-      return { ...m, kinds, enabled: depositOn || withdrawOn, ...(depositOn && { deposit: depositChannelPublic(m.id, cfg, env.BRAND_NAME) }) };
+      return { ...m, kinds, enabled: depositOn || withdrawOn, ...(depositOn && { deposit: depositChannelPublic(m.id, cfg, env.BRAND_NAME) }), ...(m.id === 'card' && gateway && { gateway }) };
     });
   }
 
@@ -145,6 +172,60 @@ export class PaymentsService {
     });
     this.afterNew(row, user.email);
     return paymentToDto(row);
+  }
+
+  /** Pending card deposit, created right before the gateway intent (the gateway reference is attached after). */
+  async openCardRequest(userId: string, input: CardIntentInput) {
+    const user = await this.guardUser(userId);
+    const acc = await this.liveAccount(userId, input.accountId);
+    const method = methodOf('card')!;
+    const amount = D(input.amount);
+    if (amount.lt(method.minDeposit)) throw ApiError.badRequest('amount_min', `Minimum card deposit is ${method.minDeposit} USD`);
+    if (amount.gt(method.maxDeposit)) throw ApiError.badRequest('amount_max', `Maximum card deposit is ${method.maxDeposit} USD`);
+    const row = await this.prisma.paymentRequest.create({
+      data: { userId, accountId: acc.id, kind: 'deposit', amount: amount.toFixed(2), currency: acc.currency, method: 'card' },
+      include: { account: { select: { loginCode: true } } },
+    });
+    this.afterNew(row, user.email);
+    return paymentToDto(row);
+  }
+
+  /** Gateway confirmed the money: same ledger path as an admin approval, audited as a gateway settlement. Idempotent. */
+  async settleByGateway(requestId: string, g: { provider: string; reference: string; paidAmount: string; currency: string }) {
+    const result = await this.prisma.$transaction(async (tx) => {
+      const locked = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM payment_requests WHERE id = ${requestId}::uuid FOR UPDATE`;
+      if (!locked[0]) return null;
+      const req = await tx.paymentRequest.findUniqueOrThrow({ where: { id: requestId } });
+      if (req.status !== 'pending' || req.kind !== 'deposit') return null;
+      const mismatch = D(g.paidAmount).lt(D(req.amount)) || g.currency !== req.currency;
+      const amount = mismatch ? D(g.paidAmount) : D(req.amount);
+      const posted = await this.ledger.postInTx(tx, { accountId: req.accountId, type: 'deposit', amount, reason: `Card deposit via ${g.provider} (${g.reference})`, refType: 'payment_request', refId: req.id, actorId: req.userId });
+      const note = `Paid by card via ${g.provider} · ${g.reference}${mismatch ? ` · gateway reported ${g.paidAmount} ${g.currency}` : ''}`;
+      const row = await tx.paymentRequest.update({ where: { id: requestId }, data: { status: 'approved', adminNote: note, reference: g.reference, decidedAt: new Date(), ledgerEntryId: posted.entryId }, include: { account: { select: { loginCode: true } } } });
+      await tx.adminAudit.create({ data: { actorId: req.userId, action: 'payment.gateway.settle', targetType: 'payment_request', targetId: requestId, before: { status: 'pending' }, after: { status: 'approved', provider: g.provider, reference: g.reference, paid: g.paidAmount, currency: g.currency } } });
+      await tx.notification.create({ data: { userId: req.userId, type: 'payment', title: 'Deposit approved', body: `${money(amount)} ${req.currency} by card was credited to account ${row.account.loginCode}` } });
+      return { row, account: posted.account, amount };
+    });
+    if (!result) return;
+    const { row, account } = result;
+    const snap = await this.accounts.snapshot(account);
+    this.ws.accountSnapshot(row.userId, snap);
+    this.ws.admin(WS_EVENTS.ADMIN_LEDGER, { ...snap, userId: row.userId });
+    const payload: WsPaymentStatus = { paymentId: row.id, kind: 'deposit', status: 'approved' };
+    this.ws.user(row.userId, WS_EVENTS.PAYMENT_STATUS, payload);
+    this.ws.notice(row.userId, { type: 'payment', title: 'Deposit approved', body: `${money(row.amount)} ${row.currency} by card on account ${row.account.loginCode}`, level: 'success' });
+    const user = await this.prisma.user.findUnique({ where: { id: row.userId }, select: { email: true, profile: { select: { notifEmail: true } } } });
+    if (user?.profile?.notifEmail) void this.mail.paymentResult(user.email, 'deposit', money(row.amount), 'approved', undefined).catch((e) => this.log.warn(e.message));
+  }
+
+  /** Card declined / cancelled at the gateway: the request is closed with the reason, no money moves. Idempotent. */
+  async failByGateway(requestId: string, g: { provider: string; reference: string; reason: string }) {
+    const req = await this.prisma.paymentRequest.findUnique({ where: { id: requestId }, include: { account: { select: { loginCode: true } } } });
+    if (!req || req.status !== 'pending') return;
+    const row = await this.prisma.paymentRequest.update({ where: { id: requestId }, data: { status: 'declined', adminNote: `${g.reason} (${g.provider} ${g.reference})`, reference: g.reference, decidedAt: new Date() }, include: { account: { select: { loginCode: true } } } });
+    const payload: WsPaymentStatus = { paymentId: row.id, kind: 'deposit', status: 'declined', note: g.reason };
+    this.ws.user(row.userId, WS_EVENTS.PAYMENT_STATUS, payload);
+    this.ws.notice(row.userId, { type: 'payment', title: 'Card payment failed', body: g.reason, level: 'warning' });
   }
 
   async withdraw(userId: string, input: WithdrawRequestInput) {

@@ -143,7 +143,9 @@ describe('phase 2: kyc -> live account -> payments -> tickets', () => {
     assert.ok(methods.data.find((m: any) => m.id === 'bank' && m.enabled));
 
     assert.equal((await client.json('POST', '/me/payments/deposit', { accountId: liveAccountId, amount: '100', method: 'bank' })).data.code, 'amount_min');
-    assert.equal((await client.json('POST', '/me/payments/deposit', { accountId: liveAccountId, amount: '500', method: 'card' })).data.code, 'method_unavailable');
+    const cardReq = await client.json('POST', '/me/payments/deposit', { accountId: liveAccountId, amount: '500', method: 'card' });
+    assert.ok([200, 201].includes(cardReq.status), 'card deposits are accepted (payment-link flow) by default');
+    await client.json('POST', `/me/payments/${cardReq.data.id}/cancel`);
     assert.equal((await client.json('POST', '/me/payments/deposit', { accountId: liveAccountId, amount: '12.345', method: 'bank' })).status, 400);
     const otherAcc = await other.json('POST', '/me/payments/deposit', { accountId: liveAccountId, amount: '500', method: 'bank' });
     assert.equal(otherAcc.status, 404, 'cannot deposit to someone else\'s account');
@@ -157,8 +159,8 @@ describe('phase 2: kyc -> live account -> payments -> tickets', () => {
     assert.equal(wd.status, 422);
     assert.equal(wd.data.code, 'insufficient_funds');
 
-    const list = await client.json('GET', '/me/payments');
-    assert.equal(list.data.total, 1);
+    const list = await client.json('GET', '/me/payments?status=pending');
+    assert.equal(list.data.total, 1, 'the cancelled card request is not pending');
   });
 
   it('admin approves the deposit and the ledger moves the balance', async () => {
@@ -218,19 +220,36 @@ describe('phase 2: kyc -> live account -> payments -> tickets', () => {
 
     const cfg = await admin.json('GET', '/admin/payments/channels');
     assert.equal(cfg.status, 200);
-    assert.equal(cfg.data.card.enabled, false);
-    const saved = await admin.json('PUT', '/admin/payments/channels', { ...cfg.data, card: { ...cfg.data.card, enabled: true }, upi: { ...cfg.data.upi, vpa: 'broker@upi' } });
+    assert.equal(cfg.data.card.enabled, true);
+    const saved = await admin.json('PUT', '/admin/payments/channels', { ...cfg.data, card: { ...cfg.data.card, enabled: false }, upi: { ...cfg.data.upi, vpa: 'broker@upi' } });
     assert.equal(saved.status, 200, JSON.stringify(saved.data));
     const after = await client.json('GET', '/me/payments/methods');
-    assert.ok(after.data.find((m: any) => m.id === 'card').enabled, 'card switched on by the admin');
+    assert.ok(!after.data.find((m: any) => m.id === 'card').enabled, 'card switched off by the admin');
     assert.ok(after.data.find((m: any) => m.id === 'upi').deposit.fields.some((f: any) => f.value === 'broker@upi'));
+    assert.equal((await client.json('POST', '/me/payments/deposit', { accountId: liveAccountId, amount: '300', method: 'card' })).data.code, 'method_unavailable');
+    const restored = await admin.json('PUT', '/admin/payments/channels', cfg.data);
+    assert.equal(restored.status, 200);
     const cardDep = await client.json('POST', '/me/payments/deposit', { accountId: liveAccountId, amount: '300', method: 'card' });
     assert.ok([200, 201].includes(cardDep.status), JSON.stringify(cardDep.data));
     await client.json('POST', `/me/payments/${cardDep.data.id}/cancel`);
-    const restored = await admin.json('PUT', '/admin/payments/channels', cfg.data);
-    assert.equal(restored.status, 200);
-    assert.equal((await client.json('POST', '/me/payments/deposit', { accountId: liveAccountId, amount: '300', method: 'card' })).data.code, 'method_unavailable');
     assert.equal((await client.json('PUT', '/admin/payments/channels', cfg.data)).status, 403, 'clients cannot edit channels');
+  });
+
+  it('cashier: footer + fx rates, card intent refuses without a gateway, webhook refuses unsigned calls', async () => {
+    const info = await client.json('GET', '/me/payments/cashier');
+    assert.equal(info.status, 200);
+    assert.equal(typeof info.data.footer, 'string');
+    assert.equal(info.data.fx.USD, 1);
+    const methods = await client.json('GET', '/me/payments/methods');
+    const card = methods.data.find((m: any) => m.id === 'card');
+    assert.equal(card.gateway, undefined, 'no gateway configured in this environment');
+    const intent = await client.json('POST', '/me/payments/card/intent', { accountId: liveAccountId, amount: '250' });
+    assert.equal(intent.status, 503);
+    assert.equal(intent.data.code, 'gateway_not_configured');
+    const before = await client.json('GET', '/me/payments?kind=deposit&status=pending');
+    assert.ok(!before.data.items.some((r: any) => r.method === 'card' && r.amount === '250.00'), 'no request is opened when the gateway is off');
+    const hook = await new Session().raw('POST', '/payments/webhooks/stripe', { id: 'evt_x', type: 'payment_intent.succeeded' });
+    assert.ok([400, 503].includes(hook.status), `webhook without signature must be rejected, got ${hook.status}`);
   });
 
   it('withdrawals: pending amounts reserve funds, cancel, approve, decline', async () => {

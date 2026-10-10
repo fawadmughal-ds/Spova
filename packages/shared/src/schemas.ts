@@ -182,7 +182,7 @@ export const PAYMENT_METHODS = [
   { id: 'upi', label: 'UPI', kinds: ['deposit'], enabled: true, minDeposit: '200', maxDeposit: '20000', minWithdraw: '0', maxWithdraw: '0', eta: 'Within hours' },
   { id: 'binance', label: 'Binance Pay', kinds: ['deposit', 'withdraw'], enabled: true, minDeposit: '200', maxDeposit: '100000', minWithdraw: '50', maxWithdraw: '100000', eta: 'Same day' },
   { id: 'crypto_usdt', label: 'Crypto (USDT)', kinds: ['deposit', 'withdraw'], enabled: true, minDeposit: '200', maxDeposit: '100000', minWithdraw: '50', maxWithdraw: '100000', eta: 'Same day' },
-  { id: 'card', label: 'Card', kinds: ['deposit'], enabled: false, minDeposit: '200', maxDeposit: '5000', minWithdraw: '0', maxWithdraw: '0', eta: 'Payment link' },
+  { id: 'card', label: 'Card', kinds: ['deposit'], enabled: true, minDeposit: '200', maxDeposit: '5000', minWithdraw: '0', maxWithdraw: '0', eta: 'Instant' },
 ] as const;
 export type PaymentMethodId = (typeof PAYMENT_METHODS)[number]['id'];
 export const PAYMENT_METHOD_IDS = PAYMENT_METHODS.map((m) => m.id) as [PaymentMethodId, ...PaymentMethodId[]];
@@ -215,20 +215,26 @@ export type WithdrawRequestInput = z.infer<typeof withdrawRequestSchema>;
  */
 const note = z.string().trim().max(300).default('');
 export const depositChannelsSchema = z.object({
-  bank: z.object({ enabled: z.boolean(), bankName: z.string().trim().max(80).default(''), accountName: z.string().trim().max(80).default(''), accountNumber: z.string().trim().max(40).default(''), ifsc: z.string().trim().max(20).default(''), swift: z.string().trim().max(20).default(''), note }),
-  upi: z.object({ enabled: z.boolean(), vpa: z.string().trim().max(80).default(''), payeeName: z.string().trim().max(80).default(''), note }),
+  bank: z.object({ enabled: z.boolean(), bankName: z.string().trim().max(80).default(''), accountName: z.string().trim().max(80).default(''), accountNumber: z.string().trim().max(40).default(''), ifsc: z.string().trim().max(20).default(''), swift: z.string().trim().max(20).default(''), currency: z.string().trim().toUpperCase().length(3).default('INR'), note }),
+  upi: z.object({ enabled: z.boolean(), vpa: z.string().trim().max(80).default(''), payeeName: z.string().trim().max(80).default(''), currency: z.string().trim().toUpperCase().length(3).default('INR'), note }),
   binance: z.object({ enabled: z.boolean(), payId: z.string().trim().max(40).default(''), email: z.string().trim().max(120).default(''), qrLink: z.string().trim().max(300).default(''), note }),
   crypto_usdt: z.object({ enabled: z.boolean(), address: z.string().trim().max(120).default(''), network: z.string().trim().max(40).default('TRC20'), note }),
   card: z.object({ enabled: z.boolean(), note }),
+  /** cashier page texts */
+  cashier: z.object({ enabled: z.boolean().default(true), footer: z.string().trim().max(1200).default('') }),
 });
 export type DepositChannels = z.infer<typeof depositChannelsSchema>;
 
+export const cardIntentSchema = z.object({ accountId: z.string().uuid(), amount: moneySchema });
+export type CardIntentInput = z.infer<typeof cardIntentSchema>;
+
 export const DEFAULT_DEPOSIT_CHANNELS: DepositChannels = {
-  bank: { enabled: true, bankName: 'HDFC Bank', accountName: 'XYZ Markets Ltd', accountNumber: '50200012345678', ifsc: 'HDFC0001234', swift: 'HDFCINBB', note: 'Use your account login as the transfer remark. INR transfers are converted at the rate of the day.' },
-  upi: { enabled: true, vpa: 'xyzmarkets@hdfcbank', payeeName: 'XYZ Markets', note: 'Scan the QR with any UPI app (GPay, PhonePe, Paytm) or pay to the UPI ID. Keep the screenshot of the success screen.' },
+  bank: { enabled: true, bankName: 'HDFC Bank', accountName: 'XYZ Markets Ltd', accountNumber: '50200012345678', ifsc: 'HDFC0001234', swift: 'HDFCINBB', currency: 'INR', note: 'Use your account login as the transfer remark. INR transfers are converted at the rate of the day.' },
+  upi: { enabled: true, vpa: 'xyzmarkets@hdfcbank', payeeName: 'XYZ Markets', currency: 'INR', note: 'Scan the QR with any UPI app (GPay, PhonePe, Paytm) or pay to the UPI ID. Keep the screenshot of the success screen.' },
   binance: { enabled: true, payId: '123456789', email: 'pay@xyz.local', qrLink: '', note: 'Binance app → Pay → Send → enter the Pay ID (or scan). Send USDT. Zero fee inside Binance.' },
   crypto_usdt: { enabled: true, address: 'TXYZ1111111111111111111111111111111', network: 'TRC20', note: 'Send USDT on the TRC20 network only. Transfers on another network cannot be recovered.' },
-  card: { enabled: false, note: 'After you submit, our team emails you a secure card payment link within business hours.' },
+  card: { enabled: true, note: 'After you submit, our team emails you a secure card payment link within business hours.' },
+  cashier: { enabled: true, footer: 'Company Information: [COMPANY LEGAL NAME] with brand name [BRAND] is authorised and regulated by [REGULATOR] with licence number [LICENCE]. The company address is [ADDRESS]. Trading CFDs involves significant risk of loss and is not suitable for all investors.' },
 };
 
 export const paymentDecisionSchema = z
