@@ -15,8 +15,8 @@ deleted after 30 days, and uploaded KYC files live on the service's disk (wiped 
    e.g. `https://spova2.vercel.app` (comma-separate several). Save → it redeploys.
 4. Note the API URL, e.g. `https://spova-api.onrender.com`. Check `https://spova-api.onrender.com/health/ready`
    returns `{"ok":true,...}`.
-5. Admin login: `SEED_ADMIN_EMAIL` (default `admin@xyz.local`) with the generated `SEED_ADMIN_PASSWORD`
-   (read it in `spova-api` → Environment). A demo client `client@xyz.local / Client@12345` (login 100001)
+5. Admin login: `SEED_ADMIN_EMAIL` (default `admin@zerventa.local`) with the generated `SEED_ADMIN_PASSWORD`
+   (read it in `spova-api` → Environment). A demo client `client@zerventa.local / Client@12345` (login 100001)
    is created because `SEED_DEMO_CLIENT=true`.
 
 Why the worker is a "web" service: Render's free plan has no background workers, so the worker binds `$PORT`
@@ -29,7 +29,7 @@ and answers `/health`; its real work runs in the background.
 3. **Environment variables** (Production + Preview):
    - `NEXT_PUBLIC_API_URL` = `https://spova-api.onrender.com`
    - `NEXT_PUBLIC_WS_URL`  = `https://spova-api.onrender.com`
-   - `NEXT_PUBLIC_BRAND_NAME` = `XYZ` (or the real brand)
+   - `NEXT_PUBLIC_BRAND_NAME` = `Zerventa`
    - `NEXT_PUBLIC_SITE_URL` = `https://<your-project>.vercel.app`
 4. Deploy. Copy the production URL and put it into Render's `WEB_ORIGIN` (step 1.3).
 

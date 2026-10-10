@@ -41,11 +41,11 @@ services:
       - key: SEED_DEMO_CLIENT
         value: "true"
       - key: SEED_ADMIN_EMAIL
-        value: admin@xyz.local
+        value: admin@zerventa.local
       - key: SEED_ADMIN_PASSWORD
         generateValue: true
       - key: BRAND_NAME
-        value: XYZ
+        value: Zerventa
       - key: MAIL_PROVIDER
         value: console
       - key: STORAGE_DRIVER

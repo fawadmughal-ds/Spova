@@ -33,7 +33,7 @@ const schema = z.object({
   JWT_REFRESH_TTL: z.string().default('7d'),
   DEMO_START_BALANCE: z.string().regex(/^\d+(\.\d{1,2})?$/).default('10000'),
   DEMO_DEFAULT_LEVERAGE: z.coerce.number().int().min(1).max(1000).default(100),
-  BRAND_NAME: z.string().default('XYZ'),
+  BRAND_NAME: z.string().default('Zerventa'),
   APP_DOMAIN: z.string().default('localhost'),
   MAIL_PROVIDER: z.enum(['console', 'resend']).default('console'),
   RESEND_API_KEY: z.string().optional().default(''),

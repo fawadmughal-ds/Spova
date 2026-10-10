@@ -19,7 +19,7 @@ function upload(group: string, docType: string, bytes: Buffer, mime: string, nam
 }
 
 async function register(s: Session, tag: string) {
-  const email = `e2e+${tag}.${Date.now()}.${Math.random().toString(36).slice(2, 7)}@xyz.local`;
+  const email = `e2e+${tag}.${Date.now()}.${Math.random().toString(36).slice(2, 7)}@zerventa.local`;
   const r = await s.json('POST', '/auth/register', {
     email,
     password: 'E2e!Passw0rd',

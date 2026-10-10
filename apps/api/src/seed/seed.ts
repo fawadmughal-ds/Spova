@@ -123,7 +123,7 @@ export async function runSeed(prisma: PrismaClient, opts: { demoClient?: boolean
   console.log(`symbols: ${SYMBOLS.length}`);
 
   // superadmin
-  const adminEmail = process.env.SEED_ADMIN_EMAIL ?? 'admin@xyz.local';
+  const adminEmail = process.env.SEED_ADMIN_EMAIL ?? 'admin@zerventa.local';
   const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? 'Admin@12345';
   const existing = await prisma.user.findUnique({ where: { email: adminEmail } });
   if (!existing) {
@@ -145,7 +145,7 @@ export async function runSeed(prisma: PrismaClient, opts: { demoClient?: boolean
 
   // demo client (dev only)
   if (opts.demoClient ?? process.env.NODE_ENV !== 'production') {
-    const demoEmail = 'client@xyz.local';
+    const demoEmail = 'client@zerventa.local';
     const u = await prisma.user.findUnique({ where: { email: demoEmail } });
     if (!u) {
       const start = new Prisma.Decimal(process.env.DEMO_START_BALANCE ?? '10000');

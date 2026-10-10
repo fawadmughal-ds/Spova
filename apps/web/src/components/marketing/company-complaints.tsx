@@ -200,7 +200,7 @@ export function ComplaintsPage() {
             <Reveal variant="stagger" step={90} className="space-y-3">
               <div className="rounded-2xl border border-dashed border-gold/30 bg-gold/[0.03] p-5">
                 <div className="label !text-gold">Where to send it</div>
-                <Pending className="mt-3">[PLACEHOLDER - complaints email, postal address and online form]</Pending>
+                <Pending className="mt-3">[PLACEHOLDER - complaints email; the support ticket form in the client area is already live]</Pending>
               </div>
               <div className="rounded-2xl border border-dashed border-gold/30 bg-gold/[0.03] p-5">
                 <div className="label !text-gold">How long it takes</div>

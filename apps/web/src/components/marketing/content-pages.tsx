@@ -1,34 +1,9 @@
 import Link from 'next/link';
 import type { CSSProperties, ReactNode } from 'react';
-import {
-  Activity,
-  ArrowRight,
-  ArrowUpRight,
-  Building2,
-  Crosshair,
-  FileText,
-  Gauge,
-  Globe,
-  GraduationCap,
-  Headset,
-  HeartHandshake,
-  Landmark,
-  ListChecks,
-  LockKeyhole,
-  Mail,
-  MessageCircle,
-  MessageSquareText,
-  Monitor,
-  MousePointerClick,
-  PhoneCall,
-  Scale,
-  ShieldAlert,
-  ShieldCheck,
-  Timer,
-  type LucideIcon,
-} from 'lucide-react';
+import { Activity, ArrowRight, ArrowUpRight, Building2, Crosshair, Download, FileText, Gauge, Globe, GraduationCap, Headset, HeartHandshake, Landmark, ListChecks, LockKeyhole, Mail, MessageCircle, MessageSquareText, Monitor, MousePointerClick, PhoneCall, Scale, ShieldAlert, ShieldCheck, Timer, type LucideIcon } from 'lucide-react';
 import { BRAND, cn } from '@/lib/utils';
 import { PageHero, Pending } from '@/components/marketing/page-hero';
+import { LEGAL_DOCS, legalText } from '@spova/shared';
 import { buttonClass } from '@/lib/button';
 import type { PublicSymbol } from '@/lib/server-api';
 import { CountUp, Reveal, Spotlight, Words } from '@/components/motion';
@@ -488,7 +463,7 @@ function Contact({ copy }: { copy: ContentCopy }) {
             {[
               { icon: Globe, label: 'International line', note: 'One number that reaches the support desk from anywhere.', mark: '[PLACEHOLDER - international support number]' },
               { icon: PhoneCall, label: 'Local numbers', note: 'Country lines, listed here with their hours.', mark: '[PLACEHOLDER - local support numbers by country]' },
-              { icon: Building2, label: 'Office', note: 'Registered address and visiting details.', mark: '[PLACEHOLDER - office address]' },
+              { icon: Building2, label: 'Online broker', note: 'Every account matter is handled from the client area and by email. There is no walk-in office.', mark: '[PLACEHOLDER - support hours by region]' },
             ].map((c) => (
               <div key={c.label} className="group rounded-[1.25rem] border border-dashed border-white/12 p-7 transition-colors duration-300 hover:border-white/25">
                 <ChannelIcon icon={c.icon} muted />
@@ -634,30 +609,12 @@ function Faq({ copy }: { copy: ContentCopy }) {
 }
 
 // ---------------------------------------------------------------- legal
-const DOC_META: Record<string, { note: string; group: string; href?: string }> = {
-  'AML & CFT Policy': { note: 'How money laundering and terrorist financing are prevented, including identity checks.', group: 'Compliance' },
-  'Bonus Terms & Conditions': { note: 'The rules that apply to any bonus or promotional credit on an account.', group: 'Promotions' },
-  'Client Agreement': { note: 'The terms that govern your account and the services we provide.', group: 'Agreement' },
-  'Complaints Handling Procedure': { note: 'How to raise a complaint and how it is handled.', group: 'Compliance', href: '/complaints' },
-  'General Fees': { note: 'Every charge that can apply to an account beyond the spread.', group: 'Costs' },
-  'Margin Information': { note: 'Margin requirements, the 100% margin call and the 20% stop-out.', group: 'Trading' },
-  'Order Execution Policy': { note: 'How your orders are priced and executed.', group: 'Trading' },
-  'Privacy Policy': { note: 'How personal data is collected, used and protected.', group: 'Data', href: '/cookies-privacy' },
-  'Refund and Cancellation Policy': { note: 'When and how a payment can be cancelled or refunded.', group: 'Costs' },
-  'Risk Disclosure': { note: 'The risks of trading leveraged CFDs, set out in full.', group: 'Risk' },
-  'Website Terms of Use': { note: 'The conditions that apply to using this website.', group: 'Agreement' },
-};
-
 function Legal({ copy }: { copy: ContentCopy }) {
-  const [text, pending] = splitPlaceholder(copy.paragraphs[0]);
-  const docs = text
-    .replace(/\.$/, '')
-    .split(',')
-    .map((d) => d.trim())
-    .filter(Boolean);
+  const [, pending] = splitPlaceholder(copy.paragraphs[0]);
+  const docs = LEGAL_DOCS;
   return (
     <>
-      <Hero eyebrow="Legal" title="Legal *documents*" lead={<p>The documents that set out how your account works. Read them before you trade.</p>}>
+      <Hero eyebrow="Legal" title="Legal *documents*" lead={<p>The documents that set out how your account works. Read them online or download the PDF. Read them before you trade.</p>}>
         <div className="relative mx-auto h-[360px] w-full max-w-[420px]" aria-hidden>
           {[
             { rotate: '-11deg', x: -70, delay: '0s' },
@@ -666,7 +623,7 @@ function Legal({ copy }: { copy: ContentCopy }) {
           ].map((s, i) => (
             <div key={i} className="absolute left-1/2 top-6" style={{ translate: `${s.x - 105}px 0`, rotate: s.rotate, zIndex: i }}>
               <div className="animate-float-slow" style={{ animationDelay: s.delay }}>
-                <Sheet lines={[80, 100, 92, 60, 100, 84, 96, 40]} className="h-[290px] w-[210px]" title={docs[i] ?? 'Document'} />
+                <Sheet lines={[80, 100, 92, 60, 100, 84, 96, 40]} className="h-[290px] w-[210px]" title={docs[i]?.title ?? 'Document'} />
               </div>
             </div>
           ))}
@@ -675,40 +632,35 @@ function Legal({ copy }: { copy: ContentCopy }) {
 
       <section className="mx-auto max-w-7xl px-4 pb-20 sm:px-6">
         <Reveal variant="stagger" step={80} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {docs.map((d, i) => {
-            const meta = DOC_META[d];
-            return (
-              <Spotlight key={d} href={meta?.href} className={cn('card card-hover group flex gap-5 overflow-hidden p-6', meta?.href && 'hover:!border-brand-400/40')}>
-                <Sheet lines={[70, 100, 86, 50]} className="h-[104px] w-[78px] shrink-0 transition-transform duration-500 ease-spring group-hover:-translate-y-1 group-hover:-rotate-6" small />
-                <div className="flex min-w-0 flex-1 flex-col">
-                  <span className="flex items-center justify-between gap-2 font-mono text-[10px] text-ink-500">
-                    <span>DOC {String(i + 1).padStart(2, '0')}</span>
-                    {meta && <span className="uppercase tracking-[0.14em]">{meta.group}</span>}
-                  </span>
-                  <h3 className="mt-1 font-display text-xl font-bold leading-tight tracking-tight">{d}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-ink-400">{meta?.note ?? ''}</p>
-                  <span className="mt-auto flex flex-wrap items-center gap-x-4 gap-y-1 pt-4">
-                    <span className="label inline-flex items-center gap-2 !text-gold">
-                      <FileText className="h-3.5 w-3.5" /> PDF pending
-                    </span>
-                    {meta?.href && (
-                      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-brand-300">
-                        <span className="link-underline">Read the summary</span>
-                        <ArrowRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-1" />
-                      </span>
-                    )}
-                  </span>
-                </div>
-              </Spotlight>
-            );
-          })}
-          {pending && (
-            <div className="bg-dots flex flex-col justify-between gap-6 rounded-[1.25rem] border border-dashed border-gold/30 p-6">
-              <FileText className="h-6 w-6 text-gold" />
-              <Pending>{pending}</Pending>
-            </div>
-          )}
+          {docs.map((d, i) => (
+            <Spotlight key={d.slug} className="card card-hover group flex gap-5 overflow-hidden p-6 hover:!border-brand-400/40">
+              <Sheet lines={[70, 100, 86, 50]} className="h-[104px] w-[78px] shrink-0 transition-transform duration-500 ease-spring group-hover:-translate-y-1 group-hover:-rotate-6" small />
+              <div className="flex min-w-0 flex-1 flex-col">
+                <span className="flex items-center justify-between gap-2 font-mono text-[10px] text-ink-500">
+                  <span>DOC {String(i + 1).padStart(2, '0')}</span>
+                  <span className="uppercase tracking-[0.14em]">{d.group}</span>
+                </span>
+                <h3 className="mt-1 font-display text-xl font-bold leading-tight tracking-tight">{d.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-ink-400">{legalText(d.note, BRAND)}</p>
+                <span className="mt-auto flex flex-wrap items-center gap-x-4 gap-y-1 pt-4">
+                  <a href={`/legal/${d.slug}.pdf`} download className="label inline-flex items-center gap-2 !text-brand-300 hover:!text-white">
+                    <Download className="h-3.5 w-3.5" /> PDF
+                  </a>
+                  <Link href={`/legal/${d.slug}`} className="inline-flex items-center gap-1.5 text-xs font-medium text-brand-300">
+                    <span className="link-underline">Read online</span>
+                    <ArrowRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-1" />
+                  </Link>
+                  <span className="ml-auto font-mono text-[10px] text-ink-500">{d.version}</span>
+                </span>
+              </div>
+            </Spotlight>
+          ))}
         </Reveal>
+        {pending && (
+          <Reveal variant="fade" className="mt-6">
+            <Pending>{pending}</Pending>
+          </Reveal>
+        )}
       </section>
 
       <section className="mx-auto max-w-7xl px-4 pb-6 sm:px-6">
@@ -720,7 +672,7 @@ function Legal({ copy }: { copy: ContentCopy }) {
             <div>
               <h2 className="font-display text-2xl font-bold tracking-tight">Regulation and legal entity</h2>
               <p className="mt-3 max-w-3xl leading-relaxed text-ink-300">Regulatory and legal entity details will be published here once confirmed.</p>
-              <Pending className="mt-4">[PLACEHOLDER - regulator, licence number and legal entity details to be supplied by the client]</Pending>
+              <Pending className="mt-4">[PLACEHOLDER - regulator, licence number and legal entity name to be supplied]</Pending>
             </div>
           </div>
         </Reveal>

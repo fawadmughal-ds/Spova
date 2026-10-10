@@ -2,6 +2,7 @@ import Link from 'next/link';
 import type { CSSProperties, ReactNode } from 'react';
 import { ArrowRight, BellRing, Cookie, Database, Eye, Hourglass, Mail, Share2, UserCheck, type LucideIcon } from 'lucide-react';
 import { BRAND, cn } from '@/lib/utils';
+import { CONSENT_KEY } from '@/components/cookie-consent';
 import { Reveal } from '@/components/motion';
 import { PageHero, Pending } from '@/components/marketing/page-hero';
 import { PolicyToc } from '@/components/marketing/company-toc';
@@ -203,7 +204,7 @@ export function PrivacyPage() {
                     ))}
                     <tr className="border-t border-white/[0.06]">
                       <td colSpan={4} className="px-5 py-4 text-ink-400">
-                        No analytics or marketing cookies are set by the application today. Your choice in the cookie notice is kept in your browser's local storage (key <code className="font-mono text-[11px]">xyz-cookie-consent</code>), not in a cookie, and is never sent to us.
+                        No analytics or marketing cookies are set by the application today. Your choice in the cookie notice is kept in your browser's local storage (key <code className="font-mono text-[11px]">{CONSENT_KEY}</code>), not in a cookie, and is never sent to us.
                       </td>
                     </tr>
                   </tbody>
@@ -246,7 +247,7 @@ export function PrivacyPage() {
               </Link>
             </Section>
 
-            <Section id="contact" title="Contact" note="[PLACEHOLDER - privacy contact email and postal address]">
+            <Section id="contact" title="Contact" note="[PLACEHOLDER - privacy contact email]">
               <p>Questions about this page or about your data go to the support team, who will pass them to the person responsible for privacy.</p>
               <div className="flex flex-wrap gap-x-8 gap-y-3">
                 {[

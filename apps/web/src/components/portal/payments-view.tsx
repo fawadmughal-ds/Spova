@@ -377,7 +377,7 @@ function WithdrawForm({ accounts, methods, onCreated, onHistory }: { accounts: A
               name="dest-details"
               value={details}
               onChange={(e) => setDetails(e.target.value)}
-              placeholder={crypto ? 'TXYZ… (TRC20)' : 'AE07 0331 2345 6789 0123 456'}
+              placeholder={crypto ? 'T… wallet address (TRC20)' : 'AE07 0331 2345 6789 0123 456'}
               maxLength={200}
               className="font-mono"
               error={fieldErr['destination.details']}

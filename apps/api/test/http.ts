@@ -8,7 +8,7 @@ import Redis from 'ioredis';
 for (const c of [resolve(process.cwd(), '.env'), resolve(process.cwd(), '../../.env')]) if (existsSync(c)) loadDotenv({ path: c });
 
 export const API = (process.env.API_URL ?? 'http://localhost:4000') + '/v1';
-export const ADMIN_EMAIL = process.env.SEED_ADMIN_EMAIL ?? 'admin@xyz.local';
+export const ADMIN_EMAIL = process.env.SEED_ADMIN_EMAIL ?? 'admin@zerventa.local';
 export const ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD ?? 'Admin@12345';
 export const INTERNAL_TOKEN = process.env.INTERNAL_TOKEN ?? '';
 export const REDIS_URL = process.env.REDIS_URL ?? 'redis://localhost:6379';
@@ -49,7 +49,7 @@ export class Session {
 export const created = (status: number) => [200, 201].includes(status);
 
 export async function register(s: Session, tag: string) {
-  const email = `e2e+${tag}.${Date.now()}.${Math.random().toString(36).slice(2, 7)}@xyz.local`;
+  const email = `e2e+${tag}.${Date.now()}.${Math.random().toString(36).slice(2, 7)}@zerventa.local`;
   const r = await s.json('POST', '/auth/register', {
     email,
     password: 'E2e!Passw0rd',

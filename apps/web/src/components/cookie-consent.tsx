@@ -6,7 +6,7 @@ import { Cookie, Settings2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Switch } from '@/components/ui';
 
-export const CONSENT_KEY = 'xyz-cookie-consent';
+export const CONSENT_KEY = 'zerventa-cookie-consent';
 
 export interface CookieConsent {
   necessary: true;

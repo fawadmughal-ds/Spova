@@ -232,7 +232,7 @@ function Declaration({ checked, onChange }: { checked: boolean; onChange: (v: bo
       <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="mt-0.5 h-5 w-5 rounded border-ink-500 accent-[#0b1220]" />
       <span>
         I have read and accepted the{' '}
-        <Link href="/legal/terms" target="_blank" className="underline underline-offset-2">
+        <Link href="/legal/client-agreement" target="_blank" className="underline underline-offset-2">
           Declaration of Deposit
         </Link>
       </span>

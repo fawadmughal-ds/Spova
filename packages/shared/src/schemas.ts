@@ -229,12 +229,12 @@ export const cardIntentSchema = z.object({ accountId: z.string().uuid(), amount:
 export type CardIntentInput = z.infer<typeof cardIntentSchema>;
 
 export const DEFAULT_DEPOSIT_CHANNELS: DepositChannels = {
-  bank: { enabled: true, bankName: 'HDFC Bank', accountName: 'XYZ Markets Ltd', accountNumber: '50200012345678', ifsc: 'HDFC0001234', swift: 'HDFCINBB', currency: 'INR', note: 'Use your account login as the transfer remark. INR transfers are converted at the rate of the day.' },
-  upi: { enabled: true, vpa: 'xyzmarkets@hdfcbank', payeeName: 'XYZ Markets', currency: 'INR', note: 'Scan the QR with any UPI app (GPay, PhonePe, Paytm) or pay to the UPI ID. Keep the screenshot of the success screen.' },
-  binance: { enabled: true, payId: '123456789', email: 'pay@xyz.local', qrLink: '', note: 'Binance app → Pay → Send → enter the Pay ID (or scan). Send USDT. Zero fee inside Binance.' },
-  crypto_usdt: { enabled: true, address: 'TXYZ1111111111111111111111111111111', network: 'TRC20', note: 'Send USDT on the TRC20 network only. Transfers on another network cannot be recovered.' },
+  bank: { enabled: true, bankName: 'HDFC Bank', accountName: 'Zerventa Ltd', accountNumber: '50200012345678', ifsc: 'HDFC0001234', swift: 'HDFCINBB', currency: 'INR', note: 'Use your account login as the transfer remark. INR transfers are converted at the rate of the day.' },
+  upi: { enabled: true, vpa: 'zerventa@hdfcbank', payeeName: 'Zerventa', currency: 'INR', note: 'Scan the QR with any UPI app (GPay, PhonePe, Paytm) or pay to the UPI ID. Keep the screenshot of the success screen.' },
+  binance: { enabled: true, payId: '123456789', email: 'pay@zerventa.com', qrLink: '', note: 'Binance app → Pay → Send → enter the Pay ID (or scan). Send USDT. Zero fee inside Binance.' },
+  crypto_usdt: { enabled: true, address: 'TXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX', network: 'TRC20', note: 'Send USDT on the TRC20 network only. Transfers on another network cannot be recovered.' },
   card: { enabled: true, note: 'After you submit, our team emails you a secure card payment link within business hours.' },
-  cashier: { enabled: true, footer: 'Company Information: [COMPANY LEGAL NAME] with brand name [BRAND] is authorised and regulated by [REGULATOR] with licence number [LICENCE]. The company address is [ADDRESS]. Trading CFDs involves significant risk of loss and is not suitable for all investors.' },
+  cashier: { enabled: true, footer: 'Company Information: [COMPANY LEGAL NAME] with brand name [BRAND] is authorised and regulated by [REGULATOR] with licence number [LICENCE]. Trading CFDs involves significant risk of loss and is not suitable for all investors.' },
 };
 
 export const paymentDecisionSchema = z
