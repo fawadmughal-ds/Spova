@@ -115,9 +115,20 @@ async function main() {
   void runCandleRetention(db, log).catch((e) => log.warn({ err: e }, 'candle retention (boot) failed'));
 
   if (cfg.CANDLE_BACKFILL) {
+    // first boot with OANDA on: drop the synthetic history of the symbols it quotes, so the chart shows real candles only
+    if (oandaOn) {
+      for (const id of oandaSymbols) {
+        const key = `candles:source:${id}`;
+        if ((await redis.get(key)) === 'oanda') continue;
+        const gone = await db.candle.deleteMany({ where: { symbolId: id } });
+        await redis.set(key, 'oanda');
+        log.info({ symbol: id, deleted: gone.count }, 'synthetic history dropped; OANDA history will be backfilled');
+      }
+    }
     const backfill = new CandleBackfill(db, symbols, log, {
       minBars: cfg.CANDLE_BACKFILL_MIN_BARS,
       bars: cfg.CANDLE_BACKFILL_BARS,
+      oanda: oandaOn ? { token: cfg.OANDA_TOKEN, accountId: cfg.OANDA_ACCOUNT_ID, env: cfg.OANDA_ENV, instruments: Object.fromEntries([...oandaSymbols].map((id) => [id, OANDA_INSTRUMENTS[id]])) } : undefined,
       currentPrice: (id) => {
         const q = ingest.book[id];
         return q ? (Number(q.bid) + Number(q.ask)) / 2 : undefined;

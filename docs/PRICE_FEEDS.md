@@ -33,6 +33,9 @@ OANDA on before any real client trades.
    ```
 5. Restart the worker. The log shows `oanda: streaming` and the list of symbols it took over. Redis key
    `feed:oanda:status` reports `up`/`down`; the terminal's wifi icon reflects it.
+6. On that first boot the worker deletes the synthetic candle history of those symbols and backfills real
+   OANDA candles for every timeframe (`CANDLE_BACKFILL_BARS` per timeframe, 1500 by default), so the chart
+   shows real history behind the live ticks. This happens once; later boots keep the accumulated candles.
 
 Practice and live OANDA accounts stream the same market prices; the practice one is free and enough for
 the feed. Instrument mapping lives in `apps/worker/src/feeds/oanda.ts` (`OANDA_INSTRUMENTS`): EUR_USD,

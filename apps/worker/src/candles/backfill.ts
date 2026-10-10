@@ -8,6 +8,36 @@ import { upsertCandles } from './service';
 
 const BINANCE_REST = 'https://api.binance.com/api/v3/klines';
 const BINANCE_PAGE = 1000; // hard max per request
+const OANDA_PAGE = 5000; // hard max per request
+/** our timeframe -> OANDA granularity */
+export const OANDA_GRANULARITY: Record<Timeframe, string> = { m1: 'M1', m5: 'M5', m15: 'M15', h1: 'H1', h4: 'H4', d1: 'D' };
+
+interface OandaCandle {
+  time: string;
+  complete: boolean;
+  volume: number;
+  mid: { o: string; h: string; l: string; c: string };
+}
+
+export interface OandaHistory {
+  token: string;
+  accountId: string;
+  env: 'practice' | 'live';
+  /** our symbol id -> OANDA instrument, only for the symbols the live feed took over */
+  instruments: Record<string, string>;
+}
+
+/** OANDA candle JSON -> our bars (closed candles only, aligned to UTC buckets). */
+export function parseOandaCandles(symbol: string, tf: Timeframe, candles: OandaCandle[], nowBucket: number): Bar[] {
+  const out: Bar[] = [];
+  for (const c of candles) {
+    if (!c.complete || !c.mid) continue;
+    const t = bucketStart(Date.parse(c.time), tf);
+    if (!Number.isFinite(t) || t >= nowBucket) continue;
+    out.push({ s: symbol, tf, t, o: c.mid.o, h: c.mid.h, l: c.mid.l, c: c.mid.c, v: c.volume ?? 0 });
+  }
+  return out;
+}
 
 type Kline = [number, string, string, string, string, string, number, string, number, string, string, string];
 
@@ -18,11 +48,14 @@ export interface BackfillOptions {
   currentPrice: (symbol: string) => number | undefined;
   fetchImpl?: typeof fetch;
   rng?: () => number;
+  /** when set, these symbols get real OANDA history instead of synthetic bars */
+  oanda?: OandaHistory;
 }
 
 /**
  * Boot-time history. A (symbol, tf) with fewer than `minBars` closed bars gets `bars` of history:
  *  - binance symbols: REST klines (paginated backwards, 1000 per call)
+ *  - OANDA-fed symbols: v3 instrument candles (mid prices, UTC-aligned, paginated backwards, 5000 per call)
  *  - synthetic symbols: a mean-reverting random walk generated backwards from the current price,
  *    skipping buckets outside the trading session. These are demo instruments; the history is plausible, not real.
  */
@@ -43,10 +76,12 @@ export class CandleBackfill {
         const n = have.get(`${s.id}:${tf}`) ?? 0;
         if (n >= this.opts.minBars) continue;
         try {
-          const bars = s.feedSource === 'binance' ? await this.fromBinance(s.feedSymbol, s.id, tf) : this.synthetic(s.id, s.assetClass, s.digits, tf);
+          const oandaInstrument = this.opts.oanda?.instruments[s.id];
+          const source = s.feedSource === 'binance' ? 'binance' : oandaInstrument ? 'oanda' : 'synthetic';
+          const bars = source === 'binance' ? await this.fromBinance(s.feedSymbol, s.id, tf) : source === 'oanda' ? await this.fromOanda(oandaInstrument!, s.id, tf) : this.synthetic(s.id, s.assetClass, s.digits, tf);
           for (let i = 0; i < bars.length; i += 500) await upsertCandles(this.db, bars.slice(i, i + 500));
           filled += bars.length;
-          this.log.info({ symbol: s.id, tf, had: n, bars: bars.length, source: s.feedSource }, 'candles backfilled');
+          this.log.info({ symbol: s.id, tf, had: n, bars: bars.length, source }, 'candles backfilled');
         } catch (e) {
           this.log.warn({ err: e, symbol: s.id, tf }, 'backfill failed');
         }
@@ -83,6 +118,37 @@ export class CandleBackfill {
     }
     out.sort((a, b) => a.t - b.t);
     return out;
+  }
+
+  async fromOanda(instrument: string, symbol: string, tf: Timeframe): Promise<Bar[]> {
+    const o = this.opts.oanda!;
+    const f = this.opts.fetchImpl ?? fetch;
+    const host = o.env === 'live' ? 'api-fxtrade.oanda.com' : 'api-fxpractice.oanda.com';
+    const out: Bar[] = [];
+    const nowBucket = bucketStart(Date.now(), tf);
+    let remaining = this.opts.bars;
+    let to: string | undefined;
+    while (remaining > 0) {
+      const count = Math.min(OANDA_PAGE, remaining);
+      const url = new URL(`https://${host}/v3/instruments/${encodeURIComponent(instrument)}/candles`);
+      url.searchParams.set('granularity', OANDA_GRANULARITY[tf]);
+      url.searchParams.set('price', 'M');
+      url.searchParams.set('count', String(count));
+      url.searchParams.set('alignmentTimezone', 'UTC');
+      url.searchParams.set('dailyAlignment', '0');
+      if (to) url.searchParams.set('to', to);
+      const res = await f(url, { signal: AbortSignal.timeout(20_000), headers: { Authorization: `Bearer ${o.token}`, 'Accept-Datetime-Format': 'RFC3339' } });
+      if (!res.ok) throw new Error(`oanda candles ${res.status}: ${(await res.text()).slice(0, 200)}`);
+      const body = (await res.json()) as { candles?: OandaCandle[] };
+      const rows = body.candles ?? [];
+      if (rows.length === 0) break;
+      out.push(...parseOandaCandles(symbol, tf, rows, nowBucket));
+      remaining -= rows.length;
+      to = rows[0]!.time;
+      if (rows.length < count) break;
+    }
+    const seen = new Set<number>();
+    return out.filter((b) => !seen.has(b.t) && seen.add(b.t)).sort((a, b) => a.t - b.t);
   }
 
   synthetic(symbol: string, assetClass: string, digits: number, tf: Timeframe): Bar[] {
