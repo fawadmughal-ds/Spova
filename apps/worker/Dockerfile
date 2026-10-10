@@ -25,4 +25,6 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates && rm -rf /var/lib/apt/lists/*
 COPY --from=build /out ./
 COPY --from=build /repo/apps/worker/dist ./dist
+RUN chown -R node:node /app
+USER node
 CMD ["node", "dist/main.js"]

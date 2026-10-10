@@ -176,6 +176,7 @@ export class PaymentsService {
 
   /** Pending card deposit, created right before the gateway intent (the gateway reference is attached after). */
   async openCardRequest(userId: string, input: CardIntentInput) {
+    if (!(await this.redis.allow(`payments:card:${userId}`, 10, 3600))) throw ApiError.tooMany('Too many card attempts. Try again later.');
     const user = await this.guardUser(userId);
     const acc = await this.liveAccount(userId, input.accountId);
     const method = methodOf('card')!;
