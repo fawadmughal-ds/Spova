@@ -69,7 +69,7 @@ const CONTENT: Record<string, ContentCopy> = {
   },
   'contact-us': {
     title: 'Contact us',
-    paragraphs: ['Support: support@[domain] - 24/5 live chat from the client area. [PLACEHOLDER - phone numbers and office address]'],
+    paragraphs: ['Support: support@[domain] - 24/5 live chat from the client area. [PLACEHOLDER - support phone numbers]'],
   },
   // questions and answers live in components/marketing/company-faq-data.ts; this is the hero lead
   faq: {
@@ -79,7 +79,7 @@ const CONTENT: Record<string, ContentCopy> = {
   legal: {
     title: 'Legal documents',
     paragraphs: [
-      'AML & CFT Policy, Bonus Terms & Conditions, Client Agreement, Complaints Handling Procedure, General Fees, Margin Information, Order Execution Policy, Privacy Policy, Refund and Cancellation Policy, Risk Disclosure, Website Terms of Use. [PLACEHOLDER - PDFs to be supplied]',
+      'Client Agreement, Risk Disclosure, AML & CFT Policy, Complaints Handling Procedure, General Fees, Margin Information, Order Execution Policy, Privacy Policy, Refund and Cancellation Policy, Website Terms of Use, Bonus Terms & Conditions.',
     ],
   },
 };

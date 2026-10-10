@@ -29,6 +29,7 @@ jobs:
       NEXT_PUBLIC_API_URL: http://localhost:4000
       NEXT_PUBLIC_WS_URL: http://localhost:4000
       NEXT_PUBLIC_BRAND_NAME: XYZ
+      INTERNAL_TOKEN: ci-internal-token-ci-internal-token-ci
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -46,4 +47,18 @@ jobs:
       - run: pnpm --filter @spova/api typecheck
       - run: pnpm --filter @spova/api build
       - run: pnpm --filter @spova/api prisma:seed
+      - run: pnpm --filter @spova/worker prisma:generate
+      - run: pnpm --filter @spova/worker typecheck
+      - run: pnpm --filter @spova/worker test
+      - run: pnpm --filter @spova/worker build
+      - name: api e2e (phase 2 flows)
+        run: |
+          node apps/api/dist/main.js > api.log 2>&1 &
+          for i in $(seq 1 30); do curl -fsS localhost:4000/health/ready && break; sleep 1; done
+          pnpm --filter @spova/api test:e2e || { cat api.log; exit 1; }
+          kill %1 || true
+        env:
+          SEED_ADMIN_EMAIL: admin@xyz.local
+          SEED_ADMIN_PASSWORD: Admin@12345
+          API_URL: http://localhost:4000
       - run: pnpm --filter @spova/web build

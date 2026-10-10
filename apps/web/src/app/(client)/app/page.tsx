@@ -1,13 +1,14 @@
 'use client';
 
-import { Suspense, useEffect, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { ArrowDownToLine, ArrowRight, ArrowUpFromLine, ArrowUpRight, Coins, LineChart, Lock, PartyPopper, Receipt, Scale, Settings2, WalletMinimal } from 'lucide-react';
-import type { LedgerEntryDto, Paginated } from '@spova/shared';
+import { WS_EVENTS, type KycStatusMap, type LedgerEntryDto, type Paginated, type PaymentRequestDto } from '@spova/shared';
 import { useAuth } from '@/lib/auth-context';
 import { useAccounts } from '@/lib/use-accounts';
 import { get } from '@/lib/api';
+import { useUserEvent } from '@/lib/ws';
 import { cn, fmtDate, fmtMoney } from '@/lib/utils';
 import { PageHeader } from '@/components/app-shell';
 import { AnimatedNumber, Tilt } from '@/components/motion';
@@ -17,6 +18,7 @@ import { BalanceChart } from '@/components/portal/balance-chart';
 import { KycSteps } from '@/components/portal/kyc-steps';
 import { LedgerIcon } from '@/components/portal/ledger-icon';
 import { MarginGauge } from '@/components/portal/margin-gauge';
+import { PaymentRow } from '@/components/portal/payment-row';
 import { SlidingTabs } from '@/components/portal/sliding-tabs';
 
 function greeting() {
@@ -25,7 +27,7 @@ function greeting() {
 }
 
 function Dashboard() {
-  const { me } = useAuth();
+  const { me, refresh } = useAuth();
   const { all, data, connected } = useAccounts();
   const welcome = useSearchParams().get('welcome') === '1';
   const [selected, setSelected] = useState<string | null>(null);
@@ -48,6 +50,31 @@ function Dashboard() {
   }, [account?.id, account?.balance, account?.credit]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const kycDone = me?.kyc.poi && me?.kyc.por;
+
+  // verification track shows "in review" / "rejected", not just approved flags
+  const [kyc, setKyc] = useState<KycStatusMap | null>(null);
+  const loadKyc = useCallback(() => get<KycStatusMap>('/me/kyc/status').then(setKyc).catch(() => {}), []);
+  useEffect(() => {
+    if (!kycDone) void loadKyc();
+  }, [kycDone, loadKyc]);
+  useUserEvent(WS_EVENTS.KYC_STATUS, () => {
+    void loadKyc();
+    void refresh();
+  });
+
+  // latest deposit / withdrawal requests across all accounts
+  const [requests, setRequests] = useState<PaymentRequestDto[] | null>(null);
+  const loadRequests = useCallback(
+    () =>
+      get<Paginated<PaymentRequestDto>>('/me/payments?limit=4')
+        .then((r) => setRequests(r.items))
+        .catch(() => setRequests([])),
+    [],
+  );
+  useEffect(() => {
+    void loadRequests();
+  }, [loadRequests]);
+  useUserEvent(WS_EVENTS.PAYMENT_STATUS, () => void loadRequests());
 
   return (
     <>
@@ -78,7 +105,7 @@ function Dashboard() {
           </div>
         </div>
       )}
-      {me && !kycDone && <KycSteps poi={me.kyc.poi} por={me.kyc.por} />}
+      {me && !kycDone && <KycSteps poi={me.kyc.poi} por={me.kyc.por} status={kyc} />}
 
       {!data ? (
         <DashboardSkeleton />
@@ -169,9 +196,10 @@ function Dashboard() {
             </Card>
           </div>
 
+          <div className="mt-5 grid gap-5 lg:grid-cols-3">
           <Card
             title="Recent transactions"
-            className="animate-page-in mt-5 [animation-delay:580ms]"
+            className="animate-page-in min-w-0 [animation-delay:580ms] lg:col-span-2"
             action={
               <Link href={`/app/accounts/${account.id}`} className="group inline-flex items-center gap-1.5 text-xs text-brand-300">
                 <span className="link-underline">
@@ -220,6 +248,42 @@ function Dashboard() {
               </ul>
             )}
           </Card>
+
+          <Card
+            title="Recent requests"
+            className="animate-page-in min-w-0 [animation-delay:640ms]"
+            action={
+              <Link href="/app/payments?tab=history" className="group inline-flex items-center gap-1.5 text-xs text-brand-300">
+                <span className="link-underline">All requests</span>
+                <ArrowUpRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+              </Link>
+            }
+          >
+            {requests === null ? (
+              <div className="space-y-3">
+                {[0, 1, 2].map((i) => (
+                  <Skeleton key={i} className="h-12 rounded-xl" />
+                ))}
+              </div>
+            ) : requests.length === 0 ? (
+              <Empty icon={<ArrowDownToLine className="h-6 w-6" />}>
+                No deposit or withdrawal requests yet.
+                <div className="mt-2">
+                  <Link href="/app/payments" className="group inline-flex items-center gap-1 text-sm font-medium text-brand-300">
+                    <span className="link-underline">Make a deposit</span>
+                    <ArrowRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-0.5" />
+                  </Link>
+                </div>
+              </Empty>
+            ) : (
+              <ul key={requests[0].id + requests[0].status} className="-mx-2">
+                {requests.map((p, i) => (
+                  <PaymentRow key={p.id} p={p} index={i} compact />
+                ))}
+              </ul>
+            )}
+          </Card>
+          </div>
         </>
       )}
     </>

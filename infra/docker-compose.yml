@@ -53,6 +53,26 @@ services:
       redis:
         condition: service_healthy
 
+  # price ingest, candles, risk engine, swap cron. Exactly one replica.
+  worker:
+    build:
+      context: ..
+      dockerfile: apps/worker/Dockerfile
+    restart: unless-stopped
+    env_file: ../.env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://spova:${POSTGRES_PASSWORD}@postgres:5432/spova?schema=public
+      REDIS_URL: redis://redis:6379
+      API_URL: http://api:4000
+    depends_on:
+      api:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
   postgres:
     image: docker.io/library/postgres:16-alpine
     restart: unless-stopped

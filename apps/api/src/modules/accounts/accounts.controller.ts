@@ -33,7 +33,7 @@ export class AccountsController {
   @Get()
   async list(@CurrentUser() user: AuthUser) {
     const rows = await this.accounts.listForUser(user.id);
-    const dtos = rows.map((r) => this.accounts.toDto(r));
+    const dtos = await Promise.all(rows.map((r) => this.accounts.toDto(r)));
     return { demo: dtos.filter((d) => d.type === 'demo'), live: dtos.filter((d) => d.type === 'live') };
   }
 

@@ -3,7 +3,7 @@ import { twMerge } from 'tailwind-merge';
 
 export const cn = (...inputs: ClassValue[]) => twMerge(clsx(inputs));
 
-export const BRAND = process.env.NEXT_PUBLIC_BRAND_NAME ?? 'XYZ';
+export const BRAND = process.env.NEXT_PUBLIC_BRAND_NAME ?? 'Zerventa';
 
 const fmt = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 /** "12000.5" -> "12,000.50" */

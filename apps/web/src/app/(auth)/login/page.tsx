@@ -26,7 +26,9 @@ function LoginForm() {
       setMe(me);
       const next = params.get('next');
       const isAdmin = me.role === 'admin' || me.role === 'superadmin';
-      router.replace(next && next.startsWith('/') ? next : isAdmin ? '/admin' : '/app');
+      // only a same-origin path: "//host" and "/\\host" are protocol-relative redirects
+      const safeNext = next && /^\/(?![\/\\])/.test(next) ? next : null;
+      router.replace(safeNext ?? (isAdmin ? '/admin' : '/app'));
     });
   };
 

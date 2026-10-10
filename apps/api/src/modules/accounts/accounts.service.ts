@@ -4,6 +4,8 @@ import type { AccountDto, WsAccountSnapshot } from '@spova/shared';
 import { PrismaService } from '../../infra/prisma.service';
 import { LedgerService } from '../ledger/ledger.service';
 import { D, money } from '../../common/money';
+import { accountMath, dec, floatingPnl, quoteCurrency, toUsd } from '@spova/shared';
+import { QuotesService } from '../quotes/quotes.service';
 import { env } from '../../config/env';
 import { ApiError } from '../../common/errors';
 
@@ -12,6 +14,7 @@ export class AccountsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly ledger: LedgerService,
+    private readonly quotes: QuotesService,
   ) {}
 
   /** 6-digit login code shown to the user (like MT logins). Retries on collision. */
@@ -58,7 +61,7 @@ export class AccountsService {
   }
 
   async create(userId: string, type: AccountType) {
-    if (type === 'live') {
+    if (type === 'live' && env.KYC_REQUIRED_FOR_LIVE) {
       const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
       if (!user.kycPoi || !user.kycPor) {
         throw ApiError.forbidden('kyc_required', 'Complete identity and address verification before opening a live account');
@@ -82,31 +85,40 @@ export class AccountsService {
   }
 
   /**
-   * Phase 1: no open positions, so floating P/L and used margin are 0.
-   * Phase 3 plugs the risk engine snapshot (Redis acct:{id}) in here.
+   * Live account math (ARCHITECTURE §08): balance + credit + floating P/L of open positions at current prices.
+   * Prices come from Redis (worker); when a quote is missing the position contributes 0 floating.
    */
-  snapshot(acc: TradingAccount): WsAccountSnapshot {
-    const balance = D(acc.balance);
-    const credit = D(acc.credit);
-    const floating = D(0);
-    const usedMargin = D(0);
-    const equity = balance.plus(credit).plus(floating);
-    const freeMargin = equity.minus(usedMargin);
-    const marginLevel = usedMargin.gt(0) ? equity.div(usedMargin).times(100).toFixed(2) : null;
+  async snapshot(acc: TradingAccount): Promise<WsAccountSnapshot> {
+    const [positions, book, specs] = await Promise.all([
+      this.prisma.position.findMany({ where: { accountId: acc.id, status: 'open' } }),
+      this.quotes.book(),
+      this.quotes.specs(),
+    ]);
+    const rows = positions.map((p) => {
+      const spec = specs.get(p.symbolId);
+      const q = book[p.symbolId];
+      let floatingUsd = dec(0);
+      if (spec && q) {
+        const raw = floatingPnl({ side: p.side, openPrice: p.openPrice.toString(), lots: p.lots.toString(), contractSize: spec.contractSize.toString(), bid: q.bid, ask: q.ask });
+        floatingUsd = toUsd(raw, quoteCurrency(spec.id, spec.assetClass), book) ?? dec(0);
+      }
+      return { marginUsed: p.marginUsed.toString(), floatingUsd };
+    });
+    const m = accountMath(acc.balance.toString(), acc.credit.toString(), rows);
     return {
       accountId: acc.id,
-      balance: money(balance),
-      credit: money(credit),
-      equity: money(equity),
-      usedMargin: money(usedMargin),
-      freeMargin: money(freeMargin),
-      marginLevel,
+      balance: money(acc.balance),
+      credit: money(acc.credit),
+      equity: money(m.equity),
+      usedMargin: money(m.usedMargin),
+      freeMargin: money(m.freeMargin),
+      marginLevel: m.marginLevel ? m.marginLevel.toFixed(2) : null,
       ts: Date.now(),
     };
   }
 
-  toDto(acc: TradingAccount): AccountDto {
-    const s = this.snapshot(acc);
+  async toDto(acc: TradingAccount): Promise<AccountDto> {
+    const s = await this.snapshot(acc);
     return {
       id: acc.id,
       type: acc.type,

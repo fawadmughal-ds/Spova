@@ -13,7 +13,16 @@ const nextConfig: NextConfig = {
     ];
   },
   async headers() {
+    const security = [
+      { key: 'X-Content-Type-Options', value: 'nosniff' },
+      { key: 'X-Frame-Options', value: 'DENY' },
+      { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+      { key: 'Permissions-Policy', value: 'camera=(self), microphone=(), geolocation=(), payment=(self "https://js.stripe.com"), usb=()' },
+      { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains' },
+      { key: 'X-DNS-Prefetch-Control', value: 'on' },
+    ];
     return [
+      { source: '/(.*)', headers: security },
       {
         // Private surfaces must never be indexed.
         source: '/(app|trade|admin)(.*)',

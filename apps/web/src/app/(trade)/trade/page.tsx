@@ -1,229 +1,551 @@
 'use client';
 
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type PointerEvent, type ReactNode } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { useEffect, useState, type CSSProperties, type MouseEvent } from 'react';
-import { ArrowLeft, CandlestickChart, Search } from 'lucide-react';
-import { RequireAuth } from '@/lib/auth-context';
+import { ChartCandlestick, ChartNoAxesColumn, ChartPie, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ChevronsUpDown, ClipboardList, BookOpen, Compass, Ellipsis, LayoutDashboard, LogOut, Moon, Sun, Wallet, X } from 'lucide-react';
+import { WS_EVENTS, type AccountDto, type OrderSide, type PlaceOrderResult, type QuoteDto, type WsNotice, type WsTick, type CandleDto } from '@spova/shared';
+import { RequireAuth, useAuth } from '@/lib/auth-context';
 import { get } from '@/lib/api';
-import { buttonClass } from '@/lib/button';
+import { useAccounts } from '@/lib/use-accounts';
+import { useAccountStream, useSocket } from '@/lib/ws';
 import { BRAND, cn } from '@/lib/utils';
-import { marketByCls } from '@/lib/markets';
-import { Logo } from '@/components/logo';
-import { Reveal, Words } from '@/components/motion';
-import { Skeleton } from '@/components/ui';
-import { SimChart } from '@/components/trade/sim-chart';
+import { useToast } from '@/components/toast';
+import { Skeleton, Spinner } from '@/components/ui';
+import { TopBar, type NoticeItem, type TerminalView } from '@/components/trade/top-bar';
+import { ClientRail, railLinks, type RailPanel } from '@/components/trade/client-rail';
+import { DepositBanner, MobileHeader, MobileStats } from '@/components/trade/mobile-home';
+import { BellMenu } from '@/components/trade/top-bar';
+import { DocumentsPanel } from '@/components/portal/documents-panel';
+import { PaymentsView } from '@/components/portal/payments-view';
+import { AccountsView } from '@/components/portal/accounts-view';
+import { StatementView } from '@/components/portal/statement-view';
+import { HelpView } from '@/components/portal/help-view';
+import { ProfileView } from '@/components/portal/profile-view';
+import { useT, type StringKey } from '@/components/trade/i18n';
+import { InfoPanel, MarketPanel, QuickTrade } from '@/components/trade/market-panel';
+import { ChartPanel } from '@/components/trade/chart-panel';
+import { OrderTicket } from '@/components/trade/order-ticket';
+import { BottomPanel, type BottomTab } from '@/components/trade/bottom-panel';
+import { AnalyticsView } from '@/components/trade/analytics-view';
+import { ExploreView } from '@/components/trade/explore-view';
+import { MarginCallStrip, StopOutCard, TradingBlockedBanner } from '@/components/trade/notices';
+import { Modal } from '@/components/trade/bits';
+import { quoteStore } from '@/components/trade/quote-store';
+import { useTradingData } from '@/components/trade/use-trading-data';
+import { useTradeEvents } from '@/components/trade/use-trade-events';
+import { fmtPrice, fmtSignedNum, type SymbolSpec } from '@/components/trade/format';
+import { alertsStore, settingsStore, useSettings } from '@/components/trade/settings';
+import { playSound, primeAudio } from '@/components/trade/sounds';
+import { groupSessions, type SessionRow } from '@/components/trade/sessions';
 
-interface WatchSymbol {
-  id: string;
-  name: string;
-  assetClass: string;
-  leverageMax: number;
-  quote: { bid: string; ask: string } | null;
-}
-
-const FEATURES = ['Live Binance ticks', 'Candles 1m-1d', 'Market / limit / stop orders', 'Positions with live P/L', 'SL/TP', 'Margin engine'];
-const TIMEFRAMES = ['1m', '5m', '15m', '1h', '4h', '1d'];
-
-function UtcClock() {
-  const [now, setNow] = useState(() => new Date());
+/** Phone sections (reference: Trade · Portfolio · Explore · Analytics · More); the chart opens when an instrument is tapped. */
+type MobileTab = 'trade' | 'chart' | 'portfolio' | 'explore' | 'analytics' | 'more';
+const MOBILE_TABS: { value: MobileTab; label: StringKey; icon: typeof Compass }[] = [
+  { value: 'trade', label: 'trade', icon: ChartNoAxesColumn },
+  { value: 'portfolio', label: 'portfolio', icon: BookOpen },
+  { value: 'explore', label: 'explore', icon: Compass },
+  { value: 'analytics', label: 'analytics', icon: ChartPie },
+  { value: 'more', label: 'more', icon: Ellipsis },
+];
+/** `lg` breakpoint: the desktop grid vs the phone tabs decide which view is live */
+function useIsDesktop() {
+  const [desktop, setDesktop] = useState(false);
   useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(t);
+    const mq = window.matchMedia('(min-width: 1024px)');
+    const on = () => setDesktop(mq.matches);
+    on();
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
   }, []);
-  return (
-    <span className="tabular inline-flex items-center gap-2 font-mono text-xs text-ink-400">
-      <span className="live-dot text-brand-400" />
-      UTC {now.toISOString().slice(11, 19)}
-    </span>
+  return desktop;
+}
+const QUOTE_POLL_MS = 15_000;
+const DEFAULT_SYMBOL = 'BTCUSD';
+const EMPTY: never[] = [];
+const MIN_BOTTOM = 43;
+
+let noticeSeq = 1;
+
+function Terminal() {
+  const params = useSearchParams();
+  const toast = useToast();
+  const { me, logout } = useAuth();
+  const { socket, connected } = useSocket();
+  const { all, data: accData, reload: reloadAccounts } = useAccounts();
+  const settings = useSettings();
+
+  // ---------------------------------------------------------------- account
+  const [accountId, setAccountId] = useState<string | null>(params.get('acc'));
+  const [override, setOverride] = useState<AccountDto | null>(null);
+  useEffect(() => {
+    if (!accData) return;
+    const wanted = params.get('acc');
+    const pick = all.find((a) => a.id === wanted) ?? all[0];
+    if (pick && pick.id !== accountId) setAccountId(pick.id);
+    // runs once the list is loaded (accData), not on every render of `all`
+  }, [accData]); // eslint-disable-line react-hooks/exhaustive-deps
+  const selectAccount = useCallback((id: string) => {
+    setAccountId(id);
+    setOverride(null);
+    const url = new URL(window.location.href);
+    url.searchParams.set('acc', id);
+    window.history.replaceState(null, '', url.toString());
+  }, []);
+  const account = useMemo(() => {
+    const base = all.find((a) => a.id === accountId);
+    if (!base) return undefined;
+    return override && override.id === base.id ? { ...base, ...override } : base;
+    // `all` is rebuilt per render; accData is the real dependency
+  }, [accData, accountId, override]); // eslint-disable-line react-hooks/exhaustive-deps
+  /** Figures returned by a mutation are shown immediately; the next snapshot / reload supersedes them. */
+  const onAccount = useCallback(
+    (a: AccountDto) => {
+      setOverride(a);
+      void reloadAccounts().then(() => setOverride((o) => (o?.id === a.id ? null : o)));
+    },
+    [reloadAccounts],
   );
-}
 
-/** The terminal ships with milestone 2. Until then: its skeleton, a simulated chart behind glass, and what is coming. */
-function TerminalPreview() {
-  const [symbols, setSymbols] = useState<WatchSymbol[] | null>(null);
+  // ---------------------------------------------------------------- symbols, sessions, quotes
+  const [symbols, setSymbols] = useState<SymbolSpec[] | null>(null);
+  const [symbolsError, setSymbolsError] = useState(false);
+  const [selected, setSelected] = useState<string | null>(params.get('s'));
+  const [sessions, setSessions] = useState<Map<string, SessionRow[]>>(() => new Map());
   useEffect(() => {
-    get<WatchSymbol[]>('/market/symbols')
-      .then(setSymbols)
-      .catch(() => setSymbols([]));
+    let alive = true;
+    get<SymbolSpec[]>('/market/symbols')
+      .then((list) => {
+        if (!alive) return;
+        list.forEach((s) => s.quote && quoteStore.seed(s.id, { ...s.quote, open: s.isOpen }));
+        setSymbols(list);
+        setSelected((cur) => (cur && list.some((s) => s.id === cur) ? cur : list.some((s) => s.id === DEFAULT_SYMBOL) ? DEFAULT_SYMBOL : (list.find((s) => s.featured) ?? list[0])?.id ?? null));
+        // previous daily close of every instrument -> base of the "Daily" column (a few requests at a time)
+        const ids = list.map((s) => s.id);
+        const run = async () => {
+          for (let i = 0; i < ids.length && alive; i += 6) {
+            await Promise.all(
+              ids.slice(i, i + 6).map((id) =>
+                get<CandleDto[]>(`/market/candles/${id}?tf=d1&limit=2`)
+                  .then((rows) => {
+                    if (!alive || rows.length === 0) return;
+                    const ref = rows.length >= 2 ? Number(rows[rows.length - 2].c) : Number(rows[0].o);
+                    if (Number.isFinite(ref) && ref > 0) quoteStore.setRef(id, ref);
+                  })
+                  .catch(() => {}),
+              ),
+            );
+          }
+        };
+        void run();
+      })
+      .catch(() => alive && setSymbolsError(true));
+    get<SessionRow[]>('/market/sessions')
+      .then((rows) => alive && setSessions(groupSessions(rows)))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const symbolIds = useMemo(() => (symbols ? symbols.map((s) => s.id).join(',') : ''), [symbols]);
+  const symbolMap = useMemo(() => new Map((symbols ?? []).map((s) => [s.id, s])), [symbols]);
+  const spec = selected ? symbolMap.get(selected) : undefined;
+
+  useEffect(() => {
+    if (!socket || !symbolIds) return;
+    const sub = () => socket.emit(WS_EVENTS.SUBSCRIBE, { symbols: symbolIds.split(',') });
+    if (socket.connected) sub();
+    socket.on('connect', sub);
+    return () => {
+      socket.off('connect', sub);
+    };
+  }, [socket, symbolIds]);
+  useEffect(() => {
+    if (!socket || !accountId) return;
+    const sel = () => socket.emit(WS_EVENTS.SELECT_ACCOUNT, { accountId });
+    if (socket.connected) sel();
+    socket.on('connect', sel);
+    return () => {
+      socket.off('connect', sel);
+    };
+  }, [socket, accountId]);
+  useEffect(() => {
+    if (!socket) return;
+    const onTick = (t: WsTick) => quoteStore.tick(t);
+    socket.on(WS_EVENTS.TICK, onTick);
+    return () => {
+      socket.off(WS_EVENTS.TICK, onTick);
+    };
+  }, [socket]);
+  useEffect(() => {
+    if (!symbolIds) return;
+    let alive = true;
+    const poll = async () => {
+      try {
+        const qs = await get<QuoteDto[]>(`/market/quotes?symbols=${symbolIds}`);
+        if (!alive) return;
+        qs.forEach((q) => quoteStore.seed(q.s, { bid: q.bid, ask: q.ask, ts: q.ts, open: q.open }));
+        setSymbols((prev) => {
+          if (!prev) return prev;
+          let changed = false;
+          const next = prev.map((s) => {
+            const q = qs.find((x) => x.s === s.id);
+            if (q && q.open !== s.isOpen) {
+              changed = true;
+              return { ...s, isOpen: q.open };
+            }
+            return s;
+          });
+          return changed ? next : prev;
+        });
+      } catch {
+        /* next poll */
+      }
+    };
+    void poll();
+    const t = setInterval(poll, QUOTE_POLL_MS);
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
+  }, [symbolIds]);
+  useEffect(() => {
+    document.title = `${selected ?? 'Terminal'} · ${BRAND} WebTrader`;
+  }, [selected]);
+  useEffect(() => {
+    primeAudio();
   }, []);
 
-  // crosshair that follows the pointer over the chart
-  const onMove = (e: MouseEvent<HTMLElement>) => {
-    const r = e.currentTarget.getBoundingClientRect();
-    e.currentTarget.style.setProperty('--cx', `${e.clientX - r.left}px`);
-    e.currentTarget.style.setProperty('--cy', `${e.clientY - r.top}px`);
+  // ---------------------------------------------------------------- notices, sounds, ledger version
+  const [notices, setNotices] = useState<NoticeItem[]>([]);
+  const note = useCallback((n: Omit<NoticeItem, 'id' | 'at'>) => setNotices((xs) => [{ ...n, id: noticeSeq++, at: Date.now() }, ...xs].slice(0, 50)), []);
+  const [ledgerVersion, setLedgerVersion] = useState(0);
+  const played = useRef(new Map<string, number>());
+  const once = (key: string) => {
+    const now = Date.now();
+    played.current.forEach((t, k) => now - t > 5000 && played.current.delete(k));
+    if (played.current.has(key)) return false;
+    played.current.set(key, now);
+    return true;
   };
+  useTradeEvents({
+    onPositionOpened: (p) => {
+      if (p.accountId !== accountId) return;
+      if (once(`open:${p.id}`)) playSound('open');
+      note({ level: 'success', title: `${p.side === 'buy' ? 'Buy' : 'Sell'} ${p.lots} ${p.symbol} opened`, body: `at ${fmtPrice(p.openPrice, symbolMap.get(p.symbol)?.digits ?? 2)}` });
+    },
+    onPositionUpdated: (p) => {
+      if (p.accountId !== accountId) return;
+      if (p.closedLots) {
+        if (once(`close:${p.id}:${p.lots}`)) playSound('close');
+        setLedgerVersion((v) => v + 1);
+        note({ level: 'info', title: `${p.symbol}: ${p.closedLots} lots closed`, body: `P/L ${fmtSignedNum(p.closedPnl)} USD` });
+      }
+    },
+    onPositionClosed: (p) => {
+      if (p.accountId !== accountId) return;
+      if (once(`close:${p.id}`)) playSound('close');
+      setLedgerVersion((v) => v + 1);
+      const pnl = Number(p.closedPnl ?? p.realizedPnl ?? 0);
+      note({ level: p.closeReason === 'stopout' ? 'danger' : pnl >= 0 ? 'success' : 'warning', title: `${p.side === 'buy' ? 'Buy' : 'Sell'} ${p.closedLots ?? p.lots} ${p.symbol} closed (${p.closeReason ?? 'closed'})`, body: `P/L ${fmtSignedNum(pnl)} USD` });
+    },
+    onOrderFilled: (o) => {
+      if (o.accountId !== accountId) return;
+      if (o.positionId && once(`open:${o.positionId}`)) playSound('open');
+      if (o.type !== 'market') note({ level: 'success', title: `${o.side === 'buy' ? 'Buy' : 'Sell'} ${o.type} ${o.lots} ${o.symbol} filled`, body: o.filledPrice ? `at ${o.filledPrice}` : undefined });
+    },
+    onOrderCancelled: (o) => o.accountId === accountId && note({ level: 'info', title: `${o.side === 'buy' ? 'Buy' : 'Sell'} ${o.type} ${o.lots} ${o.symbol} cancelled` }),
+    onOrderRejected: (o) => o.accountId === accountId && note({ level: 'danger', title: `Order rejected: ${o.side} ${o.type} ${o.lots} ${o.symbol}`, body: o.rejectReason ?? undefined }),
+  });
+
+  // one-shot price alerts: fire when the mid crosses the level
+  const lastMid = useRef(new Map<string, number>());
+  useEffect(() => {
+    return quoteStore.subscribeAll(() => {
+      const items = alertsStore.get().items;
+      if (items.length === 0) return;
+      for (const s of new Set(items.map((a) => a.symbol))) {
+        const q = quoteStore.get(s);
+        if (!q || !q.bid || !q.ask) continue;
+        const mid = (Number(q.bid) + Number(q.ask)) / 2;
+        const prev = lastMid.current.get(s);
+        lastMid.current.set(s, mid);
+        if (prev === undefined) continue;
+        for (const a of items.filter((x) => x.symbol === s)) {
+          const lvl = Number(a.price);
+          if ((prev < lvl && mid >= lvl) || (prev > lvl && mid <= lvl)) {
+            alertsStore.set({ items: alertsStore.get().items.filter((x) => x.id !== a.id) });
+            playSound('alert');
+            const digits = symbolMap.get(s)?.digits ?? 2;
+            toast({ level: 'warning', title: `${s} reached ${fmtPrice(lvl, digits)}`, body: `Now ${fmtPrice(mid, digits)}` });
+            note({ level: 'warning', title: `Alert: ${s} reached ${fmtPrice(lvl, digits)}` });
+          }
+        }
+      }
+    });
+  }, [symbolMap, toast, note]);
+
+  // ---------------------------------------------------------------- positions, orders, notices
+  const data = useTradingData(accountId);
+  const [stopOut, setStopOut] = useState<WsNotice | null>(null);
+  useAccountStream(
+    (s) => setOverride((o) => (o && o.id === s.accountId ? null : o)),
+    (n) => {
+      toast({ level: n.level, title: n.title, body: n.body });
+      note({ level: n.level, title: n.title, body: n.body });
+      if (n.type === 'ledger' || n.type === 'payment') setLedgerVersion((v) => v + 1);
+      if (n.type === 'stop_out') {
+        setStopOut(n);
+        void data.reload();
+      }
+      if (n.type === 'trading_blocked' || n.type === 'stop_out') void reloadAccounts();
+    },
+  );
+  const onPlaced = useCallback(
+    (r: PlaceOrderResult) => {
+      data.markOwn(r.order.id);
+      if (r.position) {
+        data.markOwn(r.position.id);
+        data.upsertPosition(r.position);
+        if (once(`open:${r.position.id}`)) playSound('open');
+      } else data.addOrder(r.order);
+      onAccount(r.account);
+    },
+    [data, onAccount], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+  const openPositions = data.positions ?? EMPTY;
+  const level = account?.marginLevel === null || account?.marginLevel === undefined ? null : Number(account.marginLevel);
+  const marginCall = level !== null && Number.isFinite(level) && level <= 100 && openPositions.length > 0;
+
+  // ---------------------------------------------------------------- layout
+  const [view, setView] = useState<TerminalView>('trade');
+  const [panel, setPanel] = useState<RailPanel | null>(null);
+  const t = useT();
+  const [mtab, setMtab] = useState<MobileTab>('trade');
+  const [calOpen, setCalOpen] = useState(true);
+  const desktop = useIsDesktop();
+  // phones drive Analytics / Explore from the tab bar, desktop from the top bar
+  const activeView: TerminalView = desktop ? view : mtab === 'analytics' ? 'analytics' : mtab === 'explore' ? 'explore' : 'trade';
+  const [bottomTab, setBottomTab] = useState<BottomTab>('positions');
+  const [ticket, setTicket] = useState<{ spec: SymbolSpec; side: OrderSide; lots: string } | null>(null);
+  const [sidebar, setSidebar] = useState(true);
+  const pick = useCallback((id: string) => {
+    setSelected(id);
+    setMtab('chart');
+    setView('trade');
+  }, []);
+  const show = (on: boolean) => (on ? 'flex' : 'hidden');
+
+  // bottom panel drag handle
+  const dragging = useRef<{ y: number; h: number } | null>(null);
+  const onDragStart = (e: PointerEvent) => {
+    dragging.current = { y: e.clientY, h: settings.bottomCollapsed ? MIN_BOTTOM : settings.bottomHeight };
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  };
+  const onDrag = (e: PointerEvent) => {
+    if (!dragging.current) return;
+    const h = Math.max(MIN_BOTTOM, Math.min(window.innerHeight - 260, dragging.current.h - (e.clientY - dragging.current.y)));
+    settingsStore.patch({ bottomHeight: h, bottomCollapsed: h <= MIN_BOTTOM + 4 });
+  };
+  const onDragEnd = () => {
+    dragging.current = null;
+  };
+  const bottomHeight = settings.bottomCollapsed ? MIN_BOTTOM : settings.bottomHeight;
+
+  const panelSkeleton = (cls: string) => (
+    <div className={cn('t-panel gap-2 p-3', cls)}>
+      <Skeleton className="h-6 w-48" />
+      <Skeleton className="h-5" />
+      <Skeleton className="h-5" />
+    </div>
+  );
 
   return (
-    <div className="flex h-screen min-h-[640px] flex-col overflow-hidden bg-ink-950">
-      <header className="animate-page-in relative z-20 flex h-12 shrink-0 items-center justify-between border-b border-white/[0.06] bg-ink-900/60 px-4 backdrop-blur">
-        <Link href="/app" className="group flex items-center gap-2 text-sm text-ink-300 transition-colors hover:text-white">
-          <ArrowLeft className="h-4 w-4 transition-transform duration-300 group-hover:-translate-x-1" /> Client area
-        </Link>
-        <div className="group/logo flex items-center gap-2">
-          <Logo size={22} />
-          <span className="font-display text-sm font-bold">{BRAND} WebTrader</span>
-          <span className="hidden rounded-full bg-gold/10 px-2 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-[0.14em] text-gold ring-1 ring-inset ring-gold/30 sm:inline">Preview</span>
-        </div>
-        <UtcClock />
-      </header>
+    <div className="flex h-dvh overflow-hidden">
+      {/* light client-area rail: a sibling of the dark terminal, so it keeps the normal theme */}
+      <ClientRail accounts={all} account={account} onSelectAccount={selectAccount} me={me} onLogout={() => void logout()} onOpen={setPanel} className="hidden lg:flex" />
+      {panel && <RailOverlay panel={panel} accountId={account?.id} onClose={() => setPanel(null)} />}
+      <div className="terminal flex h-dvh min-w-0 flex-1 flex-col overflow-hidden" data-theme={settings.theme}>
+      <div className="hidden lg:block">
+        <TopBar accounts={all} account={account} onSelectAccount={selectAccount} connected={connected} view={view} onView={setView} positions={openPositions} symbols={symbolMap} notices={notices} email={me?.email} onLogout={() => void logout()} />
+      </div>
+      <MobileHeader className="lg:hidden" accounts={all} account={account} onSelectAccount={selectAccount} onDeposit={() => setPanel('deposit')} onMenu={() => setMtab('more')} bell={<BellMenu notices={notices} />} />
+      {account?.tradingBlocked && <TradingBlockedBanner />}
+      {marginCall && level !== null && <MarginCallStrip level={level} />}
+      {stopOut && <StopOutCard notice={stopOut} onDismiss={() => setStopOut(null)} />}
 
-      <div className="grid min-h-0 flex-1 lg:grid-cols-[250px_1fr_290px]">
-        {/* watchlist */}
-        <aside className="preview-mock hidden min-h-0 flex-col border-r border-white/[0.06] lg:flex" aria-hidden>
-          <div className="flex items-center justify-between px-4 pb-2 pt-4">
-            <span className="label">Watchlist</span>
-            <span className="label !text-ink-500">Milestone 2</span>
-          </div>
-          <div className="mx-3 mb-2 flex h-9 items-center gap-2 rounded-lg bg-white/[0.04] px-3 text-xs text-ink-500">
-            <Search className="h-3.5 w-3.5" /> Search symbols
-          </div>
-          <ul className="min-h-0 flex-1 overflow-hidden px-2">
-            {symbols === null &&
-              Array.from({ length: 12 }, (_, i) => (
-                <li key={i} className="flex items-center justify-between px-2 py-2.5">
-                  <Skeleton className="w-20" />
-                  <Skeleton className="w-12" />
+      <main className={cn('relative flex min-h-0 flex-1 flex-col px-2 pb-2 lg:grid lg:gap-x-[14px] lg:px-[3px] lg:pb-[6px]', activeView === 'trade' ? (sidebar ? 'lg:grid-cols-[388px_minmax(0,1fr)]' : 'lg:grid-cols-[0px_minmax(0,1fr)]') : 'lg:grid-cols-1')}>
+        {activeView === 'trade' ? (
+          <>
+            <aside className={cn('relative min-h-0 flex-col gap-2', show(mtab === 'trade'), 'lg:flex', !sidebar && 'lg:invisible')}>
+              {/* phone: banner, figures and the collapsible calendar sit above the watchlist (reference layout) */}
+              <div className="flex shrink-0 flex-col gap-2 pt-2 lg:hidden">
+                <DepositBanner onClick={() => setPanel('deposit')} />
+                <MobileStats account={account} positions={openPositions} symbols={symbolMap} />
+                {symbols && (
+                  <div className="relative">
+                    <InfoPanel spec={spec} account={account} className={cn('shrink-0 overflow-hidden transition-[height] duration-300', calOpen ? 'h-[300px]' : 'h-[46px]')} />
+                    <button type="button" onClick={() => setCalOpen((v) => !v)} aria-label={calOpen ? 'Collapse the calendar' : 'Expand the calendar'} className="absolute -bottom-[7px] left-1/2 z-10 flex h-[14px] w-[38px] -translate-x-1/2 items-center justify-center rounded-full bg-[var(--t-raised-2)] text-[var(--t-text-2)]">
+                      <ChevronsUpDown className="h-3 w-3" />
+                    </button>
+                  </div>
+                )}
+              </div>
+              <MarketPanel symbols={symbolsError ? [] : symbols} selected={selected} onSelect={pick} account={account} onPlaced={onPlaced} onAdvanced={(s, side, lots) => setTicket({ spec: s, side, lots })} sessions={sessions} className="min-h-0 flex-1" />
+              {/* handle: swap the space between the instrument list and the info panel */}
+              <button type="button" onClick={() => settingsStore.patch({ infoTall: !settings.infoTall })} aria-label={settings.infoTall ? 'Shrink the information panel' : 'Expand the information panel'} className="absolute left-1/2 z-10 hidden h-[14px] w-[38px] -translate-x-1/2 items-center justify-center rounded-full bg-[var(--t-raised)] text-[var(--t-muted)] hover:text-white lg:flex" style={{ bottom: (settings.infoTall ? 520 : 270) + 1 }}>
+                <ChevronsUpDown className="h-3 w-3" />
+              </button>
+              {symbols && <InfoPanel spec={spec} account={account} className={cn('hidden shrink-0 lg:flex', settings.infoTall ? 'h-[520px]' : 'h-[270px]')} />}
+            </aside>
+            {/* sidebar collapse handle (desktop) */}
+            <button type="button" onClick={() => setSidebar((v) => !v)} aria-label={sidebar ? 'Collapse the instrument panel' : 'Expand the instrument panel'} className={cn('absolute top-1/2 z-20 hidden h-9 w-[14px] -translate-y-1/2 items-center justify-center rounded-md bg-[var(--t-raised)] text-[var(--t-text-2)] hover:text-white lg:flex', sidebar ? 'left-[385px]' : 'left-[3px]')}>
+              {sidebar ? <ChevronLeft className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+            </button>
+
+            <div className={cn('min-h-0 min-w-0 flex-1 flex-col', show(mtab === 'chart' || mtab === 'portfolio'), 'lg:flex')}>
+              {spec ? (
+                <ChartPanel
+                  spec={spec}
+                  positions={openPositions}
+                  className={cn('min-h-0 flex-1', show(mtab === 'chart'), 'lg:flex')}
+                  footer={
+                    <div className="shrink-0 border-t border-[var(--t-line)] lg:hidden">
+                      <QuickTrade spec={spec} account={account} onPlaced={onPlaced} onAdvanced={(side, lots) => setTicket({ spec, side, lots })} />
+                    </div>
+                  }
+                />
+              ) : (
+                <div className={cn('t-panel min-h-0 flex-1 items-center justify-center', show(mtab === 'chart'), 'lg:flex')}>
+                  {symbolsError ? (
+                    <div className="flex flex-col items-center gap-2 text-center">
+                      <ChartCandlestick className="h-5 w-5 text-[var(--t-sell)]" />
+                      <div className="text-sm font-semibold text-white">Could not load the instrument list</div>
+                      <div className="text-xs text-[var(--t-muted)]">Refresh the page to try again.</div>
+                    </div>
+                  ) : (
+                    <Spinner />
+                  )}
+                </div>
+              )}
+              <div className="t-drag hidden lg:flex" onPointerDown={onDragStart} onPointerMove={onDrag} onPointerUp={onDragEnd} onPointerCancel={onDragEnd} role="separator" aria-orientation="horizontal" aria-label="Resize the positions panel">
+                <span onClick={() => settingsStore.patch({ bottomCollapsed: !settings.bottomCollapsed })} title={settings.bottomCollapsed ? 'Expand' : 'Collapse'}>
+                  {settings.bottomCollapsed ? <ChevronUp /> : <ChevronDown />}
+                </span>
+              </div>
+              {account ? (
+                <BottomPanel account={account} symbols={symbolMap} data={data} onAccount={onAccount} ledgerVersion={ledgerVersion} tab={bottomTab} onTab={setBottomTab} className={cn('min-h-0 flex-1', show(mtab === 'portfolio'), 'lg:flex lg:h-[var(--bh)] lg:flex-none')} style={{ ['--bh' as string]: `${bottomHeight}px` }} />
+              ) : (
+                panelSkeleton(cn('min-h-0 flex-1', show(mtab === 'portfolio'), 'lg:flex lg:h-[330px] lg:flex-none'))
+              )}
+            </div>
+          </>
+        ) : activeView === 'analytics' ? (
+          account ? (
+            <AnalyticsView account={account} history={data.history} loadHistory={data.loadHistory} symbols={symbolMap} ledgerVersion={ledgerVersion} className="min-h-0 flex-1" />
+          ) : (
+            panelSkeleton('min-h-0 flex-1')
+          )
+        ) : (
+          <ExploreView symbols={symbolsError ? [] : symbols} onTrade={pick} className="min-h-0 flex-1" />
+        )}
+
+        {/* mobile "More" */}
+        {mtab === 'more' && (
+          <section className="t-panel min-h-0 flex-1 lg:hidden" aria-label="More">
+            <div className="t-bar !pl-4 text-[14px] font-semibold text-white">{t('more')}</div>
+            <ul className="p-2">
+              <li>
+                <Link href="/app" className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-white/[0.04]">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-md bg-[var(--t-raised)] text-[var(--t-blue)] [&>svg]:h-4 [&>svg]:w-4">
+                    <LayoutDashboard />
+                  </span>
+                  <span className="leading-tight">
+                    <span className="block text-[14px] font-semibold text-white">{t('dashboard')}</span>
+                    <span className="block text-[12px] text-[var(--t-muted)]">Back to the client area</span>
+                  </span>
+                  <ChevronRight className="ml-auto h-4 w-4 text-[var(--t-muted)]" />
+                </Link>
+              </li>
+              <li>
+                <button type="button" onClick={() => settingsStore.patch({ theme: settings.theme === 'dark' ? 'light' : 'dark' })} className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-white/[0.04]">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-md bg-[var(--t-raised)] text-[var(--t-text-2)] [&>svg]:h-4 [&>svg]:w-4">{settings.theme === 'dark' ? <Sun /> : <Moon />}</span>
+                  <span className="leading-tight">
+                    <span className="block text-[14px] font-semibold text-white">{t('darkMode')}</span>
+                    <span className="block text-[12px] text-[var(--t-muted)]">{settings.theme === 'dark' ? 'On' : 'Off'}</span>
+                  </span>
+                </button>
+              </li>
+              {(
+                [
+                  [
+                    t('finance'),
+                    'Balance, margin and ledger',
+                    <Wallet key="f" />,
+                    () => {
+                      setBottomTab('finance');
+                      setMtab('portfolio');
+                    },
+                  ],
+                ] as [string, string, ReactNode, () => void][]
+              ).map(([label, sub, icon, go]) => (
+                <li key={label}>
+                  <button type="button" onClick={go} className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-white/[0.04]">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-md bg-[var(--t-raised)] text-[var(--t-blue)] [&>svg]:h-4 [&>svg]:w-4">{icon}</span>
+                    <span className="leading-tight">
+                      <span className="block text-[14px] font-semibold text-white">{label}</span>
+                      <span className="block text-[12px] text-[var(--t-muted)]">{sub}</span>
+                    </span>
+                    <ChevronRight className="ml-auto h-4 w-4 text-[var(--t-muted)]" />
+                  </button>
                 </li>
               ))}
-            {symbols?.map((s, i) => (
-              <li
-                key={s.id}
-                style={{ '--c': marketByCls(s.assetClass)?.rgb ?? '15 23 42', animationDelay: `${Math.min(i, 18) * 40}ms` } as CSSProperties}
-                className={cn('animate-page-in flex items-center justify-between rounded-lg px-2 py-2', i === 0 && 'bg-white/[0.06]')}
-              >
-                <span className="flex items-center gap-2.5">
-                  <span className="h-1.5 w-1.5 rotate-45 bg-[rgb(var(--c))]" />
-                  <span>
-                    <span className="block text-[13px] font-semibold text-ink-100">{s.id}</span>
-                    <span className="block max-w-[120px] truncate text-[10px] text-ink-500">{s.name}</span>
-                  </span>
-                </span>
-                <span className="tabular text-right font-mono text-[11px] text-ink-400">{s.quote ? s.quote.bid : `1:${s.leverageMax}`}</span>
-              </li>
-            ))}
-          </ul>
-        </aside>
-
-        {/* chart + announcement */}
-        <main className="group/chart relative flex min-h-0 min-w-0 flex-col" onMouseMove={onMove}>
-          <div className="preview-mock flex h-11 shrink-0 items-center justify-between border-b border-white/[0.06] px-4" aria-hidden>
-            <div className="flex items-center gap-3">
-              <span className="font-display text-sm font-bold">{symbols?.[0]?.id ?? 'EURUSD'}</span>
-              <div className="flex rounded-md bg-white/[0.04] p-0.5">
-                {TIMEFRAMES.map((t, i) => (
-                  <span key={t} className={cn('rounded px-2 py-0.5 font-mono text-[10px]', i === 0 ? 'bg-white/10 text-white' : 'text-ink-500')}>
-                    {t}
-                  </span>
-                ))}
-              </div>
-            </div>
-            <span className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap font-mono text-[10px] uppercase tracking-[0.14em] text-ink-400">
-              <span className="live-dot text-gold" /> Simulated<span className="hidden sm:inline"> chart · not market data</span>
-            </span>
-          </div>
-
-          <div className="relative min-h-0 flex-1 overflow-hidden">
-            <div className="absolute inset-0 opacity-45 blur-[1.5px]">
-              <SimChart />
-            </div>
-            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgb(var(--paper-rgb)/0.88)_0%,rgb(var(--paper-rgb)/0.55)_45%,transparent_75%)]" />
-            {/* crosshair */}
-            <span className="pointer-events-none absolute inset-y-0 left-[var(--cx,-10px)] w-px bg-white/15 opacity-0 transition-opacity duration-300 group-hover/chart:opacity-100" />
-            <span className="pointer-events-none absolute inset-x-0 top-[calc(var(--cy,-10px)-2.75rem)] h-px bg-white/15 opacity-0 transition-opacity duration-300 group-hover/chart:opacity-100" />
-
-            <div className="absolute inset-0 flex items-center justify-center p-4">
-              <Reveal variant="scale" delay={200} className="w-full max-w-xl">
-                <div className="beam glass relative overflow-hidden rounded-3xl p-7 text-center shadow-lift sm:p-9">
-                  <div className="aurora-blob -top-28 left-1/2 h-56 w-80 -translate-x-1/2 bg-brand-500/20" />
-                  <div className="relative mx-auto flex h-16 w-16 items-center justify-center">
-                    <span className="absolute inset-0 animate-pulse-ring rounded-2xl border border-brand-400/50" />
-                    <span className="absolute inset-0 animate-pulse-ring rounded-2xl border border-brand-400/50 [animation-delay:1.3s]" />
-                    <span className="relative flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-b from-brand-300 to-brand-600 text-ink-950 shadow-glow">
-                      <CandlestickChart className="h-7 w-7" />
+              <li className="my-1 border-t border-[var(--t-line)]" role="separator" />
+              {railLinks(t).map((l) => (
+                <li key={l.panel}>
+                  <button type="button" onClick={() => setPanel(l.panel)} className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-white/[0.04]">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-md bg-[var(--t-raised)] text-[var(--t-text-2)] [&>svg]:h-4 [&>svg]:w-4">{l.icon}</span>
+                    <span className="leading-tight">
+                      <span className="block text-[14px] font-semibold text-white">{l.label}</span>
+                      <span className="block text-[12px] text-[var(--t-muted)]">{l.sub}</span>
                     </span>
-                  </div>
-                  <span className="eyebrow relative mt-6">Milestone 2 · 13 Oct</span>
-                  <h1 className="relative mt-4 font-display text-4xl font-extrabold leading-[0.98] tracking-tighter sm:text-5xl">
-                    <Words text="The terminal *is on its way*" delay={350} />
-                  </h1>
-                  <p className="relative mt-4 font-semibold text-ink-200">Terminal arrives with milestone 2 (13 Oct)</p>
-                  <Reveal as="ul" variant="stagger" delay={700} step={70} className="relative mt-5 flex flex-wrap justify-center gap-1.5">
-                    {FEATURES.map((f) => (
-                      <li key={f} className="rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 font-mono text-[11px] text-ink-200">
-                        {f}
-                      </li>
-                    ))}
-                  </Reveal>
-                  <Link href="/app" className={buttonClass('primary', 'md', 'group relative mt-7 rounded-full')}>
-                    <ArrowLeft className="h-4 w-4 transition-transform duration-300 group-hover:-translate-x-1" /> Back to client area
-                  </Link>
-                </div>
-              </Reveal>
-            </div>
-          </div>
-
-          {/* positions strip */}
-          <div className="preview-mock hidden h-36 shrink-0 border-t border-white/[0.06] md:block" aria-hidden>
-            <div className="flex gap-5 border-b border-white/[0.06] px-4">
-              {['Positions', 'Pending orders', 'History'].map((t, i) => (
-                <span key={t} className={cn('-mb-px border-b-2 py-2.5 text-xs', i === 0 ? 'border-brand-400 text-white' : 'border-transparent text-ink-500')}>
-                  {t}
-                </span>
+                    <ChevronRight className="ml-auto h-4 w-4 text-[var(--t-muted)]" />
+                  </button>
+                </li>
               ))}
-            </div>
-            <div className="space-y-3 p-4">
-              {[0, 1].map((r) => (
-                <div key={r} className="grid grid-cols-6 gap-4">
-                  {Array.from({ length: 6 }, (_, i) => (
-                    <Skeleton key={i} className={i === 5 ? 'w-2/3 justify-self-end' : 'w-full'} />
-                  ))}
-                </div>
-              ))}
-            </div>
-          </div>
-        </main>
+              <li>
+                <button type="button" onClick={() => void logout()} className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-white/[0.04]">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-md bg-[var(--t-raised)] text-[var(--t-sell)] [&>svg]:h-4 [&>svg]:w-4">
+                    <LogOut />
+                  </span>
+                  <span className="block text-[14px] font-semibold text-white">Logout</span>
+                </button>
+              </li>
+            </ul>
+          </section>
+        )}
+      </main>
 
-        {/* order ticket */}
-        <aside className="preview-mock hidden min-h-0 flex-col gap-4 border-l border-white/[0.06] p-4 lg:flex" aria-hidden>
-          <div className="flex items-center justify-between">
-            <span className="label">Order ticket</span>
-            <span className="label !text-ink-500">Milestone 2</span>
-          </div>
-          <div className="grid grid-cols-3 rounded-lg bg-white/[0.04] p-0.5 text-center font-mono text-[11px]">
-            {['Market', 'Limit', 'Stop'].map((t, i) => (
-              <span key={t} className={cn('rounded-md py-1.5', i === 0 ? 'bg-white/10 text-white' : 'text-ink-500')}>
-                {t}
-              </span>
-            ))}
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div className="rounded-xl bg-down/10 px-3 py-3 ring-1 ring-inset ring-down/25">
-              <div className="label !text-down/80">Sell</div>
-              <Skeleton className="mt-2 h-5 w-20" />
-            </div>
-            <div className="rounded-xl bg-up/10 px-3 py-3 text-right ring-1 ring-inset ring-up/25">
-              <div className="label !text-up/80">Buy</div>
-              <Skeleton className="ml-auto mt-2 h-5 w-20" />
-            </div>
-          </div>
-          {['Volume (lots)', 'Stop loss', 'Take profit'].map((l) => (
-            <div key={l}>
-              <div className="label mb-1.5">{l}</div>
-              <div className="flex h-10 items-center rounded-lg border border-white/[0.08] bg-white/[0.03] px-3">
-                <Skeleton className="w-16" />
-              </div>
-            </div>
-          ))}
-          <div className="mt-auto space-y-2.5 rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
-            {['Required margin', 'Free margin', 'Margin level'].map((l) => (
-              <div key={l} className="flex items-center justify-between">
-                <span className="text-[11px] text-ink-500">{l}</span>
-                <Skeleton className="h-3 w-14" />
-              </div>
-            ))}
-          </div>
-        </aside>
+      {/* mobile bottom tab bar */}
+      <nav className="flex h-14 shrink-0 border-t border-[var(--t-line)] bg-[var(--t-bg)] pb-[env(safe-area-inset-bottom)] lg:hidden" aria-label="Terminal sections">
+        {MOBILE_TABS.map((m) => (
+          <button
+            key={m.value}
+            type="button"
+            data-on={mtab === m.value || (m.value === 'trade' && mtab === 'chart')}
+            onClick={() => setMtab(m.value)}
+            className="t-mobile-tab"
+          >
+            <m.icon /> {t(m.label)}
+          </button>
+        ))}
+      </nav>
+
+      {ticket && account && (
+        <Modal onClose={() => setTicket(null)} label="Advanced order">
+          <OrderTicket spec={symbolMap.get(ticket.spec.id) ?? ticket.spec} account={account} onPlaced={onPlaced} initialSide={ticket.side} initialLots={ticket.lots} confirmOrders={settings.confirmOrders} onClose={() => setTicket(null)} className="max-h-[92dvh]" />
+        </Modal>
+      )}
       </div>
     </div>
   );
@@ -232,7 +554,50 @@ function TerminalPreview() {
 export default function TradePage() {
   return (
     <RequireAuth>
-      <TerminalPreview />
+      <Suspense
+        fallback={
+          <div className="terminal flex h-dvh items-center justify-center" data-theme="light">
+            <Spinner />
+          </div>
+        }
+      >
+        <Terminal />
+      </Suspense>
     </RequireAuth>
+  );
+}
+
+const PANEL_LABEL: Record<RailPanel, string> = { deposit: 'Deposit', accounts: 'Trading accounts', payments: 'Payments', documents: 'Documents', statement: 'Statement', help: 'Help', profile: 'Profile' };
+
+/** Client-area module drawn over the terminal (light palette), like the reference's modal client area. */
+function RailOverlay({ panel, accountId, onClose }: { panel: RailPanel; accountId: string | undefined; onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
+  const narrow = panel === 'documents';
+  return (
+    <div className="light-scope fixed inset-0 z-[85] flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div role="dialog" aria-modal aria-label={PANEL_LABEL[panel]} className={cn('animate-pop-in relative max-h-[94dvh] w-full overflow-y-auto rounded-t-2xl bg-ink-950 p-5 text-white shadow-lift sm:rounded-2xl sm:p-8', narrow ? 'sm:max-w-[760px]' : 'sm:max-w-[1120px]')}>
+        {panel === 'documents' ? (
+          <DocumentsPanel onClose={onClose} />
+        ) : (
+          <>
+            <button type="button" onClick={onClose} aria-label="Close" className="absolute right-4 top-4 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-paper text-ink-400 shadow-sm ring-1 ring-ink-800 transition-colors hover:text-white sm:right-6 sm:top-6">
+              <X className="h-5 w-5" />
+            </button>
+            <Suspense fallback={<Skeleton className="h-96 rounded-2xl" />}>
+              {panel === 'deposit' && <PaymentsView embedded initialTab="deposit" />}
+              {panel === 'payments' && <PaymentsView embedded initialTab="history" />}
+              {panel === 'accounts' && <AccountsView />}
+              {panel === 'statement' && (accountId ? <StatementView id={accountId} embedded /> : <AccountsView />)}
+              {panel === 'help' && <HelpView />}
+              {panel === 'profile' && <ProfileView />}
+            </Suspense>
+          </>
+        )}
+      </div>
+    </div>
   );
 }

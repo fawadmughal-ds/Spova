@@ -15,7 +15,9 @@ export const CurrentUser = createParamDecorator((_data: unknown, ctx: ExecutionC
 
 export const ClientIp = createParamDecorator((_data: unknown, ctx: ExecutionContext): string => {
   const req = ctx.switchToHttp().getRequest();
+  // Behind one trusted proxy (Render / Cloudflare) the proxy appends the real client IP as the LAST entry;
+  // anything before it can be forged by the client, so never trust the first entry.
   const fwd = req.headers['x-forwarded-for'];
-  const first = Array.isArray(fwd) ? fwd[0] : fwd?.split(',')[0];
-  return (first ?? req.socket?.remoteAddress ?? '').trim();
+  const list = (Array.isArray(fwd) ? fwd.join(',') : (fwd ?? '')).split(',').map((s: string) => s.trim()).filter(Boolean);
+  return (list[list.length - 1] ?? req.socket?.remoteAddress ?? '').trim();
 });

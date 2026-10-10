@@ -6,9 +6,10 @@ import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 import { env } from './config/env';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import type { NextFunction, Request, Response } from 'express';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  const app = await NestFactory.create(AppModule, { bufferLogs: true, rawBody: true });
   app.useLogger(app.get(Logger));
   app.setGlobalPrefix('v1', { exclude: ['health', 'health/ready'] });
   app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
@@ -18,6 +19,19 @@ async function bootstrap() {
     credentials: true,
     methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Idempotency-Key', 'X-CSRF'],
+  });
+  // CSRF defence in depth: a browser always sends Origin on cross-site POST/PUT/PATCH/DELETE (forms included).
+  // Cookies may run with SameSite=None on split-domain deployments, so refuse state changes from any
+  // origin outside WEB_ORIGIN. Server-to-server callers (Stripe webhooks, the worker) send no Origin.
+  const allowedOrigins = new Set(env.WEB_ORIGIN.split(',').map((o) => o.trim()).filter(Boolean));
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) return next();
+    const origin = req.headers.origin;
+    if (origin && !allowedOrigins.has(origin)) {
+      res.status(403).json({ code: 'origin_forbidden', message: 'Cross-site request refused' });
+      return;
+    }
+    next();
   });
   app.useGlobalFilters(new HttpExceptionFilter());
   app.enableShutdownHooks();

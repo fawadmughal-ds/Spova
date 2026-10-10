@@ -1,3 +1,4 @@
+# Render Blueprint: API + worker (Docker) + Postgres + Redis. Web is deployed on Vercel (see docs/DEPLOY_RENDER_VERCEL.md).
 # Render Blueprint: API (Docker) + Postgres + Redis. Web is deployed on Vercel (see docs/DEPLOY_RENDER_VERCEL.md).
 # Free plans spin down when idle and the free Postgres expires after 30 days - fine for a client preview only.
 services:
