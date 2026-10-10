@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { Bell, BellOff, ChartNoAxesColumn, ChartPie, Check, ChevronDown, CircleUser, Compass, LayoutDashboard, LogOut, UserRound, Volume2, VolumeX, Wifi, WifiOff } from 'lucide-react';
+import { Bell, BellOff, ChartNoAxesColumn, ChartPie, Check, ChevronDown, CircleUser, Compass, LayoutDashboard, LogOut, Moon, Sun, UserRound, Volume2, VolumeX, Wifi, WifiOff } from 'lucide-react';
 import type { AccountDto, PositionDto } from '@spova/shared';
 import { cn } from '@/lib/utils';
 import { Logo, Wordmark } from '@/components/logo';
@@ -29,7 +29,7 @@ const VIEWS: { value: TerminalView; label: StringKey; icon: typeof Compass }[] =
 ];
 
 function TypeTag({ type }: { type: AccountDto['type'] }) {
-  return <span className={cn('rounded px-1.5 py-px text-[10px] font-bold uppercase leading-4 tracking-wide', type === 'live' ? 'bg-[var(--t-blue-deep)] text-white' : 'bg-[#1f6867] text-[#9ff0e5]')}>{type}</span>;
+  return <span className={cn('rounded px-1.5 py-px text-[10px] font-bold uppercase leading-4 tracking-wide', type === 'live' ? 'bg-[var(--t-blue-deep)] text-white' : 'bg-[var(--t-pos-bg)] text-[var(--t-pos-text)]')}>{type}</span>;
 }
 
 /** "DEMO 746181 ▾": the account chip with a dropdown of every account the user owns. */
@@ -77,7 +77,7 @@ function AccountChip({ accounts, account, onSelect }: { accounts: AccountDto[]; 
               {a.id === account.id && <Check className="text-[var(--t-blue)]" strokeWidth={3} />}
             </button>
           ))}
-          <div className="mt-1 border-t border-[#3b434f] pt-1">
+          <div className="mt-1 border-t border-[var(--t-raised-2)] pt-1">
             <Link href="/app/accounts" className="t-menu-item">
               <LayoutDashboard /> Manage accounts
             </Link>
@@ -138,7 +138,7 @@ function ProfitBlock({ account, positions, symbols, compact }: { account: Accoun
         pinned.map((f) => {
           const v = figureValue(account, f.key);
           return (
-            <span key={f.key} className="flex flex-col items-start border-l border-[#3b434f] pl-3 leading-none">
+            <span key={f.key} className="flex flex-col items-start border-l border-[var(--t-raised-2)] pl-3 leading-none">
               <span className="text-[11px] font-medium text-[var(--t-muted)]">{f.label}</span>
               <FigureValue value={v.value} suffix={v.suffix} className="mt-0.5 text-[15px]" />
             </span>
@@ -195,7 +195,7 @@ function BellMenu({ notices }: { notices: NoticeItem[] }) {
       {() => (
         <div className="w-80">
           <ToggleRow label="Sounds" icon={s.sounds ? <Volume2 /> : <VolumeX />} checked={s.sounds} onChange={(v) => settingsStore.patch({ sounds: v })} />
-          <div className="my-1 border-t border-[#3b434f]" />
+          <div className="my-1 border-t border-[var(--t-raised-2)]" />
           <div className="t-menu-label">Recent</div>
           {notices.length === 0 ? (
             <div className="px-2.5 pb-2 pt-1 text-[12px] text-[var(--t-muted)]">Nothing yet. Fills, closes, margin notices and alerts show up here.</div>
@@ -236,7 +236,7 @@ function UserMenu({ email, onLogout }: { email: string | undefined; onLogout: ()
           <Link href="/app" className="t-menu-item" onClick={close}>
             <LayoutDashboard /> Client area
           </Link>
-          <div className="my-1 border-t border-[#3b434f]" />
+          <div className="my-1 border-t border-[var(--t-raised-2)]" />
           <button type="button" className="t-menu-item" onClick={onLogout}>
             <LogOut /> Log out
           </button>
@@ -271,6 +271,7 @@ export function TopBar({
   email: string | undefined;
   onLogout: () => void;
 }) {
+  const { theme } = useSettings();
   const t = useT();
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
@@ -310,9 +311,15 @@ export function TopBar({
       <div className="flex-1" />
 
       <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
-        <span className={cn('t-top-btn hidden sm:inline-flex', connected ? 'text-[#2ad4a6]' : 'text-[var(--t-alert)]')} title={connected ? 'Connected to the price stream' : 'Reconnecting…'} aria-live="polite">
+        <span className={cn('t-top-btn hidden sm:inline-flex', connected ? 'text-[var(--t-ok)]' : 'text-[var(--t-alert)]')} title={connected ? 'Connected to the price stream' : 'Reconnecting…'} aria-live="polite">
           {mounted && connected ? <Wifi /> : <WifiOff />}
         </span>
+        <Link href="/app" className="t-top-btn !w-auto gap-1.5 !px-2.5 text-[12px] font-semibold" title={t('dashboard')}>
+          <LayoutDashboard /> <span className="hidden md:inline">{t('dashboard')}</span>
+        </Link>
+        <button type="button" onClick={() => settingsStore.patch({ theme: theme === 'dark' ? 'light' : 'dark' })} className="t-top-btn" title={theme === 'dark' ? 'Switch to the light theme' : 'Switch to the dark theme'} aria-pressed={theme === 'dark'}>
+          {theme === 'dark' ? <Sun /> : <Moon />}
+        </button>
         <BellMenu notices={notices} />
         <UserMenu email={email} onLogout={onLogout} />
       </div>

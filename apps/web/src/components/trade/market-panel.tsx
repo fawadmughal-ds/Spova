@@ -128,7 +128,7 @@ export function QuickTrade({ spec, account, onPlaced, onAdvanced }: { spec: Symb
             <span className="text-[12px] font-bold tracking-wide">{t('sell')}</span>
             <span className="mt-1 text-[15px] font-semibold">{busy === 'sell' ? <Spinner className="h-4" tone="current" /> : px('sell')}</span>
           </button>
-          <div className="flex w-[108px] shrink-0 flex-col items-stretch rounded-lg bg-[var(--t-bg)] ring-1 ring-inset ring-[#3b434f]">
+          <div className="flex w-[108px] shrink-0 flex-col items-stretch rounded-lg bg-[var(--t-bg)] ring-1 ring-inset ring-[var(--t-raised-2)]">
             <div className="flex flex-col items-center pt-1.5 leading-tight">
               <input
                 value={lots}
@@ -145,11 +145,11 @@ export function QuickTrade({ spec, account, onPlaced, onAdvanced }: { spec: Symb
                 {value ? `≈ ${fmtNum(value.toFixed(0), 0)} ${account?.currency ?? 'USD'}` : lotsErr && lots ? lotsErr : '—'}
               </span>
             </div>
-            <div className="mt-auto flex border-t border-[#3b434f]">
+            <div className="mt-auto flex border-t border-[var(--t-raised-2)]">
               <button type="button" onClick={() => step(-1)} aria-label="Decrease volume" className="flex h-7 flex-1 items-center justify-center text-[var(--t-blue)] transition-colors hover:bg-white/[0.06]">
                 <Minus className="h-3.5 w-3.5" strokeWidth={3} />
               </button>
-              <span className="w-px bg-[#3b434f]" />
+              <span className="w-px bg-[var(--t-raised-2)]" />
               <button type="button" onClick={() => step(1)} aria-label="Increase volume" className="flex h-7 flex-1 items-center justify-center text-[var(--t-blue)] transition-colors hover:bg-white/[0.06]">
                 <Plus className="h-3.5 w-3.5" strokeWidth={3} />
               </button>

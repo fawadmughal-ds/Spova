@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type PointerEvent, type ReactNode } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { ChartCandlestick, ChartNoAxesColumn, ChartPie, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ChevronsUpDown, ClipboardList, Compass, Ellipsis, LogOut, Wallet, X } from 'lucide-react';
+import { ChartCandlestick, ChartNoAxesColumn, ChartPie, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ChevronsUpDown, ClipboardList, Compass, Ellipsis, LayoutDashboard, LogOut, Moon, Sun, Wallet, X } from 'lucide-react';
 import { WS_EVENTS, type AccountDto, type OrderSide, type PlaceOrderResult, type QuoteDto, type WsNotice, type WsTick, type CandleDto } from '@spova/shared';
 import { RequireAuth, useAuth } from '@/lib/auth-context';
 import { get } from '@/lib/api';
@@ -345,7 +345,7 @@ function Terminal() {
       {/* light client-area rail: a sibling of the dark terminal, so it keeps the normal theme */}
       <ClientRail accounts={all} account={account} onSelectAccount={selectAccount} me={me} onLogout={() => void logout()} onOpen={setPanel} className="hidden lg:flex" />
       {panel && <RailOverlay panel={panel} accountId={account?.id} onClose={() => setPanel(null)} />}
-      <div className="terminal flex h-dvh min-w-0 flex-1 flex-col overflow-hidden">
+      <div className="terminal flex h-dvh min-w-0 flex-1 flex-col overflow-hidden" data-theme={settings.theme}>
       <TopBar accounts={all} account={account} onSelectAccount={selectAccount} connected={connected} view={view} onView={setView} positions={openPositions} symbols={symbolMap} notices={notices} email={me?.email} onLogout={() => void logout()} />
       {account?.tradingBlocked && <TradingBlockedBanner />}
       {marginCall && level !== null && <MarginCallStrip level={level} />}
@@ -417,8 +417,29 @@ function Terminal() {
         {/* mobile "More" */}
         {mtab === 'more' && view === 'trade' && (
           <section className="t-panel min-h-0 flex-1 lg:hidden" aria-label="More">
-            <div className="t-bar !pl-4 text-[14px] font-semibold text-white">More</div>
+            <div className="t-bar !pl-4 text-[14px] font-semibold text-white">{t('more')}</div>
             <ul className="p-2">
+              <li>
+                <Link href="/app" className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-white/[0.04]">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-md bg-[var(--t-raised)] text-[var(--t-blue)] [&>svg]:h-4 [&>svg]:w-4">
+                    <LayoutDashboard />
+                  </span>
+                  <span className="leading-tight">
+                    <span className="block text-[14px] font-semibold text-white">{t('dashboard')}</span>
+                    <span className="block text-[12px] text-[var(--t-muted)]">Back to the client area</span>
+                  </span>
+                  <ChevronRight className="ml-auto h-4 w-4 text-[var(--t-muted)]" />
+                </Link>
+              </li>
+              <li>
+                <button type="button" onClick={() => settingsStore.patch({ theme: settings.theme === 'dark' ? 'light' : 'dark' })} className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-white/[0.04]">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-md bg-[var(--t-raised)] text-[var(--t-text-2)] [&>svg]:h-4 [&>svg]:w-4">{settings.theme === 'dark' ? <Sun /> : <Moon />}</span>
+                  <span className="leading-tight">
+                    <span className="block text-[14px] font-semibold text-white">{t('darkMode')}</span>
+                    <span className="block text-[12px] text-[var(--t-muted)]">{settings.theme === 'dark' ? 'On' : 'Off'}</span>
+                  </span>
+                </button>
+              </li>
               {(
                 [
                   [t('analytics'), 'Statistics and equity curve', <ChartPie key="a" />, () => setView('analytics')],
@@ -504,7 +525,7 @@ export default function TradePage() {
     <RequireAuth>
       <Suspense
         fallback={
-          <div className="terminal flex h-dvh items-center justify-center">
+          <div className="terminal flex h-dvh items-center justify-center" data-theme="light">
             <Spinner />
           </div>
         }

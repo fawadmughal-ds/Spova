@@ -913,8 +913,8 @@
    re-pointed under `.terminal`, so the shared primitives (Spinner, Skeleton, Badge, notices)
    render on the dark palette without touching the global theme. */
 /* the terminal is the only dark surface; body:has() lets portalled toasts next to it pick up the same tokens */
-.terminal,
-body:has(.terminal) {
+.terminal[data-theme='dark'],
+body:has(.terminal[data-theme='dark']) {
   color-scheme: dark;
   --color-white: #ffffff;
   --color-paper: #20252c;
@@ -966,6 +966,25 @@ body:has(.terminal) {
   --t-blue: #2ac3ed;
   --t-blue-deep: #1d7694;
   --t-alert: #f5a524;
+  --t-panel: #262c35;
+  --t-menu: #2a313b;
+  --t-line-strong: #454d5a;
+  --t-dim-bg: #4b5868;
+  --t-tile: #1c2128;
+  --t-pos-bg: #1f6867;
+  --t-pos-text: #9ff0e5;
+  --t-neg-bg: #5a2a35;
+  --t-neg-text: #ffb3bf;
+  --t-ok: #2ad4a6;
+  --t-chart-grid: rgba(255, 255, 255, 0.045);
+  --t-chart-cross: rgba(186, 195, 210, 0.4);
+  --t-chart-up: #3fd0c0;
+  --t-chart-down: #f0556d;
+  --t-chart-line: #3fb6d8;
+  --t-vol-up: #1f6867;
+  --t-vol-down: #893c4d;
+  --t-scroll: #3f4753;
+  --t-scroll-hover: #4b5868;
   background: var(--t-bg);
   color: var(--t-text);
   font-family: var(--font-sans);
@@ -973,19 +992,75 @@ body:has(.terminal) {
   font-feature-settings: 'tnum';
   -webkit-font-smoothing: antialiased;
 }
+/* the same terminal on the site theme (white + blue): only the terminal tokens change, the palette stays the light one */
+.terminal[data-theme='light'],
+body:has(.terminal[data-theme='light']) {
+  color-scheme: light;
+  --t-bg: #ffffff;
+  --t-raised: #f3f5f8;
+  --t-raised-2: #e2e7f0;
+  --t-line: #e2e7f0;
+  --t-line-soft: #eceff6;
+  --t-text: #0b1220;
+  --t-text-2: #3f4a62;
+  --t-muted: #6b778f;
+  --t-dim: #a3acbd;
+  --t-buy: #15803d;
+  --t-sell: #dc2626;
+  --t-up: #15803d;
+  --t-down: #dc2626;
+  --t-sl: #9333ea;
+  --t-tp: #4d7c0f;
+  --t-blue: #2563eb;
+  --t-blue-deep: #1d4ed8;
+  --t-alert: #b45309;
+  --t-panel: #ffffff;
+  --t-menu: #ffffff;
+  --t-line-strong: #d3dae7;
+  --t-dim-bg: #cbd3df;
+  --t-tile: #141b2c;
+  --t-pos-bg: #dcfce7;
+  --t-pos-text: #15803d;
+  --t-neg-bg: #fee2e2;
+  --t-neg-text: #b91c1c;
+  --t-ok: #15803d;
+  --t-chart-grid: rgba(15, 23, 42, 0.06);
+  --t-chart-cross: rgba(15, 23, 42, 0.35);
+  --t-chart-up: #15803d;
+  --t-chart-down: #dc2626;
+  --t-chart-line: #2563eb;
+  --t-vol-up: #86efac;
+  --t-vol-down: #fca5a5;
+  --t-scroll: #cbd3df;
+  --t-scroll-hover: #a3acbd;
+  --shadow-lift: 0 24px 60px -28px rgb(15 23 42 / 0.3), 0 0 0 1px rgb(15 23 42 / 0.06);
+  background: var(--t-bg);
+  color: var(--t-text);
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+  -webkit-font-smoothing: antialiased;
+}
+.terminal[data-theme='light'] .t-panel,
+.terminal[data-theme='light'] .t-bar {
+  box-shadow: inset 0 0 0 1px var(--t-line);
+}
+.terminal[data-theme='light'] .t-quick:disabled {
+  opacity: 0.4;
+}
 .terminal ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 .terminal ::-webkit-scrollbar-thumb {
-  background: #3f4753;
+  background: var(--t-scroll);
   border: 2px solid var(--t-bg);
 }
 .terminal ::-webkit-scrollbar-thumb:hover {
-  background: #4b5868;
+  background: var(--t-scroll-hover);
 }
 .terminal ::selection {
-  background: rgb(42 195 237 / 0.35);
+  background: rgb(var(--brand-rgb) / 0.35);
 }
 @layer components {
   .t-panel {
@@ -1029,7 +1104,7 @@ body:has(.terminal) {
   }
   .t-tab[data-on='true'] {
     background: var(--t-bg);
-    color: #f9fafb;
+    color: var(--t-text);
   }
   .t-tab svg {
     width: 15px;
@@ -1050,11 +1125,11 @@ body:has(.terminal) {
   }
   .t-icon-btn:hover:not(:disabled) {
     background: rgb(255 255 255 / 0.08);
-    color: #fff;
+    color: var(--t-text);
   }
   .t-icon-btn[data-on='true'] {
     background: var(--t-bg);
-    color: #fff;
+    color: var(--t-text);
   }
   .t-icon-btn:disabled {
     cursor: not-allowed;
@@ -1073,7 +1148,7 @@ body:has(.terminal) {
     justify-content: center;
     border-radius: 8px;
     background: var(--t-raised);
-    color: #cdd3dd;
+    color: var(--t-text-2);
     transition: background-color 0.15s ease;
   }
   .t-top-btn:hover {
@@ -1094,8 +1169,8 @@ body:has(.terminal) {
     z-index: 60;
     min-width: 11rem;
     border-radius: 8px;
-    border: 1px solid #3b434f;
-    background: #2a313b;
+    border: 1px solid var(--t-raised-2);
+    background: var(--t-menu);
     padding: 4px;
     box-shadow: 0 18px 40px -16px rgb(0 0 0 / 0.7);
     animation: pop-in 0.25s var(--ease-spring) both;
@@ -1104,7 +1179,7 @@ body:has(.terminal) {
     display: inline-flex;
     align-items: center;
     border-radius: 999px;
-    border: 1px solid #3b434f;
+    border: 1px solid var(--t-raised-2);
     padding: 3px 10px;
     font-size: 11px;
     font-weight: 600;
@@ -1112,12 +1187,12 @@ body:has(.terminal) {
     transition: background-color 0.12s ease, color 0.12s ease;
   }
   .t-chip:hover {
-    color: #fff;
+    color: var(--t-text);
   }
   .t-chip[data-on='true'] {
     border-color: var(--t-blue);
-    background: rgb(42 195 237 / 0.12);
-    color: #fff;
+    background: rgb(var(--brand-rgb) / 0.12);
+    color: var(--t-text);
   }
   .t-menu-item {
     display: flex;
@@ -1133,11 +1208,11 @@ body:has(.terminal) {
   }
   .t-menu-item:hover:not(:disabled) {
     background: rgb(255 255 255 / 0.07);
-    color: #fff;
+    color: var(--t-text);
   }
   .t-menu-item[data-on='true'] {
-    color: #fff;
-    background: rgb(42 195 237 / 0.12);
+    color: var(--t-text);
+    background: rgb(var(--brand-rgb) / 0.12);
   }
   .t-menu-item:disabled {
     color: var(--t-dim);
@@ -1152,7 +1227,7 @@ body:has(.terminal) {
   .t-menu-head {
     margin: 0 -4px 4px;
     padding: 6px 14px 8px;
-    border-bottom: 1px solid #3b434f;
+    border-bottom: 1px solid var(--t-raised-2);
     font-size: 12px;
     font-weight: 500;
     color: var(--t-muted);
@@ -1183,7 +1258,7 @@ body:has(.terminal) {
     height: 32px;
     width: 100%;
     border-radius: 6px;
-    border: 1px solid #3b434f;
+    border: 1px solid var(--t-raised-2);
     background: var(--t-bg);
     padding: 0 10px;
     font-size: 13px;
@@ -1236,12 +1311,12 @@ body:has(.terminal) {
     color: #fff;
   }
   .t-btn-ghost {
-    border: 1px solid #3b434f;
+    border: 1px solid var(--t-raised-2);
     color: var(--t-text-2);
   }
   .t-btn-ghost:hover:not(:disabled) {
     background: rgb(255 255 255 / 0.06);
-    color: #fff;
+    color: var(--t-text);
   }
   /* quick-trade: big SELL / BUY blocks in the expanded watchlist row */
   .t-quick {
@@ -1269,7 +1344,7 @@ body:has(.terminal) {
     flex-shrink: 0;
     appearance: none;
     border-radius: 3px;
-    border: 1.5px solid #6b7382;
+    border: 1.5px solid var(--t-line-strong);
     background: transparent;
     display: inline-grid;
     place-content: center;
@@ -1358,14 +1433,14 @@ body:has(.terminal) {
     justify-content: center;
     border-radius: 50%;
     background: var(--t-raised);
-    color: #bac3d2;
+    color: var(--t-text-2);
     transition:
       background-color 0.12s ease,
       color 0.12s ease;
   }
   .t-row-btn:hover:not(:disabled) {
     background: var(--t-raised-2);
-    color: #fff;
+    color: var(--t-text);
   }
   .t-row-btn:disabled {
     opacity: 0.35;
@@ -1430,30 +1505,30 @@ body:has(.terminal) {
 }
 @keyframes t-flash-up {
   0% {
-    color: #a7ece4;
+    color: var(--t-pos-text);
   }
 }
 @keyframes t-flash-down {
   0% {
-    color: #ffb3bf;
+    color: var(--t-neg-text);
   }
 }
 .terminal .t-menu-item[data-on='true'] {
-  background: rgb(42 195 237 / 0.12);
+  background: rgb(var(--brand-rgb) / 0.12);
 }
 
 /* ---- terminal extras: section cards, segmented control, explore rows */
 @layer components {
   .terminal .t-card {
     border-radius: 6px;
-    background: #2a313b;
+    background: var(--t-menu);
     padding: 10px 12px;
   }
   .terminal .t-h2 {
     font-size: 20px;
     font-weight: 600;
     line-height: 1.2;
-    color: #fff;
+    color: var(--t-text);
   }
   .terminal .t-seg {
     display: inline-flex;
@@ -1476,11 +1551,11 @@ body:has(.terminal) {
       color 0.15s ease;
   }
   .terminal .t-seg > button:hover {
-    color: #fff;
+    color: var(--t-text);
   }
   .terminal .t-seg > button[data-on='true'] {
     background: var(--t-bg);
-    color: #fff;
+    color: var(--t-text);
   }
   /* explore cards: symbol / price / daily rows */
   .terminal .t-xrow {

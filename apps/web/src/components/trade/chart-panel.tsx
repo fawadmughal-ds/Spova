@@ -32,11 +32,34 @@ import { livePnl, useFloatingTotal } from './pnl';
 import { Dropdown, SymbolTile, ToggleRow } from './bits';
 import { addAlert, pickTemplate, removeAlert, settingsStore, TEMPLATE_NAMES, templatesStore, useAlerts, useSettings, useTemplates, type ChartType } from './settings';
 
-const UP = '#3fd0c0';
-const DOWN = '#f0556d';
-const VOL_UP = '#1f6867';
-const VOL_DOWN = '#893c4d';
-const BLUE = '#2ac3ed';
+/** Chart colours come from the terminal theme tokens (see globals.css); refreshed when the theme switches. */
+const P = { up: '#3fd0c0', down: '#f0556d', volUp: '#1f6867', volDown: '#893c4d', blue: '#2ac3ed', bg: '#20252c', muted: '#858c99', grid: 'rgba(255,255,255,0.045)', cross: 'rgba(186,195,210,0.4)', dimBg: '#4b5868', text2: '#9ea7b5', sl: '#c251bf', tp: '#80c251', alert: '#f5a524' };
+function readPalette(el: HTMLElement) {
+  const cs = getComputedStyle(el);
+  const v = (name: string, fallback: string) => cs.getPropertyValue(name).trim() || fallback;
+  P.up = v('--t-chart-up', P.up);
+  P.down = v('--t-chart-down', P.down);
+  P.volUp = v('--t-vol-up', P.volUp);
+  P.volDown = v('--t-vol-down', P.volDown);
+  P.blue = v('--t-blue', P.blue);
+  P.bg = v('--t-bg', P.bg);
+  P.muted = v('--t-muted', P.muted);
+  P.grid = v('--t-chart-grid', P.grid);
+  P.cross = v('--t-chart-cross', P.cross);
+  P.dimBg = v('--t-dim-bg', P.dimBg);
+  P.text2 = v('--t-text-2', P.text2);
+  P.sl = v('--t-sl', P.sl);
+  P.tp = v('--t-tp', P.tp);
+  P.alert = v('--t-alert', P.alert);
+}
+const chartTheme = () => ({
+  layout: { background: { type: ColorType.Solid, color: P.bg }, textColor: P.muted },
+  grid: { vertLines: { color: P.grid }, horzLines: { color: P.grid } },
+  crosshair: { vertLine: { color: P.cross, labelBackgroundColor: P.dimBg }, horzLine: { color: P.cross, labelBackgroundColor: P.dimBg } },
+});
+const seriesColors = (type: ChartType) =>
+  type === 'line' ? { color: P.blue } : type === 'area' ? { lineColor: P.blue, topColor: hexAlpha(P.blue, 0.28), bottomColor: hexAlpha(P.blue, 0.02) } : type === 'bars' ? { upColor: P.up, downColor: P.down } : { upColor: P.up, downColor: P.down, wickUpColor: P.up, wickDownColor: P.down };
+const hexAlpha = (hex: string, a: number) => (/^#[0-9a-f]{6}$/i.test(hex) ? `rgba(${parseInt(hex.slice(1, 3), 16)}, ${parseInt(hex.slice(3, 5), 16)}, ${parseInt(hex.slice(5, 7), 16)}, ${a})` : hex);
 const TF_NAME: Record<Timeframe, string> = { m1: 'M1', m5: 'M5', m15: 'M15', h1: 'H1', h4: 'H4', d1: 'D1' };
 const TF_SECS: Record<Timeframe, number> = { m1: 60, m5: 300, m15: 900, h1: 3600, h4: 14400, d1: 86400 };
 
@@ -62,7 +85,7 @@ function OhlcBarsIcon() {
 }
 
 const mainData = (bars: Bar[], type: ChartType) => (type === 'line' || type === 'area' ? bars.map((b) => ({ time: b.time, value: b.close })) : bars.map(({ time, open, high, low, close }) => ({ time, open, high, low, close })));
-const volPoint = (b: Bar) => ({ time: b.time, value: b.volume, color: b.close >= b.open ? VOL_UP : VOL_DOWN });
+const volPoint = (b: Bar) => ({ time: b.time, value: b.volume, color: b.close >= b.open ? P.volUp : P.volDown });
 
 const sma = (bars: Bar[], n: number) => {
   const out: { time: UTCTimestamp; value: number }[] = [];
@@ -126,7 +149,7 @@ function SymbolPnlBadge({ spec, positions }: { spec: SymbolSpec; positions: Posi
   const symbols = useMemo(() => new Map([[spec.id, spec]]), [spec]);
   const total = useFloatingTotal(positions, symbols, (p) => p.symbol === spec.id);
   if (total === null) return null;
-  return <span className={cn('rounded px-1.5 py-0.5 text-[12px] font-semibold', total >= 0 ? 'bg-[#1f6867] text-[#9ff0e5]' : 'bg-[#5a2a35] text-[#ffb3bf]')}>{fmtNum(total)}</span>;
+  return <span className={cn('rounded px-1.5 py-0.5 text-[12px] font-semibold', total >= 0 ? 'bg-[var(--t-pos-bg)] text-[var(--t-pos-text)]' : 'bg-[var(--t-neg-bg)] text-[var(--t-neg-text)]')}>{fmtNum(total)}</span>;
 }
 
 /** Alert menu: one-shot price alerts for this symbol (localStorage). */
@@ -232,7 +255,7 @@ function TemplateMenu() {
               </div>
             );
           })}
-          <div className="mt-1 border-t border-[#3b434f] pt-1">
+          <div className="mt-1 border-t border-[var(--t-raised-2)] pt-1">
             <button type="button" className="t-menu-item" onClick={() => settingsStore.patch({ chartType: 'candles', ma20: false, ma50: false, bollinger: false, showVolume: true, showPositionLines: true })}>
               <Trash2 /> Reset chart settings
             </button>
@@ -257,7 +280,7 @@ export interface ChartPanelProps {
  */
 export function ChartPanel({ spec, positions, className, footer }: ChartPanelProps) {
   const settings = useSettings();
-  const { tf, chartType, ma20, ma50, bollinger: bb, showVolume, showPositionLines } = settings;
+  const { tf, chartType, ma20, ma50, bollinger: bb, showVolume, showPositionLines, theme } = settings;
   const alerts = useAlerts();
   const { socket } = useSocket();
   const section = useRef<HTMLElement>(null);
@@ -287,16 +310,17 @@ export function ChartPanel({ spec, positions, className, footer }: ChartPanelPro
   useEffect(() => {
     const el = host.current;
     if (!el) return;
+    readPalette(el);
     const c = createChart(el, {
       autoSize: false,
       width: el.clientWidth,
       height: el.clientHeight,
-      layout: { background: { type: ColorType.Solid, color: '#20252c' }, textColor: '#858c99', fontFamily: 'var(--ff-body), ui-sans-serif, system-ui, sans-serif', fontSize: 11, attributionLogo: false },
-      grid: { vertLines: { color: 'rgba(255,255,255,0.045)' }, horzLines: { color: 'rgba(255,255,255,0.045)' } },
+      layout: { background: { type: ColorType.Solid, color: P.bg }, textColor: P.muted, fontFamily: 'var(--ff-body), ui-sans-serif, system-ui, sans-serif', fontSize: 11, attributionLogo: false },
+      grid: { vertLines: { color: P.grid }, horzLines: { color: P.grid } },
       crosshair: {
         mode: CrosshairMode.Normal,
-        vertLine: { color: 'rgba(186,195,210,0.4)', labelBackgroundColor: '#4b5868', width: 1, style: LineStyle.Dashed },
-        horzLine: { color: 'rgba(186,195,210,0.4)', labelBackgroundColor: '#4b5868', width: 1, style: LineStyle.Dashed },
+        vertLine: { color: P.cross, labelBackgroundColor: P.dimBg, width: 1, style: LineStyle.Dashed },
+        horzLine: { color: P.cross, labelBackgroundColor: P.dimBg, width: 1, style: LineStyle.Dashed },
       },
       rightPriceScale: { borderColor: 'rgba(255,255,255,0.08)', scaleMargins: { top: 0.08, bottom: 0.22 } },
       timeScale: { borderColor: 'rgba(255,255,255,0.08)', timeVisible: true, secondsVisible: false, rightOffset: 6, barSpacing: 7, rightBarStaysOnScroll: true, shiftVisibleRangeOnNewBar: true, tickMarkFormatter },
@@ -343,12 +367,12 @@ export function ChartPanel({ spec, positions, className, footer }: ChartPanelPro
     drawn.current = [];
     setDrawnCount(0);
     const priceFormat = { type: 'price' as const, precision: spec.digits, minMove: Math.pow(10, -spec.digits) };
-    const common = { priceFormat, priceLineColor: BLUE, priceLineWidth: 1 as const, priceLineStyle: LineStyle.Solid, lastValueVisible: true };
+    const common = { priceFormat, priceLineColor: P.blue, priceLineWidth: 1 as const, priceLineStyle: LineStyle.Solid, lastValueVisible: true };
     let s: MainSeries;
-    if (chartType === 'line') s = c.addSeries(LineSeries, { ...common, color: BLUE, lineWidth: 2, crosshairMarkerVisible: true });
-    else if (chartType === 'area') s = c.addSeries(AreaSeries, { ...common, lineColor: BLUE, lineWidth: 2, topColor: 'rgba(42, 195, 237, 0.28)', bottomColor: 'rgba(42, 195, 237, 0.02)', crosshairMarkerVisible: true });
-    else if (chartType === 'bars') s = c.addSeries(BarSeries, { ...common, upColor: UP, downColor: DOWN, thinBars: false });
-    else s = c.addSeries(CandlestickSeries, { ...common, upColor: UP, downColor: DOWN, borderVisible: false, wickUpColor: UP, wickDownColor: DOWN });
+    if (chartType === 'line') s = c.addSeries(LineSeries, { ...common, color: P.blue, lineWidth: 2, crosshairMarkerVisible: true });
+    else if (chartType === 'area') s = c.addSeries(AreaSeries, { ...common, lineColor: P.blue, lineWidth: 2, topColor: hexAlpha(P.blue, 0.28), bottomColor: hexAlpha(P.blue, 0.02), crosshairMarkerVisible: true });
+    else if (chartType === 'bars') s = c.addSeries(BarSeries, { ...common, upColor: P.up, downColor: P.down, thinBars: false });
+    else s = c.addSeries(CandlestickSeries, { ...common, upColor: P.up, downColor: P.down, borderVisible: false, wickUpColor: P.up, wickDownColor: P.down });
     main.current = s;
     if (bars.current.length) s.setData(mainData(bars.current, chartType) as never);
     setDataVersion((v) => v + 1);
@@ -425,6 +449,17 @@ export function ChartPanel({ spec, positions, className, footer }: ChartPanelPro
     }
   }, [showVolume, ma20, ma50, bb, dataVersion]);
 
+  // ------------------------------------------------------------ theme
+  useEffect(() => {
+    const el = host.current;
+    const c = chart.current;
+    if (!el || !c) return;
+    readPalette(el);
+    c.applyOptions(chartTheme());
+    main.current?.applyOptions(seriesColors(chartType) as never);
+    vol.current?.setData(bars.current.map(volPoint));
+  }, [theme, chartType]);
+
   // ------------------------------------------------------------ live bars
   useEffect(() => {
     const push = (bar: Bar) => {
@@ -485,14 +520,14 @@ export function ChartPanel({ spec, positions, className, footer }: ChartPanelPro
     posLineRefs.current = [];
     if (showPositionLines) {
       mine.forEach((p) => {
-        const line = s.createPriceLine({ price: Number(p.openPrice), color: p.side === 'buy' ? UP : DOWN, lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: `${p.side === 'buy' ? 'Buy' : 'Sell'} ${fmtLots(p.lots)}` });
+        const line = s.createPriceLine({ price: Number(p.openPrice), color: p.side === 'buy' ? P.up : P.down, lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: `${p.side === 'buy' ? 'Buy' : 'Sell'} ${fmtLots(p.lots)}` });
         lines.current.push(line);
         posLineRefs.current.push({ p, line });
-        if (p.sl) lines.current.push(s.createPriceLine({ price: Number(p.sl), color: '#c251bf', lineWidth: 2, lineStyle: LineStyle.Solid, axisLabelVisible: true, title: 'SL' }));
-        if (p.tp) lines.current.push(s.createPriceLine({ price: Number(p.tp), color: '#80c251', lineWidth: 2, lineStyle: LineStyle.Solid, axisLabelVisible: true, title: 'TP' }));
+        if (p.sl) lines.current.push(s.createPriceLine({ price: Number(p.sl), color: P.sl, lineWidth: 2, lineStyle: LineStyle.Solid, axisLabelVisible: true, title: 'SL' }));
+        if (p.tp) lines.current.push(s.createPriceLine({ price: Number(p.tp), color: P.tp, lineWidth: 2, lineStyle: LineStyle.Solid, axisLabelVisible: true, title: 'TP' }));
       });
     }
-    myAlerts.forEach((a) => lines.current.push(s.createPriceLine({ price: Number(a.price), color: '#f5a524', lineWidth: 1, lineStyle: LineStyle.Dotted, axisLabelVisible: true, title: 'Alert' })));
+    myAlerts.forEach((a) => lines.current.push(s.createPriceLine({ price: Number(a.price), color: P.alert, lineWidth: 1, lineStyle: LineStyle.Dotted, axisLabelVisible: true, title: 'Alert' })));
   }, [mine, myAlerts, showPositionLines, dataVersion]);
   // live P/L inside the position label, once a second
   useEffect(() => {
@@ -520,7 +555,7 @@ export function ChartPanel({ spec, positions, className, footer }: ChartPanelPro
       if (price === null) return;
       const t = toolRef.current;
       if (t === 'hline') {
-        const line = s.createPriceLine({ price, color: '#9ea7b5', lineWidth: 1, lineStyle: LineStyle.Solid, axisLabelVisible: true, title: '' });
+        const line = s.createPriceLine({ price, color: P.text2, lineWidth: 1, lineStyle: LineStyle.Solid, axisLabelVisible: true, title: '' });
         drawn.current.push(line);
         setDrawnCount(drawn.current.length);
         setTool('crosshair');
@@ -654,7 +689,7 @@ export function ChartPanel({ spec, positions, className, footer }: ChartPanelPro
             </div>
           )}
         </Dropdown>
-        <span className="mx-1 h-5 w-px bg-[#454d5a]" />
+        <span className="mx-1 h-5 w-px bg-[var(--t-line-strong)]" />
         <ToolbarBtn icon={<ZoomIn />} title="Zoom in" onClick={() => zoom(1)} />
         <ToolbarBtn icon={<ZoomOut />} title="Zoom out" onClick={() => zoom(-1)} />
         <ToolbarBtn icon={full ? <Minimize2 /> : <Maximize />} title={full ? 'Exit full screen' : 'Full screen'} onClick={toggleFull} on={full} />
@@ -663,7 +698,7 @@ export function ChartPanel({ spec, positions, className, footer }: ChartPanelPro
             <span className="live-dot !h-1.5 !w-1.5" /> Live
           </button>
         )}
-        <span className="mx-1 h-5 w-px bg-[#454d5a]" />
+        <span className="mx-1 h-5 w-px bg-[var(--t-line-strong)]" />
         <Dropdown title="Indicators" buttonClassName={cn('t-icon-btn', (ma20 || ma50 || bb) && '!text-[var(--t-blue)]')} button={() => <SquareFunction />}>
           {() => (
             <div className="w-52">
@@ -676,7 +711,7 @@ export function ChartPanel({ spec, positions, className, footer }: ChartPanelPro
         </Dropdown>
         <AlertMenu spec={spec} />
         <ToolbarBtn icon={<Square />} title="Save chart image" onClick={snapshot} />
-        <span className="mx-1 h-5 w-px bg-[#454d5a]" />
+        <span className="mx-1 h-5 w-px bg-[var(--t-line-strong)]" />
         <TemplateMenu />
         <Dropdown title="Layers" align="right" buttonClassName="t-icon-btn" button={() => <Layers />}>
           {() => (
@@ -702,7 +737,7 @@ export function ChartPanel({ spec, positions, className, footer }: ChartPanelPro
             </div>
           )}
         </Dropdown>
-        <span className="mx-1 hidden h-5 w-px bg-[#454d5a] xl:block" />
+        <span className="mx-1 hidden h-5 w-px bg-[var(--t-line-strong)] xl:block" />
         <Clock />
       </div>
 
@@ -743,7 +778,7 @@ export function ChartPanel({ spec, positions, className, footer }: ChartPanelPro
             )}
           </div>
           {measureInfo && (
-            <div className="pointer-events-none absolute left-2 top-8 z-10 rounded-md border border-[var(--t-blue-deep)] bg-[#262c35]/95 px-2.5 py-1.5 text-[12px]">
+            <div className="pointer-events-none absolute left-2 top-8 z-10 rounded-md border border-[var(--t-blue-deep)] bg-[var(--t-panel)]/95 px-2.5 py-1.5 text-[12px]">
               <span className={measureInfo.dp >= 0 ? 't-pnl-up' : 't-pnl-down'}>
                 {fmtSignedNum(measureInfo.dp, d)} ({fmtSignedNum(measureInfo.pct)}%)
               </span>
@@ -753,8 +788,8 @@ export function ChartPanel({ spec, positions, className, footer }: ChartPanelPro
               </span>
             </div>
           )}
-          {tool === 'measure' && !measureInfo && <div className="pointer-events-none absolute left-2 top-8 z-10 rounded-md bg-[#262c35]/95 px-2.5 py-1 text-[11px] text-[var(--t-muted)]">{measure.a ? 'Click the second point' : 'Click the first point'}</div>}
-          {tool === 'hline' && <div className="pointer-events-none absolute left-2 top-8 z-10 rounded-md bg-[#262c35]/95 px-2.5 py-1 text-[11px] text-[var(--t-muted)]">Click where the line should go</div>}
+          {tool === 'measure' && !measureInfo && <div className="pointer-events-none absolute left-2 top-8 z-10 rounded-md bg-[var(--t-panel)]/95 px-2.5 py-1 text-[11px] text-[var(--t-muted)]">{measure.a ? 'Click the second point' : 'Click the first point'}</div>}
+          {tool === 'hline' && <div className="pointer-events-none absolute left-2 top-8 z-10 rounded-md bg-[var(--t-panel)]/95 px-2.5 py-1 text-[11px] text-[var(--t-muted)]">Click where the line should go</div>}
           {state === 'loading' && (
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-[var(--t-bg)]/60">
               <Spinner />
@@ -762,7 +797,7 @@ export function ChartPanel({ spec, positions, className, footer }: ChartPanelPro
           )}
           {state === 'empty' && (
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-              <div className="rounded-lg border border-dashed border-[#3b434f] px-6 py-4 text-center">
+              <div className="rounded-lg border border-dashed border-[var(--t-raised-2)] px-6 py-4 text-center">
                 <div className="text-[13px] font-medium text-[var(--t-text-2)]">Waiting for the first ticks</div>
                 <div className="text-[11px] text-[var(--t-muted)]">No {TF_NAME[tf]} history for {spec.id} yet. Bars build as prices arrive.</div>
               </div>

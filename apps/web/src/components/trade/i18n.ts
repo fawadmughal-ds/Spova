@@ -31,6 +31,8 @@ export const flagEmoji = (cc: string) => (cc.length === 2 ? String.fromCodePoint
 type Entry = Partial<Record<Lang, string>> & { en: string };
 /** Terminal chrome strings. Table-level content (prices, symbols, numbers) is not translated. */
 const STRINGS = {
+  dashboard: { en: 'Dashboard', hi: 'डैशबोर्ड', ur: 'ڈیش بورڈ', ar: 'لوحة التحكم', es: 'Panel', pt: 'Painel', fr: 'Tableau de bord', de: 'Dashboard', ru: 'Панель', zh: '控制台' },
+  darkMode: { en: 'Dark mode', hi: 'डार्क मोड', ur: 'ڈارک موڈ', ar: 'الوضع الداكن', es: 'Modo oscuro', pt: 'Modo escuro', fr: 'Mode sombre', de: 'Dunkelmodus', ru: 'Тёмная тема', zh: '深色模式' },
   deposit: { en: 'Deposit', hi: 'जमा करें', ur: 'ڈپازٹ', ar: 'إيداع', es: 'Depositar', pt: 'Depositar', fr: 'Dépôt', de: 'Einzahlen', ru: 'Пополнить', zh: '入金' },
   accounts: { en: 'Trading accounts', hi: 'ट्रेडिंग खाते', ur: 'ٹریڈنگ اکاؤنٹس', ar: 'حسابات التداول', es: 'Cuentas', pt: 'Contas', fr: 'Comptes', de: 'Konten', ru: 'Счета', zh: '交易账户' },
   payments: { en: 'Payments', hi: 'भुगतान', ur: 'ادائیگیاں', ar: 'المدفوعات', es: 'Pagos', pt: 'Pagamentos', fr: 'Paiements', de: 'Zahlungen', ru: 'Платежи', zh: '付款' },

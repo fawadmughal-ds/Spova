@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useLayoutEffect, useState, type CSSProperties, type ReactNode, type RefObject } from 'react';
-import { Check, ChevronRight, CircleDollarSign, CircleHelp, CircleUser, CreditCard, FileText, IdCard, LogOut, Wallet } from 'lucide-react';
+import { Check, ChevronRight, CircleDollarSign, CircleHelp, CircleUser, CreditCard, FileText, IdCard, LayoutDashboard, LogOut, Wallet } from 'lucide-react';
 import type { AccountDto, MeDto } from '@spova/shared';
 import { cn, initials } from '@/lib/utils';
 import { Logo } from '@/components/logo';
@@ -35,6 +35,11 @@ export function ClientRail({ accounts, account, onSelectAccount, me, onLogout, o
       </div>
 
       <ul className="trail-list">
+        <li>
+          <Link href="/app" className="trail-item">
+            <LayoutDashboard /> {t('dashboard')}
+          </Link>
+        </li>
         <li>
           <button type="button" onClick={() => onOpen('deposit')} className="trail-item trail-item-deposit">
             <CircleDollarSign /> {t('deposit')}

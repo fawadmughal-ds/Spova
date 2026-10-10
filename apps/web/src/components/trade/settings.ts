@@ -46,6 +46,8 @@ export function createLocalStore<T extends object>(key: string, defaults: T, san
 }
 
 export type ChartType = 'candles' | 'bars' | 'line' | 'area';
+/** `light` = the site theme (white + blue); `dark` = the black MatchTrader-style terminal */
+export type TerminalTheme = 'light' | 'dark';
 export interface TerminalSettings {
   /** ask before sending one-click market orders (MatchTrader default: off) */
   confirmOrders: boolean;
@@ -53,6 +55,7 @@ export interface TerminalSettings {
   showVolume: boolean;
   showPositionLines: boolean;
   chartType: ChartType;
+  theme: TerminalTheme;
   tf: Timeframe;
   ma20: boolean;
   ma50: boolean;
@@ -69,6 +72,7 @@ export const DEFAULT_SETTINGS: TerminalSettings = {
   showVolume: true,
   showPositionLines: true,
   chartType: 'candles',
+  theme: 'light',
   tf: 'm15',
   ma20: false,
   ma50: false,
@@ -82,6 +86,7 @@ const CHART_TYPES: ChartType[] = ['candles', 'bars', 'line', 'area'];
 const sanitizeSettings = (v: TerminalSettings): TerminalSettings => ({
   ...v,
   chartType: CHART_TYPES.includes(v.chartType) ? v.chartType : DEFAULT_SETTINGS.chartType,
+  theme: v.theme === 'dark' || v.theme === 'light' ? v.theme : DEFAULT_SETTINGS.theme,
   tf: (TIMEFRAMES as readonly string[]).includes(v.tf) ? v.tf : DEFAULT_SETTINGS.tf,
   bottomHeight: Number.isFinite(v.bottomHeight) && v.bottomHeight > 0 ? v.bottomHeight : DEFAULT_SETTINGS.bottomHeight,
 });

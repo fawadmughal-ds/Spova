@@ -84,7 +84,7 @@ export function Dropdown({ button, buttonClassName, children, align = 'left', cl
 export function SymbolTile({ spec, id, size = 26, className }: { spec?: SymbolSpec | null; id?: string; size?: number; className?: string }) {
   const sym = spec?.id ?? id ?? '?';
   const cls = spec?.assetClass;
-  const style: CSSProperties = cls === 'crypto' || cls === 'stock' ? { background: '#0f1115', color: '#fff', boxShadow: 'inset 0 0 0 1px #3b434f' } : cls === 'metal' ? { background: '#e0a526', color: '#1c2128' } : cls === 'commodity' ? { background: '#1c2128', color: '#fff', boxShadow: 'inset 0 0 0 1px #3b434f' } : { background: '#f3f5f8', color: '#1c2128' };
+  const style: CSSProperties = cls === 'crypto' || cls === 'stock' ? { background: '#0f1115', color: '#fff', boxShadow: 'inset 0 0 0 1px var(--t-raised-2)' } : cls === 'metal' ? { background: '#e0a526', color: '#1c2128' } : cls === 'commodity' ? { background: '#1c2128', color: '#fff', boxShadow: 'inset 0 0 0 1px var(--t-raised-2)' } : { background: '#f3f5f8', color: '#1c2128' };
   return (
     <span className={cn('t-tile', className)} style={{ ...style, width: size, height: size, fontSize: Math.round(size * 0.5) }} aria-hidden>
       {sym.charAt(0)}
@@ -106,7 +106,7 @@ export function ToggleRow({ label, checked, onChange, icon }: { label: ReactNode
         {icon}
         {label}
       </span>
-      <span className={cn('relative inline-flex h-[18px] w-8 shrink-0 items-center rounded-full transition-colors', checked ? 'bg-[var(--t-blue-deep)]' : 'bg-[#4b5868]')}>
+      <span className={cn('relative inline-flex h-[18px] w-8 shrink-0 items-center rounded-full transition-colors', checked ? 'bg-[var(--t-blue-deep)]' : 'bg-[var(--t-dim-bg)]')}>
         <span className={cn('absolute h-3.5 w-3.5 rounded-full bg-white transition-transform', checked ? 'translate-x-[16px]' : 'translate-x-[2px]')} />
       </span>
     </button>
@@ -122,7 +122,7 @@ export function Modal({ onClose, children, className, label }: { onClose: () => 
   }, [onClose]);
   return (
     <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/55 p-0 sm:items-center sm:p-4" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div role="dialog" aria-modal aria-label={label} className={cn('animate-pop-in max-h-[92dvh] w-full overflow-hidden rounded-t-xl border border-[#3b434f] bg-[#262c35] shadow-lift sm:max-w-md sm:rounded-xl', className)}>
+      <div role="dialog" aria-modal aria-label={label} className={cn('animate-pop-in max-h-[92dvh] w-full overflow-hidden rounded-t-xl border border-[var(--t-raised-2)] bg-[var(--t-panel)] shadow-lift sm:max-w-md sm:rounded-xl', className)}>
         {children}
       </div>
     </div>
@@ -157,10 +157,10 @@ export function SplitBar({ sellPct, buyPct, className, labels = true }: { sellPc
 export function InfoTip({ text, className }: { text: string; className?: string }) {
   return (
     <span className={cn('group/tip relative inline-flex', className)}>
-      <button type="button" aria-label={text} className="inline-flex h-[18px] w-[18px] items-center justify-center rounded-full bg-[#4b5868] text-[11px] font-bold leading-none text-white">
+      <button type="button" aria-label={text} className="inline-flex h-[18px] w-[18px] items-center justify-center rounded-full bg-[var(--t-dim-bg)] text-[11px] font-bold leading-none text-white">
         i
       </button>
-      <span role="tooltip" className="pointer-events-none absolute left-1/2 top-[calc(100%+8px)] z-30 w-64 -translate-x-1/2 rounded-md border border-[#3b434f] bg-[#2a313b] px-3 py-2 text-left text-[11.5px] font-normal leading-relaxed text-[var(--t-text-2)] opacity-0 shadow-lift transition-opacity group-hover/tip:opacity-100 group-focus-within/tip:opacity-100">
+      <span role="tooltip" className="pointer-events-none absolute left-1/2 top-[calc(100%+8px)] z-30 w-64 -translate-x-1/2 rounded-md border border-[var(--t-raised-2)] bg-[var(--t-menu)] px-3 py-2 text-left text-[11.5px] font-normal leading-relaxed text-[var(--t-text-2)] opacity-0 shadow-lift transition-opacity group-hover/tip:opacity-100 group-focus-within/tip:opacity-100">
         {text}
       </span>
     </span>

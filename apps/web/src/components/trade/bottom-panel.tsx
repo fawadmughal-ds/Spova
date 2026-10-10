@@ -490,7 +490,7 @@ function ClosedTable({ history, symbols }: { history: PositionDto[] | null; symb
                 <Pnl v={p.realizedPnl} className="text-[14px]" />
               </td>
               <td>
-                <span className={cn('rounded px-1.5 py-0.5 text-[11px] font-medium', p.closeReason === 'tp' ? 'bg-[#1f6867] text-[#9ff0e5]' : p.closeReason === 'sl' || p.closeReason === 'stopout' ? 'bg-[#5a2a35] text-[#ffb3bf]' : 'bg-[var(--t-raised)] text-[var(--t-text-2)]')} title={p.closeReason ? CLOSE_REASON_LABEL[p.closeReason] : undefined}>
+                <span className={cn('rounded px-1.5 py-0.5 text-[11px] font-medium', p.closeReason === 'tp' ? 'bg-[var(--t-pos-bg)] text-[var(--t-pos-text)]' : p.closeReason === 'sl' || p.closeReason === 'stopout' ? 'bg-[var(--t-neg-bg)] text-[var(--t-neg-text)]' : 'bg-[var(--t-raised)] text-[var(--t-text-2)]')} title={p.closeReason ? CLOSE_REASON_LABEL[p.closeReason] : undefined}>
                   {p.closeReason ? CLOSE_REASON_LABEL[p.closeReason] ?? p.closeReason : '—'}
                 </span>
               </td>

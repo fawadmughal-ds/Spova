@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import { Spinner } from '@/components/ui';
 import { fmtNum, type SymbolSpec } from './format';
 import { EmptyState, InfoTip } from './bits';
+import { useSettings } from './settings';
 
 type Period = '3m' | '1y' | 'all';
 const PERIODS: { value: Period; label: string; days: number | null }[] = [
@@ -18,7 +19,7 @@ const PERIODS: { value: Period; label: string; days: number | null }[] = [
 ];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const DAY_MS = 86_400_000;
-const LINE = '#3fb6d8';
+const cssVar = (el: HTMLElement, name: string, fallback: string) => getComputedStyle(el).getPropertyValue(name).trim() || fallback;
 
 interface Closed {
   p: PositionDto;
@@ -60,6 +61,7 @@ const toneOf = (v: number | null) => (v === null ? 'text-white' : v > 0 ? 't-pnl
 
 /** Cumulative ROI % after every closed trade, teal line on a % axis with the 0% baseline. */
 function RoiChart({ trades, base }: { trades: Closed[]; base: number | null }) {
+  const { theme } = useSettings();
   const host = useRef<HTMLDivElement>(null);
   const points = useMemo(() => {
     if (base === null || trades.length === 0) return [];
@@ -92,9 +94,9 @@ function RoiChart({ trades, base }: { trades: Closed[]; base: number | null }) {
       autoSize: false,
       width: el.clientWidth,
       height: el.clientHeight,
-      layout: { background: { type: ColorType.Solid, color: '#20252c' }, textColor: '#9ea7b5', fontFamily: 'var(--ff-body), ui-sans-serif, system-ui, sans-serif', fontSize: 12, attributionLogo: false },
-      grid: { vertLines: { visible: false }, horzLines: { color: 'rgba(255,255,255,0.08)' } },
-      crosshair: { mode: CrosshairMode.Magnet, vertLine: { color: 'rgba(186,195,210,0.35)', labelBackgroundColor: '#4b5868', style: LineStyle.Dashed }, horzLine: { color: 'rgba(186,195,210,0.35)', labelBackgroundColor: '#4b5868', style: LineStyle.Dashed } },
+      layout: { background: { type: ColorType.Solid, color: cssVar(el, '--t-bg', '#20252c') }, textColor: cssVar(el, '--t-text-2', '#9ea7b5'), fontFamily: 'var(--ff-body), ui-sans-serif, system-ui, sans-serif', fontSize: 12, attributionLogo: false },
+      grid: { vertLines: { visible: false }, horzLines: { color: cssVar(el, '--t-chart-grid', 'rgba(255,255,255,0.08)') } },
+      crosshair: { mode: CrosshairMode.Magnet, vertLine: { color: cssVar(el, '--t-chart-cross', 'rgba(186,195,210,0.35)'), labelBackgroundColor: cssVar(el, '--t-dim-bg', '#4b5868'), style: LineStyle.Dashed }, horzLine: { color: cssVar(el, '--t-chart-cross', 'rgba(186,195,210,0.35)'), labelBackgroundColor: cssVar(el, '--t-dim-bg', '#4b5868'), style: LineStyle.Dashed } },
       leftPriceScale: { visible: true, borderVisible: false, scaleMargins: { top: 0.12, bottom: 0.12 } },
       rightPriceScale: { visible: false },
       timeScale: { borderVisible: false, timeVisible: false, fixLeftEdge: true, fixRightEdge: true, tickMarkFormatter: (t: number) => fmtDate(t) },
@@ -102,7 +104,7 @@ function RoiChart({ trades, base }: { trades: Closed[]; base: number | null }) {
       handleScale: false,
       localization: { locale: 'en-GB', timeFormatter: (t: number) => fmtDate(t) },
     });
-    const s = c.addSeries(LineSeries, { color: LINE, lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerRadius: 4, priceFormat: { type: 'custom', formatter: (v: number) => (Math.abs(v) < 0.005 ? '0%' : `${v.toFixed(2)}%`), minMove: 0.01 } });
+    const s = c.addSeries(LineSeries, { color: cssVar(el, '--t-chart-line', '#3fb6d8'), lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerRadius: 4, priceFormat: { type: 'custom', formatter: (v: number) => (Math.abs(v) < 0.005 ? '0%' : `${v.toFixed(2)}%`), minMove: 0.01 } });
     s.setData(points);
     s.createPriceLine({ price: 0, color: 'rgba(255,255,255,0.35)', lineWidth: 1, lineStyle: LineStyle.Solid, axisLabelVisible: false, title: '' });
     c.timeScale().fitContent();
@@ -117,7 +119,7 @@ function RoiChart({ trades, base }: { trades: Closed[]; base: number | null }) {
       ro.disconnect();
       c.remove();
     };
-  }, [points]);
+  }, [points, theme]);
   if (base === null) return <EmptyState title="No starting balance">ROI needs a funded account: deposit or credit first.</EmptyState>;
   if (points.length === 0) return <EmptyState title="No closed trades in this period" />;
   return <div ref={host} className="absolute inset-0" />;

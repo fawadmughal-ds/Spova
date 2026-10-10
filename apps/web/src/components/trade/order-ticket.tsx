@@ -30,8 +30,8 @@ function Stepper({ value, onChange, onStep, placeholder, label, hint, error, dig
         </label>
         {hint && <span className="text-[10px] text-[var(--t-muted)]">{hint}</span>}
       </div>
-      <div className={cn('flex h-9 items-stretch overflow-hidden rounded-lg border bg-[var(--t-bg)] transition-colors focus-within:border-[var(--t-blue)]', error ? 'border-[var(--t-sell)]/60' : 'border-[#3b434f]')}>
-        <button type="button" tabIndex={-1} onClick={() => onStep(-1)} disabled={disabled} aria-label={`Decrease ${typeof label === 'string' ? label : ''}`} className={cn(btn, 'border-r border-[#3b434f]')}>
+      <div className={cn('flex h-9 items-stretch overflow-hidden rounded-lg border bg-[var(--t-bg)] transition-colors focus-within:border-[var(--t-blue)]', error ? 'border-[var(--t-sell)]/60' : 'border-[var(--t-raised-2)]')}>
+        <button type="button" tabIndex={-1} onClick={() => onStep(-1)} disabled={disabled} aria-label={`Decrease ${typeof label === 'string' ? label : ''}`} className={cn(btn, 'border-r border-[var(--t-raised-2)]')}>
           <Minus className="h-3.5 w-3.5" />
         </button>
         <input
@@ -50,7 +50,7 @@ function Stepper({ value, onChange, onStep, placeholder, label, hint, error, dig
             <X className="h-3 w-3" />
           </button>
         )}
-        <button type="button" tabIndex={-1} onClick={() => onStep(1)} disabled={disabled} aria-label={`Increase ${typeof label === 'string' ? label : ''}`} className={cn(btn, 'border-l border-[#3b434f]')}>
+        <button type="button" tabIndex={-1} onClick={() => onStep(1)} disabled={disabled} aria-label={`Increase ${typeof label === 'string' ? label : ''}`} className={cn(btn, 'border-l border-[var(--t-raised-2)]')}>
           <Plus className="h-3.5 w-3.5" />
         </button>
       </div>
@@ -218,7 +218,7 @@ export function OrderTicket({ spec, account, onPlaced, onBeforePlace, className,
         aria-pressed={on}
         className={cn(
           'flex h-[58px] flex-col items-center justify-center rounded-lg transition-all duration-200',
-          on ? (up ? 'bg-[var(--t-buy)] text-white' : 'bg-[var(--t-sell)] text-white') : 'bg-[var(--t-bg)] text-[var(--t-text-2)] ring-1 ring-inset ring-[#3b434f] hover:bg-white/[0.04]',
+          on ? (up ? 'bg-[var(--t-buy)] text-white' : 'bg-[var(--t-sell)] text-white') : 'bg-[var(--t-bg)] text-[var(--t-text-2)] ring-1 ring-inset ring-[var(--t-raised-2)] hover:bg-white/[0.04]',
         )}
       >
         <span className="text-[12px] font-bold tracking-wide uppercase">{label}</span>
