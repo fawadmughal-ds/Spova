@@ -12,6 +12,7 @@ import { MarketModule } from './modules/market/market.module';
 import { NewsletterModule } from './modules/newsletter/newsletter.module';
 import { QuotesModule } from './modules/quotes/quotes.module';
 import { KycModule } from './modules/kyc/kyc.module';
+import { ControlModule } from './modules/control/control.module';
 import { PaymentsModule } from './modules/payments/payments.module';
 import { SupportModule } from './modules/support/support.module';
 import { TradingModule } from './modules/trading/trading.module';
@@ -41,6 +42,7 @@ import { env } from './config/env';
     NewsletterModule,
     KycModule,
     PaymentsModule,
+    ControlModule,
     SupportModule,
     TradingModule,
   ],

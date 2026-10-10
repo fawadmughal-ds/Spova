@@ -15,6 +15,7 @@ import { Skeleton, Spinner } from '@/components/ui';
 import { TopBar, type NoticeItem, type TerminalView } from '@/components/trade/top-bar';
 import { ClientRail, railLinks, type RailPanel } from '@/components/trade/client-rail';
 import { DepositBanner, MobileHeader, MobileStats } from '@/components/trade/mobile-home';
+import { PlatformStrip } from '@/components/platform-notice';
 import { BellMenu } from '@/components/trade/top-bar';
 import { DocumentsPanel } from '@/components/portal/documents-panel';
 import { PaymentsView } from '@/components/portal/payments-view';
@@ -370,6 +371,7 @@ function Terminal() {
         <TopBar accounts={all} account={account} onSelectAccount={selectAccount} connected={connected} view={view} onView={setView} positions={openPositions} symbols={symbolMap} notices={notices} email={me?.email} onLogout={() => void logout()} />
       </div>
       <MobileHeader className="lg:hidden" accounts={all} account={account} onSelectAccount={selectAccount} onDeposit={() => setPanel('deposit')} onMenu={() => setMtab('more')} bell={<BellMenu notices={notices} />} />
+      <PlatformStrip />
       {account?.tradingBlocked && <TradingBlockedBanner />}
       {marginCall && level !== null && <MarginCallStrip level={level} />}
       {stopOut && <StopOutCard notice={stopOut} onDismiss={() => setStopOut(null)} />}

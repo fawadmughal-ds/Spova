@@ -10,6 +10,8 @@ import type {
 import { WS_EVENTS } from '@spova/shared';
 import { PrismaService } from '../../infra/prisma.service';
 import { MailService } from '../../infra/mail.service';
+import { RedisService } from '../../infra/redis.service';
+import { SettingsService } from '../../infra/settings.service';
 import { LedgerService } from '../ledger/ledger.service';
 import { AccountsService } from '../accounts/accounts.service';
 import { AuthService } from '../auth/auth.service';
@@ -35,13 +37,17 @@ export class AdminService {
     private readonly auth: AuthService,
     private readonly ws: RealtimeGateway,
     private readonly mail: MailService,
+    private readonly redis: RedisService,
+    private readonly settings: SettingsService,
   ) {}
 
   // ---------------------------------------------------------------- dashboard
 
   async dashboard(): Promise<AdminDashboardDto> {
     const weekAgo = new Date(Date.now() - 7 * 86400 * 1000);
-    const [clients, newClients7d, pendingKyc, pendingPayments, openPositions, demoSum, liveSum] = await Promise.all([
+    const dayAgo = new Date(Date.now() - 86400 * 1000);
+    const todayUtc = new Date(new Date().toISOString().slice(0, 10));
+    const [clients, newClients7d, pendingKyc, pendingPayments, openPositions, demoSum, liveSum, openTickets, depToday, wdToday, pendDep, pendWd, active, exposureRows, feedStatus, platform] = await Promise.all([
       this.prisma.user.count({ where: { role: 'client' } }),
       this.prisma.user.count({ where: { role: 'client', createdAt: { gte: weekAgo } } }),
       this.prisma.kycDocument.count({ where: { status: 'pending' } }),
@@ -49,7 +55,28 @@ export class AdminService {
       this.prisma.position.count({ where: { status: 'open' } }),
       this.prisma.tradingAccount.aggregate({ _sum: { balance: true }, where: { type: 'demo' } }),
       this.prisma.tradingAccount.aggregate({ _sum: { balance: true }, where: { type: 'live' } }),
+      this.prisma.ticket.count({ where: { status: 'open' } }),
+      this.prisma.paymentRequest.aggregate({ _sum: { amount: true }, where: { kind: 'deposit', status: 'approved', decidedAt: { gte: todayUtc } } }),
+      this.prisma.paymentRequest.aggregate({ _sum: { amount: true }, where: { kind: 'withdraw', status: 'approved', decidedAt: { gte: todayUtc } } }),
+      this.prisma.paymentRequest.aggregate({ _sum: { amount: true }, where: { kind: 'deposit', status: 'pending' } }),
+      this.prisma.paymentRequest.aggregate({ _sum: { amount: true }, where: { kind: 'withdraw', status: 'pending' } }),
+      this.prisma.session.findMany({ where: { createdAt: { gte: dayAgo }, revokedAt: null, user: { role: 'client' } }, distinct: ['userId'], select: { userId: true } }),
+      this.prisma.position.groupBy({ by: ['symbolId', 'side'], where: { status: 'open' }, _sum: { lots: true }, _count: { _all: true } }),
+      this.redis.client.mget('feed:binance:status', 'feed:finnhub:status', 'feed:oanda:status', 'feed:synthetic:status'),
+      this.settings.get<{ tradingHalt?: { enabled?: boolean } }>('platform', {}),
     ]);
+    const bySymbol = new Map<string, { buy: number; sell: number; positions: number }>();
+    for (const r of exposureRows) {
+      const e = bySymbol.get(r.symbolId) ?? { buy: 0, sell: 0, positions: 0 };
+      e[r.side] += Number(r._sum.lots ?? 0);
+      e.positions += r._count._all;
+      bySymbol.set(r.symbolId, e);
+    }
+    const exposure = [...bySymbol.entries()]
+      .map(([symbol, e]) => ({ symbol, buyLots: e.buy.toFixed(2), sellLots: e.sell.toFixed(2), netLots: (e.buy - e.sell).toFixed(2), positions: e.positions }))
+      .sort((a, b) => Math.abs(Number(b.netLots)) - Math.abs(Number(a.netLots)))
+      .slice(0, 8);
+    const feeds = (['binance', 'finnhub', 'oanda', 'synthetic'] as const).map((source, i) => ({ source, status: (feedStatus[i] === 'up' || feedStatus[i] === 'down' ? feedStatus[i] : 'unknown') as 'up' | 'down' | 'unknown' }));
     return {
       clients,
       newClients7d,
@@ -58,6 +85,15 @@ export class AdminService {
       openPositions,
       demoBalanceTotal: money(demoSum._sum.balance),
       liveBalanceTotal: money(liveSum._sum.balance),
+      openTickets,
+      depositsToday: money(depToday._sum.amount),
+      withdrawalsToday: money(wdToday._sum.amount),
+      pendingDepositsTotal: money(pendDep._sum.amount),
+      pendingWithdrawalsTotal: money(pendWd._sum.amount),
+      activeClients24h: active.length,
+      exposure,
+      feeds,
+      tradingHalt: !!platform.tradingHalt?.enabled,
     };
   }
 

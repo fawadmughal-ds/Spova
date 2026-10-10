@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { CloseReason, Order, Position, Prisma, TradingAccount } from '@prisma/client';
 import {
+  DEFAULT_PLATFORM_SETTINGS,
+  type PlatformSettings,
   WS_EVENTS,
   accountMath,
   closePriceFor,
@@ -28,6 +30,7 @@ import {
 import type { Decimal } from 'decimal.js';
 import { PrismaService } from '../../infra/prisma.service';
 import { RedisService } from '../../infra/redis.service';
+import { SettingsService } from '../../infra/settings.service';
 import { MailService } from '../../infra/mail.service';
 import { LedgerService } from '../ledger/ledger.service';
 import { AccountsService } from '../accounts/accounts.service';
@@ -62,6 +65,7 @@ export class TradingService {
     private readonly accounts: AccountsService,
     private readonly quotes: QuotesService,
     private readonly ws: RealtimeGateway,
+    private readonly settings: SettingsService,
   ) {}
 
   // ---------------------------------------------------------------- helpers
@@ -138,6 +142,8 @@ export class TradingService {
   /** Market orders fill now; limit/stop are stored pending after a margin pre-check (not reserved). */
   async placeOrder(accountId: string, input: PlaceOrderInput, actor: Actor): Promise<PlaceOrderResult> {
     if (!(await this.redis.allow(`orders:${accountId}`, 10, 1))) throw ApiError.tooMany('Too many orders. Slow down.');
+    const platform = await this.settings.getCached<PlatformSettings>('platform', DEFAULT_PLATFORM_SETTINGS);
+    if (platform.tradingHalt.enabled) throw ApiError.forbidden('trading_halted', platform.tradingHalt.message || 'Trading is paused');
     const acc = await this.guardedAccount(accountId, actor);
     const spec = await this.tradableSpec(input.symbol);
     const lotsErr = validateLots(input.lots, spec.minLot.toString(), spec.maxLot.toString(), spec.lotStep.toString());

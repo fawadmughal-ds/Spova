@@ -13,6 +13,7 @@ import { quoteStore, useBookVersion, useQuote } from './quote-store';
 import { EmptyState, SplitBar, SymbolTile } from './bits';
 import { useSentiment } from './explore-view';
 import { useT } from './i18n';
+import { usePlatform } from '@/lib/platform';
 import { CalendarTab } from './calendar-tab';
 import { favouritesStore, settingsStore, toggleFavourite, useFavourites, useSettings } from './settings';
 import { nextOpen, type SessionRow } from './sessions';
@@ -49,6 +50,7 @@ function Change({ v, className }: { v: number | null; className?: string }) {
 export function QuickTrade({ spec, account, onPlaced, onAdvanced }: { spec: SymbolSpec; account: AccountDto | undefined; onPlaced: (r: PlaceOrderResult) => void; onAdvanced: (side: OrderSide, lots: string) => void }) {
   const toast = useToast();
   const t = useT();
+  const platform = usePlatform();
   const q = useQuote(spec.id);
   useBookVersion();
   const settings = useSettings();
@@ -76,7 +78,7 @@ export function QuickTrade({ spec, account, onPlaced, onAdvanced }: { spec: Symb
   const ccy = quoteCurrency(spec.id, spec.assetClass);
   const value = hasQuote && !lotsErr ? toUsd(notional(lots, spec.contractSize, (Number(q.bid) + Number(q.ask)) / 2), ccy, quoteStore.book()) : null;
   const margin = hasQuote && !lotsErr && account ? requiredMarginUsd({ lots, contractSize: spec.contractSize, price: q.ask, leverage: effectiveLeverage(account.leverage, spec.leverageMax), quoteCcy: ccy, book: quoteStore.book() }) : null;
-  const blocker = !account ? 'No account' : account.tradingBlocked ? 'Trading blocked' : account.status !== 'enabled' ? `Account ${account.status}` : closed ? 'Market closed' : !hasQuote ? 'No live price' : lotsErr ?? (margin && margin.gt(account.freeMargin) ? 'Not enough free margin' : null);
+  const blocker = platform.tradingHalt.enabled ? 'Trading paused' : !account ? 'No account' : account.tradingBlocked ? 'Trading blocked' : account.status !== 'enabled' ? `Account ${account.status}` : closed ? 'Market closed' : !hasQuote ? 'No live price' : lotsErr ?? (margin && margin.gt(account.freeMargin) ? 'Not enough free margin' : null);
 
   const send = async (side: OrderSide, clientRef: string) => {
     if (!account) return;

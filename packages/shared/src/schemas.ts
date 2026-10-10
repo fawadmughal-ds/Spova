@@ -237,6 +237,78 @@ export const DEFAULT_DEPOSIT_CHANNELS: DepositChannels = {
   cashier: { enabled: true, footer: 'Company Information: [COMPANY LEGAL NAME] with brand name [BRAND] is authorised and regulated by [REGULATOR] with licence number [LICENCE]. Trading CFDs involves significant risk of loss and is not suitable for all investors.' },
 };
 
+// ---------- back-office controls
+const decimalStr = (max: number) => z.string().trim().regex(/^\d+(\.\d{1,6})?$/, 'Decimal number').refine((v) => Number(v) <= max, `At most ${max}`);
+export const adminSymbolPatchSchema = z
+  .object({
+    name: z.string().trim().min(2).max(80),
+    enabled: z.boolean(),
+    featured: z.boolean(),
+    sortOrder: z.number().int().min(0).max(10000),
+    spreadMarkup: decimalStr(1000),
+    swapLong: z.string().trim().regex(/^-?\d+(\.\d{1,6})?$/, 'Decimal number'),
+    swapShort: z.string().trim().regex(/^-?\d+(\.\d{1,6})?$/, 'Decimal number'),
+    leverageMax: z.number().int().min(1).max(2000),
+    minLot: decimalStr(1000),
+    maxLot: decimalStr(100000),
+    lotStep: decimalStr(100),
+  })
+  .partial()
+  .refine((v) => Object.keys(v).length > 0, 'Nothing to change');
+export type AdminSymbolPatch = z.infer<typeof adminSymbolPatchSchema>;
+
+export const riskConfigSchema = z
+  .object({
+    marginCallPct: z.number().min(50).max(1000),
+    stopOutPct: z.number().min(0).max(100),
+    defaultLeverage: z.number().int().min(1).max(2000),
+    maxLeverage: z.number().int().min(1).max(2000),
+    minDeposit: moneySchema,
+    spreadDiscountPct: z.number().min(0).max(100),
+  })
+  .refine((v) => v.stopOutPct < v.marginCallPct, { path: ['stopOutPct'], message: 'Stop-out must be below the margin call level' })
+  .refine((v) => v.defaultLeverage <= v.maxLeverage, { path: ['defaultLeverage'], message: 'Default leverage cannot exceed the maximum' });
+export type RiskConfigInput = z.infer<typeof riskConfigSchema>;
+
+export const platformSettingsSchema = z.object({
+  /** stop all new orders (open positions stay, closes still work) */
+  tradingHalt: z.object({ enabled: z.boolean(), message: z.string().trim().max(300).default('') }),
+  /** banner shown in the terminal and the client area */
+  announcement: z.object({ enabled: z.boolean(), text: z.string().trim().max(300).default(''), level: z.enum(['info', 'warning', 'danger', 'success']).default('info') }),
+  registrationOpen: z.boolean(),
+  liveAccountsOpen: z.boolean(),
+});
+export type PlatformSettings = z.infer<typeof platformSettingsSchema>;
+export const DEFAULT_PLATFORM_SETTINGS: PlatformSettings = {
+  tradingHalt: { enabled: false, message: 'Trading is paused for maintenance. Open positions are safe; new orders resume shortly.' },
+  announcement: { enabled: false, text: '', level: 'info' },
+  registrationOpen: true,
+  liveAccountsOpen: true,
+};
+
+export const staffCreateSchema = z.object({
+  email: emailSchema,
+  firstName: z.string().trim().min(1).max(60),
+  lastName: z.string().trim().min(1).max(60),
+  role: z.enum(['admin', 'superadmin']),
+  password: passwordSchema,
+});
+export type StaffCreateInput = z.infer<typeof staffCreateSchema>;
+export const staffPatchSchema = z
+  .object({ role: z.enum(['admin', 'superadmin']), status: z.enum(['active', 'frozen']) })
+  .partial()
+  .refine((v) => Object.keys(v).length > 0, 'Nothing to change');
+export type StaffPatchInput = z.infer<typeof staffPatchSchema>;
+
+export const broadcastSchema = z.object({
+  title: z.string().trim().min(3).max(120),
+  body: z.string().trim().min(5).max(2000),
+  level: z.enum(['info', 'warning', 'danger', 'success']).default('info'),
+  audience: z.enum(['all', 'live', 'demo']).default('all'),
+  email: z.boolean().default(false),
+});
+export type BroadcastInput = z.infer<typeof broadcastSchema>;
+
 export const paymentDecisionSchema = z
   .object({ status: z.enum(['approved', 'declined']), note: z.string().trim().max(300).optional() })
   .refine((v) => v.status === 'approved' || (v.note && v.note.length >= 3), { path: ['note'], message: 'Give the client a reason for the decline' });

@@ -131,6 +131,11 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     void this.publish(`user:${userId}`, WS_EVENTS.NOTICE, notice);
   }
 
+  /** Every connected socket (clients and staff). */
+  broadcast(event: string, payload: unknown) {
+    this.server?.emit(event, payload);
+  }
+
   admin(event: string, payload: unknown) {
     void this.publish('admin', event, payload);
   }

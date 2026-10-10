@@ -1,6 +1,6 @@
 'use client';
 
-import { BookOpenCheck, CandlestickChart, FileCheck2, Landmark, LayoutDashboard, MessagesSquare, Users } from 'lucide-react';
+import { BookOpenCheck, CandlestickChart, FileCheck2, Landmark, LayoutDashboard, ListChecks, MessagesSquare, ShieldHalf, SlidersHorizontal, UserCog, Users } from 'lucide-react';
 import { RequireAuth } from '@/lib/auth-context';
 import { AppShell, type NavItem } from '@/components/app-shell';
 
@@ -11,6 +11,10 @@ const NAV: NavItem[] = [
   { href: '/admin/payments', label: 'Payments', icon: Landmark },
   { href: '/admin/tickets', label: 'Tickets', icon: MessagesSquare },
   { href: '/admin/trades', label: 'Trades', icon: CandlestickChart },
+  { href: '/admin/instruments', label: 'Instruments', icon: ListChecks },
+  { href: '/admin/risk', label: 'Risk & limits', icon: ShieldHalf },
+  { href: '/admin/platform', label: 'Platform', icon: SlidersHorizontal },
+  { href: '/admin/staff', label: 'Staff', icon: UserCog },
   { href: '/admin/audit', label: 'Audit log', icon: BookOpenCheck },
 ];
 

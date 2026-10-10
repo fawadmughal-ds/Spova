@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowRight } from 'lucide-react';
 import { registerSchema, type MeDto, type RegisterInput } from '@spova/shared';
+import { usePlatform } from '@/lib/platform';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useForm } from '@/lib/use-form';
@@ -24,6 +25,7 @@ function Step({ n, children }: { n: string; children: string }) {
 }
 
 export default function RegisterPage() {
+  const platform = usePlatform();
   const router = useRouter();
   const { setMe } = useAuth();
   const [show, setShow] = useState(false);
@@ -41,6 +43,11 @@ export default function RegisterPage() {
   return (
     <>
       <AuthHeading eyebrow="Two minutes" title="Open *your account*" sub="Free demo with $10,000 virtual funds. Takes two minutes." />
+      {!platform.registrationOpen && (
+        <div role="alert" className="mt-6 rounded-xl border border-gold/30 bg-gold/[0.08] px-4 py-3 text-sm text-ink-100">
+          <strong>New registrations are paused.</strong> Please try again later or contact support. Existing clients can still sign in.
+        </div>
+      )}
       <form onSubmit={onSubmit} className="mt-8" noValidate>
         <Reveal variant="stagger" delay={250} step={55} className="space-y-4">
           {f.serverError && <Alert tone="danger">{f.serverError}</Alert>}

@@ -252,6 +252,70 @@ describe('phase 2: kyc -> live account -> payments -> tickets', () => {
     assert.ok([400, 503].includes(hook.status), `webhook without signature must be rejected, got ${hook.status}`);
   });
 
+  it('back-office controls: instruments, risk tiers, platform switches, staff, broadcast', async () => {
+    // instruments
+    const syms = await admin.json('GET', '/admin/symbols');
+    assert.equal(syms.status, 200);
+    const eur = syms.data.find((x: any) => x.id === 'EURUSD');
+    assert.ok(eur && typeof eur.spreadMarkup === 'string');
+    const patched = await admin.json('PATCH', '/admin/symbols/EURUSD', { spreadMarkup: '0.00012', leverageMax: 300 });
+    assert.equal(patched.status, 200, JSON.stringify(patched.data));
+    assert.equal(patched.data.spreadMarkup, '0.00012');
+    assert.equal(patched.data.leverageMax, 300);
+    assert.equal((await admin.json('PATCH', '/admin/symbols/EURUSD', { minLot: '5', maxLot: '1' })).data.code, 'lots_invalid');
+    assert.equal((await admin.json('PATCH', '/admin/symbols/NOPE', { enabled: false })).status, 404);
+    await admin.json('PATCH', '/admin/symbols/EURUSD', { spreadMarkup: eur.spreadMarkup, leverageMax: eur.leverageMax });
+    assert.equal((await client.json('GET', '/admin/symbols')).status, 403, 'clients cannot read the control surface');
+
+    // risk tiers
+    const risk = await admin.json('GET', '/admin/risk-config');
+    assert.equal(risk.status, 200);
+    const classic = risk.data.find((r: any) => r.tier === 'classic');
+    assert.ok(classic);
+    const bad = await admin.json('PUT', '/admin/risk-config/classic', { ...classic, stopOutPct: 150 });
+    assert.equal(bad.status, 400, 'stop-out above margin call is refused');
+    const ok = await admin.json('PUT', '/admin/risk-config/classic', { marginCallPct: classic.marginCallPct, stopOutPct: classic.stopOutPct, defaultLeverage: classic.defaultLeverage, maxLeverage: classic.maxLeverage, minDeposit: classic.minDeposit, spreadDiscountPct: 5 });
+    assert.equal(ok.status, 200, JSON.stringify(ok.data));
+    assert.equal(ok.data.spreadDiscountPct, 5);
+    await admin.json('PUT', '/admin/risk-config/classic', { marginCallPct: classic.marginCallPct, stopOutPct: classic.stopOutPct, defaultLeverage: classic.defaultLeverage, maxLeverage: classic.maxLeverage, minDeposit: classic.minDeposit, spreadDiscountPct: classic.spreadDiscountPct });
+
+    // platform switches: halt blocks new orders, registration can be closed
+    const platform = await admin.json('GET', '/admin/platform');
+    assert.equal(platform.status, 200);
+    const halted = await admin.json('PUT', '/admin/platform', { ...platform.data, tradingHalt: { enabled: true, message: 'Maintenance' }, registrationOpen: false });
+    assert.equal(halted.status, 200, JSON.stringify(halted.data));
+    const pub = await new Session().json('GET', '/market/platform');
+    assert.equal(pub.data.tradingHalt.enabled, true);
+    assert.equal(pub.data.registrationOpen, false);
+    const order = await client.json('POST', `/me/accounts/${demoAccountId}/orders`, { symbol: 'EURUSD', side: 'buy', type: 'market', lots: '0.01' });
+    assert.equal(order.data.code, 'trading_halted', JSON.stringify(order.data));
+    const reg = await new Session().json('POST', '/auth/register', { email: `e2e+closed.${Date.now()}@zerventa.local`, password: 'E2e!Passw0rd', firstName: 'E2e', lastName: 'Closed', phone: '+971501234567', dob: '1990-01-01', countryCode: 'AE', tcAccepted: true, riskAccepted: true });
+    assert.equal(reg.data.code, 'registration_closed');
+    const restored = await admin.json('PUT', '/admin/platform', { ...platform.data, tradingHalt: { ...platform.data.tradingHalt, enabled: false }, registrationOpen: true });
+    assert.equal(restored.status, 200);
+    assert.equal((await client.json('PUT', '/admin/platform', platform.data)).status, 403);
+
+    // staff (the seeded admin is a superadmin)
+    const staffEmail = `e2e+staff.${Date.now()}@zerventa.local`;
+    const created = await admin.json('POST', '/admin/staff', { email: staffEmail, firstName: 'Ops', lastName: 'Desk', role: 'admin', password: 'Staff!Passw0rd' });
+    assert.ok([200, 201].includes(created.status), JSON.stringify(created.data));
+    assert.equal(created.data.role, 'admin');
+    const staffSession = new Session();
+    assert.equal((await staffSession.json('POST', '/auth/login', { email: staffEmail, password: 'Staff!Passw0rd' })).status, 200, 'new staff can sign in');
+    assert.equal((await staffSession.json('GET', '/admin/symbols')).status, 200, 'admin role reaches the control surface');
+    assert.equal((await staffSession.json('POST', '/admin/staff', { email: 'x@zerventa.local', firstName: 'a', lastName: 'b', role: 'admin', password: 'Staff!Passw0rd' })).data.code, 'superadmin_only');
+    const frozen = await admin.json('PATCH', `/admin/staff/${created.data.id}`, { status: 'frozen' });
+    assert.equal(frozen.data.status, 'frozen');
+    assert.equal((await staffSession.json('GET', '/admin/symbols')).status, 401, 'frozen staff sessions are revoked');
+
+    // broadcast
+    const bc = await admin.json('POST', '/admin/broadcast', { title: 'Holiday hours', body: 'Markets close early on Friday.', level: 'info', audience: 'all', email: false });
+    assert.ok([200, 201].includes(bc.status), JSON.stringify(bc.data));
+    assert.ok(bc.data.recipients >= 1);
+    const audit = await admin.json('GET', '/admin/audit?limit=50');
+    for (const action of ['symbol.update', 'risk.update', 'platform.update', 'staff.create', 'staff.update', 'broadcast.send']) assert.ok(audit.data.items.some((a: any) => a.action === action), `audit has ${action}`);
+  });
+
   it('withdrawals: pending amounts reserve funds, cancel, approve, decline', async () => {
     const w1 = await client.json('POST', '/me/payments/withdraw', { accountId: liveAccountId, amount: '100', method: 'bank', destination: { label: 'My bank', details: 'AE07 0331 2345 6789 0123 456' } });
     assert.ok([200, 201].includes(w1.status), JSON.stringify(w1.data));

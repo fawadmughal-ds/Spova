@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { AccountType, Prisma, TradingAccount } from '@prisma/client';
-import type { AccountDto, WsAccountSnapshot } from '@spova/shared';
+import { DEFAULT_PLATFORM_SETTINGS, type AccountDto, type PlatformSettings, type WsAccountSnapshot } from '@spova/shared';
+import { SettingsService } from '../../infra/settings.service';
 import { PrismaService } from '../../infra/prisma.service';
 import { LedgerService } from '../ledger/ledger.service';
 import { D, money } from '../../common/money';
@@ -15,6 +16,7 @@ export class AccountsService {
     private readonly prisma: PrismaService,
     private readonly ledger: LedgerService,
     private readonly quotes: QuotesService,
+    private readonly settings: SettingsService,
   ) {}
 
   /** 6-digit login code shown to the user (like MT logins). Retries on collision. */
@@ -61,6 +63,10 @@ export class AccountsService {
   }
 
   async create(userId: string, type: AccountType) {
+    if (type === 'live') {
+      const platform = await this.settings.getCached<PlatformSettings>('platform', DEFAULT_PLATFORM_SETTINGS);
+      if (!platform.liveAccountsOpen) throw ApiError.forbidden('live_accounts_closed', 'Live account opening is paused at the moment');
+    }
     if (type === 'live' && env.KYC_REQUIRED_FOR_LIVE) {
       const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
       if (!user.kycPoi || !user.kycPor) {

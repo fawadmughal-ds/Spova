@@ -1,4 +1,5 @@
 import type {
+  AssetClass,
   AccountStatus,
   AccountType,
   CloseReason,
@@ -121,6 +122,79 @@ export interface AdminDashboardDto {
   openPositions: number;
   demoBalanceTotal: string;
   liveBalanceTotal: string;
+  openTickets: number;
+  /** approved today (UTC) */
+  depositsToday: string;
+  withdrawalsToday: string;
+  pendingDepositsTotal: string;
+  pendingWithdrawalsTotal: string;
+  /** distinct clients with a session opened in the last 24 hours */
+  activeClients24h: number;
+  /** net open lots per symbol (buy minus sell), largest first */
+  exposure: { symbol: string; buyLots: string; sellLots: string; netLots: string; positions: number }[];
+  /** price feed health keys as the worker writes them */
+  feeds: { source: string; status: 'up' | 'down' | 'unknown' }[];
+  tradingHalt: boolean;
+}
+
+export interface AdminSymbolDto {
+  id: string;
+  name: string;
+  assetClass: AssetClass;
+  digits: number;
+  contractSize: string;
+  minLot: string;
+  maxLot: string;
+  lotStep: string;
+  leverageMax: number;
+  spreadMarkup: string;
+  swapLong: string;
+  swapShort: string;
+  feedSource: string;
+  feedSymbol: string;
+  enabled: boolean;
+  featured: boolean;
+  sortOrder: number;
+  /** last quote from Redis, if the worker is running */
+  bid: string | null;
+  ask: string | null;
+  quoteTs: number | null;
+  openPositions: number;
+}
+
+export interface RiskConfigDto {
+  tier: Tier;
+  marginCallPct: number;
+  stopOutPct: number;
+  defaultLeverage: number;
+  maxLeverage: number;
+  minDeposit: string;
+  spreadDiscountPct: number;
+  accounts: number;
+}
+
+/** What clients may see of the platform switches. */
+export interface PlatformPublicDto {
+  tradingHalt: { enabled: boolean; message: string };
+  announcement: { enabled: boolean; text: string; level: 'info' | 'warning' | 'danger' | 'success' };
+  registrationOpen: boolean;
+  liveAccountsOpen: boolean;
+}
+
+export interface StaffDto {
+  id: string;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+  role: 'admin' | 'superadmin';
+  status: UserStatus;
+  lastLoginAt: string | null;
+  createdAt: string;
+}
+
+export interface BroadcastResultDto {
+  recipients: number;
+  emailed: number;
 }
 
 // WebSocket payloads (ARCHITECTURE §05)
@@ -136,7 +210,7 @@ export interface WsAccountSnapshot {
 }
 
 export interface WsNotice {
-  type: 'margin_call' | 'stop_out' | 'trading_blocked' | 'kyc' | 'payment' | 'ledger';
+  type: 'margin_call' | 'stop_out' | 'trading_blocked' | 'kyc' | 'payment' | 'ledger' | 'broadcast';
   title: string;
   body: string;
   level: 'info' | 'warning' | 'danger' | 'success';

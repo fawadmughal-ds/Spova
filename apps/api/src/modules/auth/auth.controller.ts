@@ -16,6 +16,8 @@ import { ClientIp, CurrentUser, Public } from '../../common/auth/decorators';
 import type { AuthUser } from '../../common/auth/auth.types';
 import { clearAuthCookies, setAuthCookies } from './cookies';
 import { RedisService } from '../../infra/redis.service';
+import { SettingsService } from '../../infra/settings.service';
+import { DEFAULT_PLATFORM_SETTINGS, type PlatformSettings } from '@spova/shared';
 import { ApiError } from '../../common/errors';
 
 @Controller('auth')
@@ -23,6 +25,7 @@ export class AuthController {
   constructor(
     private readonly auth: AuthService,
     private readonly redis: RedisService,
+    private readonly settings: SettingsService,
   ) {}
 
   @Public()
@@ -34,6 +37,8 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     if (!(await this.redis.allow(`register:ip:${ip}`, 5, 3600))) throw ApiError.tooMany();
+    const platform = await this.settings.getCached<PlatformSettings>('platform', DEFAULT_PLATFORM_SETTINGS);
+    if (!platform.registrationOpen) throw ApiError.forbidden('registration_closed', 'New registrations are paused. Please try again later.');
     const { me, tokens } = await this.auth.register(body, { ip, ua });
     setAuthCookies(res, tokens);
     return me;

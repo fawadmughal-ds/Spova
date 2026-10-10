@@ -31,6 +31,11 @@ export class QuotesService {
     return this.symbols;
   }
 
+  /** Back office changed an instrument: reload on the next read. */
+  invalidate() {
+    this.loadedAt = 0;
+  }
+
   async spec(symbolId: string): Promise<SymbolSpec | undefined> {
     return (await this.specs()).get(symbolId);
   }
