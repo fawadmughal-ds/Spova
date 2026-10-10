@@ -1,4 +1,5 @@
 # Render Blueprint: API + worker (Docker) + Postgres + Redis. Web is deployed on Vercel (see docs/DEPLOY_RENDER_VERCEL.md).
+# Render Blueprint: API (Docker) + Postgres + Redis. Web is deployed on Vercel (see docs/DEPLOY_RENDER_VERCEL.md).
 # Free plans spin down when idle and the free Postgres expires after 30 days - fine for a client preview only.
 services:
   - type: web
@@ -34,59 +35,20 @@ services:
         generateValue: true
       - key: JWT_REFRESH_SECRET
         generateValue: true
-      - key: INTERNAL_TOKEN
-        generateValue: true
       - key: SEED_ON_BOOT
         value: "true"
       - key: SEED_DEMO_CLIENT
         value: "true"
       - key: SEED_ADMIN_EMAIL
-        value: admin@zerventa.local
+        value: admin@xyz.local
       - key: SEED_ADMIN_PASSWORD
         generateValue: true
       - key: BRAND_NAME
-        value: Zerventa
+        value: XYZ
       - key: MAIL_PROVIDER
         value: console
-      - key: STORAGE_DRIVER
-        value: local
       - key: DEMO_START_BALANCE
         value: "10000"
-
-  # Runs as a "web" service only so it fits the free plan; it serves /health on $PORT and does its real work in the background.
-  - type: web
-    name: spova-worker
-    runtime: docker
-    plan: free
-    dockerfilePath: apps/worker/Dockerfile
-    dockerContext: .
-    healthCheckPath: /health
-    envVars:
-      - key: NODE_ENV
-        value: production
-      - key: DATABASE_URL
-        fromDatabase:
-          name: spova-db
-          property: connectionString
-      - key: REDIS_URL
-        fromService:
-          type: keyvalue
-          name: spova-redis
-          property: connectionString
-      - key: API_URL
-        fromService:
-          type: web
-          name: spova-api
-          envVarKey: RENDER_EXTERNAL_URL
-      - key: INTERNAL_TOKEN
-        fromService:
-          type: web
-          name: spova-api
-          envVarKey: INTERNAL_TOKEN
-      - key: FEED_BINANCE
-        value: "on"
-      - key: FEED_SYNTHETIC
-        value: "on"
 
   - type: keyvalue
     name: spova-redis
