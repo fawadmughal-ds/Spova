@@ -14,13 +14,31 @@ different markup, different tick timing). That is normal; MatchTrader brokers di
 | Asset class | Source | Cost |
 |---|---|---|
 | Crypto (BTC, ETH, LTC, XRP, SOL) | Binance bookTicker websocket | free, no key |
-| Forex, metals, indices, energies | **OANDA v20 streaming** (`FEED_OANDA=on`) or the synthetic demo feed | free (practice account) |
-| Shares (AAPL, TSLA, AMZN, NVDA) | synthetic demo feed | - |
+| Forex, metals, indices, energies | **OANDA v20 streaming** (`FEED_OANDA=on`), else **Finnhub's OANDA relay** (`FEED_FINNHUB=on`), else the synthetic demo feed | free |
+| Shares (AAPL, TSLA, AMZN, NVDA) | **Finnhub** trade websocket (`FEED_FINNHUB=on`), else synthetic | free |
+
+Priority per symbol: direct OANDA > Finnhub > synthetic. Shares only exist on Finnhub.
+
+## Finnhub (works from Pakistan, no documents)
+1. https://finnhub.io -> **Get free API key** (email only). Copy the key.
+2. Worker env: `FEED_FINNHUB=on`, `FINNHUB_TOKEN=<key>`, `FINNHUB_FOREX=on`. Restart the worker.
+3. The log shows `finnhub: connected and subscribed`; `feed:finnhub:status` in Redis goes `up`.
+Limits of the free tier: 50 websocket symbols (we use 24), US share trades during US market hours, forex /
+metals / indices relayed from OANDA. **No candle history on the free tier**, so those symbols keep the
+synthetic history generated backwards from the live price until a candle source exists (a direct OANDA
+account backfills real history, see below). The live candles are real from the moment the feed is on.
 
 The synthetic feed is a demo generator: realistic movement, session-aware, but **not the market**. Switch
 OANDA on before any real client trades.
 
-## Turning on real prices (OANDA, free)
+## OANDA direct (real history too; not available to Pakistan residents)
+OANDA does not open accounts, demo included, for residents of Pakistan. The demo signup needs only name,
+email and phone (no documents), but the country list must contain your country of residence. If a partner or
+company entity in a supported country (UAE, UK, EU, Singapore, Australia, ...) opens the practice account,
+its token can be used by the worker from anywhere; that is a decision for the business owner, not a
+technical one.
+
+### Turning on real prices (OANDA, free)
 1. Create a free practice account at https://www.oanda.com (any region's demo signup works).
 2. In the account portal open **Manage API Access** and generate a **personal access token**.
 3. Note the practice **account ID** (format `101-004-1234567-001`).

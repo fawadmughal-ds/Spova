@@ -30,6 +30,11 @@ const schema = z.object({
   OANDA_TOKEN: z.string().optional().default(''),
   OANDA_ACCOUNT_ID: z.string().optional().default(''),
   OANDA_ENV: z.enum(['practice', 'live']).default('practice'),
+  /** Finnhub websocket (free key): US shares, and the OANDA price relay for forex/metals/indices when no direct OANDA account */
+  FEED_FINNHUB: z.enum(['on', 'off']).default('off').transform((v) => v === 'on'),
+  FINNHUB_TOKEN: z.string().optional().default(''),
+  /** also quote forex/metals/indices/energies through Finnhub's OANDA relay when FEED_OANDA is off */
+  FINNHUB_FOREX: onOff,
   /** backfill candle history on boot (Binance klines / synthetic history) */
   CANDLE_BACKFILL: onOff,
   /** a (symbol, tf) with fewer closed bars than this gets backfilled */

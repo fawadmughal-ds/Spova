@@ -11,7 +11,7 @@ import type { Ingest } from './ingest';
 export class FeedHealth {
   private timer?: NodeJS.Timeout;
   private binanceUp = false;
-  private oandaUp = false;
+  private readonly socketUp: Record<string, boolean> = {};
   private readonly startedAt = Date.now();
 
   constructor(
@@ -19,9 +19,9 @@ export class FeedHealth {
     private readonly symbols: SymbolRegistry,
     private readonly ingest: Ingest,
     private readonly log: Logger,
-    private readonly enabled: { binance: boolean; synthetic: boolean; oanda?: boolean },
-    /** synthetic-source symbols currently quoted by OANDA instead */
-    private readonly oandaSymbols: Set<string> = new Set(),
+    private readonly enabled: { binance: boolean; synthetic: boolean; oanda?: boolean; finnhub?: boolean },
+    /** synthetic-source symbols taken over by a real feed (source -> symbol ids) */
+    private readonly takeover: Record<string, Set<string>> = {},
     private readonly staleMs = 60_000,
   ) {}
 
@@ -30,9 +30,13 @@ export class FeedHealth {
     void this.write('binance', up ? 'up' : 'down');
   }
 
-  setOandaSocket(up: boolean) {
-    this.oandaUp = up;
-    void this.write('oanda', up ? 'up' : 'down');
+  setSocket(source: 'oanda' | 'finnhub', up: boolean) {
+    this.socketUp[source] = up;
+    void this.write(source, up ? 'up' : 'down');
+  }
+
+  private takenOver(id: string) {
+    return Object.values(this.takeover).some((set) => set.has(id));
   }
 
   start(intervalMs = 10_000) {
@@ -59,20 +63,21 @@ export class FeedHealth {
       if (stale.length) this.log.warn({ stale, socket: this.binanceUp ? 'up' : 'down' }, 'binance: symbols without ticks for 60s');
       await this.write('binance', status);
     }
-    if (this.enabled.oanda) {
+    for (const source of ['oanda', 'finnhub'] as const) {
+      if (!this.enabled[source]) continue;
       const stale: string[] = [];
-      for (const id of this.oandaSymbols) {
+      for (const id of this.takeover[source] ?? []) {
         if (!this.symbols.isOpen(id)) continue;
         const last = this.ingest.lastTick(id);
         if (last === undefined ? !bootGrace : now - last > this.staleMs) stale.push(id);
       }
-      const status = this.oandaUp && stale.length === 0 ? 'up' : 'down';
-      if (stale.length) this.log.warn({ stale, socket: this.oandaUp ? 'up' : 'down' }, 'oanda: open symbols without ticks for 60s');
-      await this.write('oanda', status);
+      const up = !!this.socketUp[source];
+      if (stale.length) this.log.warn({ stale, socket: up ? 'up' : 'down' }, `${source}: open symbols without ticks for 60s`);
+      await this.write(source, up && stale.length === 0 ? 'up' : 'down');
     }
     if (this.enabled.synthetic) {
       const stale: string[] = [];
-      for (const s of this.symbols.enabled().filter((x) => x.feedSource === 'synthetic' && !this.oandaSymbols.has(x.id))) {
+      for (const s of this.symbols.enabled().filter((x) => x.feedSource === 'synthetic' && !this.takenOver(x.id))) {
         if (!this.symbols.isOpen(s.id)) continue;
         const last = this.ingest.lastTick(s.id);
         if (last === undefined ? !bootGrace : now - last > this.staleMs) stale.push(s.id);
