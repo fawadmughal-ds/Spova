@@ -28,8 +28,9 @@ function LoginForm() {
       const isAdmin = me.role === 'admin' || me.role === 'superadmin';
       // only a same-origin path: "//host" and "/\\host" are protocol-relative redirects
       const safeNext = next && /^\/(?![\/\\])/.test(next) ? next : null;
-      // clients land in the web terminal (the client area lives inside it); staff in the back office
-      router.replace(safeNext ?? (isAdmin ? '/admin' : '/trade'));
+      // clients always land in the web terminal (the client area lives inside it); an /app next is treated as the terminal. staff go to the back office.
+      const clientNext = safeNext && !safeNext.startsWith('/app') ? safeNext : '/trade';
+      router.replace(isAdmin ? (safeNext ?? '/admin') : clientNext);
     });
   };
 

@@ -255,7 +255,7 @@ export function AppShell({ nav, children, variant }: { nav: NavItem[]; children:
                 </Link>
               </>
             ) : (
-              <Link href="/app" className={buttonClass('outline', 'sm', 'group h-9 rounded-full px-4')}>
+              <Link href="/trade" className={buttonClass('outline', 'sm', 'group h-9 rounded-full px-4')}>
                 Client view <ArrowUpRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
               </Link>
             )}

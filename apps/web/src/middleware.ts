@@ -31,10 +31,16 @@ export function middleware(req: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // the standalone client-area home no longer exists as a destination: everything lives in the web terminal
+  if (pathname === '/app' && signedIn) {
+    const role = roleFrom(access);
+    return NextResponse.redirect(new URL(role === 'admin' || role === 'superadmin' ? '/admin' : '/trade', req.url));
+  }
+
   if (pathname.startsWith('/admin') && access) {
     const role = roleFrom(access);
     if (role && role !== 'admin' && role !== 'superadmin') {
-      return NextResponse.redirect(new URL('/app', req.url));
+      return NextResponse.redirect(new URL('/trade', req.url));
     }
   }
 

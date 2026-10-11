@@ -29,7 +29,7 @@ export function ClientRail({ accounts, account, onSelectAccount, me, onLogout, o
     <nav className={cn('trail', className)} aria-label="Client area">
       <div className="trail-top">
         <AccountPill accounts={accounts} account={account} onSelect={onSelectAccount} onOpenAccounts={() => onOpen('accounts')} />
-        <Link href="/app" className="trail-brand" title="Client area">
+        <Link href="/trade" className="trail-brand" title="Web terminal">
           <Logo size={26} />
         </Link>
       </div>
