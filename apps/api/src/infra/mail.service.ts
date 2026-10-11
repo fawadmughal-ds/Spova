@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Resend } from 'resend';
+import nodemailer, { type Transporter } from 'nodemailer';
 import { DEFAULT_EMAIL_SETTINGS, EMAIL_SETTINGS_KEY, type EmailSettings, type EmailType } from '@spova/shared';
 import { env } from '../config/env';
 import { SettingsService } from './settings.service';
@@ -19,6 +20,10 @@ interface Mail {
 export class MailService {
   private readonly log = new Logger('Mail');
   private readonly resend = env.MAIL_PROVIDER === 'resend' && env.RESEND_API_KEY ? new Resend(env.RESEND_API_KEY) : null;
+  private readonly smtp: Transporter | null =
+    env.MAIL_PROVIDER === 'smtp' && env.SMTP_HOST
+      ? nodemailer.createTransport({ host: env.SMTP_HOST, port: env.SMTP_PORT, secure: env.SMTP_SECURE, auth: env.SMTP_USER ? { user: env.SMTP_USER, pass: env.SMTP_PASS } : undefined })
+      : null;
 
   constructor(private readonly settings: SettingsService) {}
 
@@ -29,18 +34,21 @@ export class MailService {
   }
 
   async send(mail: Mail): Promise<void> {
-    if (!this.resend) {
-      this.log.log(`\n--- MAIL (console) ---\nTo: ${mail.to}\nSubject: ${mail.subject}\n\n${mail.text}\n----------------------`);
+    const from = `${env.BRAND_NAME} <${env.MAIL_FROM}>`;
+    if (this.smtp) {
+      try {
+        await this.smtp.sendMail({ from, to: mail.to, subject: mail.subject, html: mail.html, text: mail.text });
+      } catch (e) {
+        this.log.error(`smtp send failed: ${(e as Error).message}`);
+      }
       return;
     }
-    const { error } = await this.resend.emails.send({
-      from: `${env.BRAND_NAME} <${env.MAIL_FROM}>`,
-      to: mail.to,
-      subject: mail.subject,
-      html: mail.html,
-      text: mail.text,
-    });
-    if (error) this.log.error(`resend failed: ${error.message}`);
+    if (this.resend) {
+      const { error } = await this.resend.emails.send({ from, to: mail.to, subject: mail.subject, html: mail.html, text: mail.text });
+      if (error) this.log.error(`resend failed: ${error.message}`);
+      return;
+    }
+    this.log.log(`\n--- MAIL (console) ---\nTo: ${mail.to}\nSubject: ${mail.subject}\n\n${mail.text}\n----------------------`);
   }
 
   async welcome(to: string, firstName: string, loginCode: number) {

@@ -4,6 +4,7 @@ import { twMerge } from 'tailwind-merge';
 export const cn = (...inputs: ClassValue[]) => twMerge(clsx(inputs));
 
 export const BRAND = process.env.NEXT_PUBLIC_BRAND_NAME ?? 'Zerventa';
+export const SUPPORT_EMAIL = 'info@zerventa.com';
 
 const fmt = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 /** "12000.5" -> "12,000.50" */

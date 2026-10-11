@@ -69,7 +69,7 @@ const CONTENT: Record<string, ContentCopy> = {
   },
   'contact-us': {
     title: 'Contact us',
-    paragraphs: ['Support: support@[domain] - 24/5 live chat from the client area. [PLACEHOLDER - support phone numbers]'],
+    paragraphs: ['Support: info@zerventa.com - 24/5 live chat from the client area.'],
   },
   // questions and answers live in components/marketing/company-faq-data.ts; this is the hero lead
   faq: {

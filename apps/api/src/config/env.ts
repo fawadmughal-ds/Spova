@@ -35,7 +35,12 @@ const schema = z.object({
   DEMO_DEFAULT_LEVERAGE: z.coerce.number().int().min(1).max(1000).default(100),
   BRAND_NAME: z.string().default('Zerventa'),
   APP_DOMAIN: z.string().default('localhost'),
-  MAIL_PROVIDER: z.enum(['console', 'resend']).default('console'),
+  MAIL_PROVIDER: z.enum(['console', 'resend', 'smtp']).default('console'),
+  SMTP_HOST: z.string().optional().default(''),
+  SMTP_PORT: z.coerce.number().int().default(465),
+  SMTP_SECURE: z.coerce.boolean().default(true),
+  SMTP_USER: z.string().optional().default(''),
+  SMTP_PASS: z.string().optional().default(''),
   RESEND_API_KEY: z.string().optional().default(''),
   MAIL_FROM: z.string().default('info@zerventa.com'),
   // phase 2: private file storage for KYC documents

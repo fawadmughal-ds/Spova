@@ -390,7 +390,7 @@ const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 function Contact({ copy }: { copy: ContentCopy }) {
   const [text, pending] = splitPlaceholder(copy.paragraphs[0]);
   // "Support: support@[domain] - 24/5 live chat from the client area."
-  const email = text.match(/\S+@\S+/)?.[0] ?? 'support@[domain]';
+  const email = text.match(/\S+@\S+/)?.[0] ?? 'info@zerventa.com';
   return (
     <>
       <Hero eyebrow="Contact us" title="Talk to *real people*" lead={<p>{text}</p>}>
@@ -423,7 +423,7 @@ function Contact({ copy }: { copy: ContentCopy }) {
           <Spotlight className="card card-hover corners group overflow-hidden p-8">
             <ChannelIcon icon={Mail} />
             <div className="label mt-8">Email support</div>
-            <div className="mt-2 break-all font-display text-3xl font-bold tracking-tight sm:text-4xl">{email}</div>
+            <a href={`mailto:${email}`} className="mt-2 block break-all font-display text-3xl font-bold tracking-tight hover:text-brand-300 sm:text-4xl">{email}</a>
             <p className="mt-3 text-sm text-ink-400">For anything you would rather put in writing.</p>
           </Spotlight>
 

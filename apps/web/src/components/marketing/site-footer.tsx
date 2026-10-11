@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { ArrowUpRight, Facebook, Instagram } from 'lucide-react';
-import { BRAND } from '@/lib/utils';
+import { BRAND, SUPPORT_EMAIL } from '@/lib/utils';
 import { MARKET_LIST } from '@/lib/markets';
 import { COMPANY_LINKS, EDUCATION_LINKS, TIER_LINKS, TRADING_LINKS, tierHref } from '@/lib/site-nav';
 import { Wordmark } from '@/components/logo';
@@ -68,6 +68,9 @@ export function SiteFooter() {
               <span className="link-underline">Open a free demo</span>
               <ArrowUpRight className="h-4 w-4 transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
             </Link>
+            <p className="mt-4 text-sm text-ink-400">
+              Contact: <a href={`mailto:${SUPPORT_EMAIL}`} className="font-medium text-ink-200 hover:text-white">{SUPPORT_EMAIL}</a>
+            </p>
             <NewsletterForm className="mt-8 max-w-sm" />
             <SocialLinks className="mt-7" />
           </div>

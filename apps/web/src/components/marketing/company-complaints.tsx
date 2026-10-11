@@ -32,7 +32,7 @@ const STAGES: Stage[] = [
     tag: 'Step 1',
     title: 'Submit your complaint',
     body: 'If support could not resolve it, put the complaint in writing with the details listed below. A written complaint is what starts the formal procedure.',
-    pending: '[PLACEHOLDER - complaints form link and complaints email address]',
+    pending: 'Email info@zerventa.com or open a support ticket from your client area.',
   },
   {
     icon: MailCheck,
@@ -200,7 +200,7 @@ export function ComplaintsPage() {
             <Reveal variant="stagger" step={90} className="space-y-3">
               <div className="rounded-2xl border border-dashed border-gold/30 bg-gold/[0.03] p-5">
                 <div className="label !text-gold">Where to send it</div>
-                <Pending className="mt-3">[PLACEHOLDER - complaints email; the support ticket form in the client area is already live]</Pending>
+                <p className="mt-3 text-sm text-ink-300">Email <a href="mailto:info@zerventa.com" className="font-medium text-brand-300 hover:underline">info@zerventa.com</a>, or open a support ticket from your client area.</p>
               </div>
               <div className="rounded-2xl border border-dashed border-gold/30 bg-gold/[0.03] p-5">
                 <div className="label !text-gold">How long it takes</div>

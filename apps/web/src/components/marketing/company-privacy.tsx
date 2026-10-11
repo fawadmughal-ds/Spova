@@ -247,8 +247,8 @@ export function PrivacyPage() {
               </Link>
             </Section>
 
-            <Section id="contact" title="Contact" note="[PLACEHOLDER - privacy contact email]">
-              <p>Questions about this page or about your data go to the support team, who will pass them to the person responsible for privacy.</p>
+            <Section id="contact" title="Contact" note="info@zerventa.com">
+              <p>Questions about this page or about your data go to <a href="mailto:info@zerventa.com" className="font-medium text-brand-300 hover:underline">info@zerventa.com</a>, and we pass them to the person responsible for privacy.</p>
               <div className="flex flex-wrap gap-x-8 gap-y-3">
                 {[
                   ['/contact-us', 'Contact us'],
