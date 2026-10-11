@@ -237,7 +237,7 @@ export const FAQ_TOPICS: FaqTopic[] = [
       },
       {
         q: 'Which countries do you accept clients from?',
-        a: 'We do not offer services to residents of certain jurisdictions, including the United States.',
+        a: 'We do not offer services to residents of certain jurisdictions, where CFD trading is restricted.',
         pending: '[PLACEHOLDER - full list of restricted jurisdictions]',
       },
       {

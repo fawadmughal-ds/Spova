@@ -40,7 +40,7 @@ export function middleware(req: NextRequest) {
 
   if (isAuthPage && signedIn && access) {
     const role = roleFrom(access);
-    return NextResponse.redirect(new URL(role === 'admin' || role === 'superadmin' ? '/admin' : '/app', req.url));
+    return NextResponse.redirect(new URL(role === 'admin' || role === 'superadmin' ? '/admin' : '/trade', req.url));
   }
 
   return NextResponse.next();

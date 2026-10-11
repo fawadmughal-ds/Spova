@@ -38,8 +38,8 @@ export class MailService {
     return this.send({
       to,
       subject: `Welcome to ${brand}`,
-      text: `Hi ${firstName},\n\nYour ${brand} account is ready. A demo trading account (login ${loginCode}) has been created for you.\n\nLogin: ${env.WEB_ORIGIN}/login\n\nTrading CFDs involves significant risk of loss.`,
-      html: `<p>Hi ${esc(firstName)},</p><p>Your ${esc(brand)} account is ready. A demo trading account (login <b>${loginCode}</b>) has been created for you.</p><p><a href="${env.WEB_ORIGIN}/login">Log in</a></p><p style="color:#888;font-size:12px">Trading CFDs involves significant risk of loss.</p>`,
+      text: `Hi ${firstName},\n\nYour ${brand} account is ready. Your live trading account (login ${loginCode}) is open. Upload your documents within 15 days to keep it active.\n\nLogin: ${env.WEB_ORIGIN}/login\n\nTrading CFDs involves significant risk of loss.`,
+      html: `<p>Hi ${esc(firstName)},</p><p>Your ${esc(brand)} account is ready. Your live trading account (login <b>${loginCode}</b>) is open. Upload your documents within 15 days to keep it active.</p><p><a href="${env.WEB_ORIGIN}/login">Log in</a></p><p style="color:#888;font-size:12px">Trading CFDs involves significant risk of loss.</p>`,
     });
   }
 
@@ -82,6 +82,34 @@ export class MailService {
   }
 
   /** Back-office alert; silently skipped when ADMIN_NOTIFY_EMAIL is empty. */
+  kycReminder(to: string, firstName: string, days: number, deadline: Date) {
+    const brand = env.BRAND_NAME;
+    const when = deadline.toISOString().slice(0, 10);
+    const link = `${env.WEB_ORIGIN.split(',')[0]}/app/documents`;
+    return this.send({
+      to,
+      subject: `${days} day${days === 1 ? '' : 's'} left to upload your documents`,
+      text: `Hi ${firstName},\n\nYour ${brand} account needs proof of identity, proof of residence, a payment document and any other requested document by ${when}. After that date trading is paused until they arrive.\n\nUpload them here: ${link}`,
+      html: `<p>Hi ${esc(firstName)},</p><p>Your ${esc(brand)} account needs <b>proof of identity, proof of residence, a payment document</b> and any other requested document by <b>${when}</b>. After that date trading is paused until they arrive.</p><p><a href="${link}">Upload documents</a></p>`,
+    });
+  }
+
+  kycFrozen(to: string, firstName: string) {
+    const brand = env.BRAND_NAME;
+    const link = `${env.WEB_ORIGIN.split(',')[0]}/app/documents`;
+    return this.send({
+      to,
+      subject: `${brand}: trading paused until your documents arrive`,
+      text: `Hi ${firstName},\n\nThe 15-day window to upload your documents has passed, so trading on your ${brand} account is paused. Upload the missing documents and trading resumes automatically: ${link}`,
+      html: `<p>Hi ${esc(firstName)},</p><p>The 15-day window to upload your documents has passed, so trading on your ${esc(brand)} account is paused. Upload the missing documents and trading resumes automatically.</p><p><a href="${link}">Upload documents</a></p>`,
+    });
+  }
+
+  kycUnfrozen(to: string, firstName: string) {
+    const brand = env.BRAND_NAME;
+    return this.send({ to, subject: `${brand}: trading resumed`, text: `Hi ${firstName},\n\nTrading on your ${brand} account is open again.`, html: `<p>Hi ${esc(firstName)},</p><p>Trading on your ${esc(brand)} account is open again.</p>` });
+  }
+
   adminAlert(subject: string, body: string) {
     if (!env.ADMIN_NOTIFY_EMAIL) return Promise.resolve();
     return this.send({ to: env.ADMIN_NOTIFY_EMAIL, subject: `[${env.BRAND_NAME} back office] ${subject}`, text: body, html: `<p>${esc(body)}</p>` });

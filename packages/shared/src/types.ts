@@ -25,7 +25,19 @@ export interface MeDto {
   email: string;
   role: Role;
   status: UserStatus;
-  kyc: { poi: boolean; por: boolean; payment: boolean };
+  kyc: {
+    poi: boolean;
+    por: boolean;
+    payment: boolean;
+    /** ISO time by which all four document groups must be uploaded */
+    deadlineAt: string | null;
+    /** whole days until the deadline (negative = overdue), null for staff */
+    daysLeft: number | null;
+    /** one document (not rejected) in each of the four groups */
+    complete: boolean;
+    /** deadline passed without complete documents: trading blocked until uploaded or unfrozen by an admin */
+    frozen: boolean;
+  };
   emailVerified: boolean;
   profile: ProfileDto | null;
 }
@@ -101,6 +113,8 @@ export interface AdminUserRowDto {
   lastName: string | null;
   countryCode: string | null;
   kyc: { poi: boolean; por: boolean };
+  kycDeadlineAt: string | null;
+  kycFrozen: boolean;
   accountsCount: number;
   totalBalance: string;
   createdAt: string;
@@ -135,6 +149,22 @@ export interface AdminDashboardDto {
   /** price feed health keys as the worker writes them */
   feeds: { source: string; status: 'up' | 'down' | 'unknown' }[];
   tradingHalt: boolean;
+  /** clients whose document deadline is within 3 days and who have not uploaded everything */
+  kycDueSoon: number;
+  /** clients frozen for missing documents */
+  kycFrozen: number;
+}
+
+/** Row of the back-office document deadline list. */
+export interface KycDeadlineRowDto {
+  user: { id: string; email: string; firstName: string | null; lastName: string | null };
+  deadlineAt: string;
+  daysLeft: number;
+  frozen: boolean;
+  frozenAt: string | null;
+  /** groups with at least one non-rejected document */
+  uploadedGroups: KycGroup[];
+  complete: boolean;
 }
 
 export interface AdminSymbolDto {

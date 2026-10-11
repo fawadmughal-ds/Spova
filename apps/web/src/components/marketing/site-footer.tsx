@@ -61,7 +61,7 @@ export function SiteFooter() {
             you understand how CFDs work and whether you can afford to take the high risk of losing your money. Past performance is not a reliable indicator of future results.
           </p>
           <p>
-            {BRAND} does not offer services to residents of certain jurisdictions, including the United States. Regulatory and legal entity details will be published here once confirmed. [PLACEHOLDER]
+            {BRAND} does not offer services to residents of certain jurisdictions where CFD trading is restricted. Regulatory and legal entity details will be published here once confirmed. [PLACEHOLDER]
           </p>
           <p className="font-mono text-[11px] uppercase tracking-[0.14em]">
             © {new Date().getFullYear()} {BRAND}. All rights reserved.

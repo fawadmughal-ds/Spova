@@ -50,14 +50,18 @@ describe('phase 2: kyc -> live account -> payments -> tickets', () => {
     clientId = a.me.id;
     await register(other, 'other');
     await adminLogin(admin);
+    // sign-up opens a live account; a demo account is an optional extra the client opens
     const accounts = await client.json('GET', '/me/accounts');
-    demoAccountId = accounts.data.demo[0].id;
+    liveAccountId = accounts.data.live[0].id;
+    const demo = await client.json('POST', '/me/accounts', { type: 'demo' });
+    assert.ok([200, 201].includes(demo.status), JSON.stringify(demo.data));
+    demoAccountId = demo.data.id;
   });
 
   // ---------------------------------------------------------------- KYC
   it('starts unverified and cannot see admin queues', async () => {
     const me = await client.json('GET', '/auth/me');
-    assert.deepEqual(me.data.kyc, { poi: false, por: false, payment: false });
+    assert.deepEqual({ poi: me.data.kyc.poi, por: me.data.kyc.por, payment: me.data.kyc.payment }, { poi: false, por: false, payment: false });
     assert.equal((await client.json('GET', '/me/kyc/status')).data.poi, 'incomplete');
     assert.equal((await client.json('GET', '/admin/kyc')).status, 403);
     assert.equal((await client.json('GET', '/admin/payments')).status, 403);
@@ -89,7 +93,11 @@ describe('phase 2: kyc -> live account -> payments -> tickets', () => {
     assert.equal((await other.raw('GET', `/me/kyc/documents/${poiDocId}/file`)).status, 404);
   });
 
-  it('blocks live account and real-money deposits before verification', async () => {
+  it('sign-up opened a live account; a second one needs verification; demo accounts take no real money', async () => {
+    const me = await client.json('GET', '/auth/me');
+    assert.equal(typeof me.data.kyc.deadlineAt, 'string', '15-day document deadline is set');
+    assert.ok(me.data.kyc.daysLeft >= 14 && me.data.kyc.daysLeft <= 15, `daysLeft=${me.data.kyc.daysLeft}`);
+    assert.equal(me.data.kyc.frozen, false);
     const live = await client.json('POST', '/me/accounts', { type: 'live' });
     assert.equal(live.status, 403);
     assert.equal(live.data.code, 'kyc_required');
@@ -127,7 +135,7 @@ describe('phase 2: kyc -> live account -> payments -> tickets', () => {
       assert.equal(r.status, 200, JSON.stringify(r.data));
     }
     const me = await client.json('GET', '/auth/me');
-    assert.deepEqual(me.data.kyc, { poi: true, por: true, payment: false });
+    assert.deepEqual({ poi: me.data.kyc.poi, por: me.data.kyc.por, payment: me.data.kyc.payment }, { poi: true, por: true, payment: false });
     const st = await client.json('GET', '/me/kyc/status');
     assert.equal(st.data.poi, 'approved');
     assert.equal(st.data.por, 'approved');
@@ -135,10 +143,10 @@ describe('phase 2: kyc -> live account -> payments -> tickets', () => {
   });
 
   // ---------------------------------------------------------------- payments
-  it('opens a live account and validates deposit requests', async () => {
-    const live = await client.json('POST', '/me/accounts', { type: 'live' });
-    assert.ok([200, 201].includes(live.status), JSON.stringify(live.data));
-    liveAccountId = live.data.id;
+  it('one live account per client; deposit requests are validated', async () => {
+    const second = await client.json('POST', '/me/accounts', { type: 'live' });
+    assert.equal(second.status, 409, JSON.stringify(second.data));
+    assert.equal(second.data.code, 'live_limit');
     const methods = await client.json('GET', '/me/payments/methods');
     assert.ok(methods.data.find((m: any) => m.id === 'bank' && m.enabled));
 
@@ -314,6 +322,86 @@ describe('phase 2: kyc -> live account -> payments -> tickets', () => {
     assert.ok(bc.data.recipients >= 1);
     const audit = await admin.json('GET', '/admin/audit?limit=50');
     for (const action of ['symbol.update', 'risk.update', 'platform.update', 'staff.create', 'staff.update', 'broadcast.send']) assert.ok(audit.data.items.some((a: any) => a.action === action), `audit has ${action}`);
+  });
+
+  it('document deadline: reminder at 3 days, freeze at 15 days, auto-unfreeze on upload, admin unfreeze', async () => {
+    await resetRateLimits(); // this test registers two more clients on the same IP
+    const late = new Session();
+    const lateReg = await register(late, 'late');
+    const lateId = lateReg.me.id;
+    const lateDemo = await late.json('POST', '/me/accounts', { type: 'demo' });
+    const lateAcc = lateDemo.data.id;
+
+    // reminder window: deadline in 2 days -> sweep reminds once, never twice
+    const soon = new Date(Date.now() + 2 * 86_400_000).toISOString();
+    assert.equal((await admin.json('PATCH', `/admin/users/${lateId}`, { kycDeadlineAt: soon })).status, 200);
+    const s1 = await admin.json('POST', '/admin/kyc/sweep');
+    assert.ok([200, 201].includes(s1.status), JSON.stringify(s1.data));
+    assert.ok(s1.data.reminded >= 1, 'reminder sent');
+    const s2 = await admin.json('POST', '/admin/kyc/sweep');
+    const dl = await admin.json('GET', '/admin/kyc/deadlines');
+    const row = dl.data.find((r: any) => r.user.id === lateId);
+    assert.ok(row && row.frozen === false && row.daysLeft <= 3 && row.uploadedGroups.length === 0, JSON.stringify(row));
+    assert.ok(s2.data.reminded === 0 || !dl.data.some((r: any) => r.user.id === lateId && r.daysLeft > 3), 'no second reminder for the same client');
+
+    // deadline passed -> frozen: trading blocked everywhere, me.kyc.frozen, admin list shows it first
+    const past = new Date(Date.now() - 3600_000).toISOString();
+    await admin.json('PATCH', `/admin/users/${lateId}`, { kycDeadlineAt: past });
+    const s3 = await admin.json('POST', '/admin/kyc/sweep');
+    assert.ok(s3.data.frozen >= 1, JSON.stringify(s3.data));
+    const meFrozen = await late.json('GET', '/auth/me');
+    assert.equal(meFrozen.data.kyc.frozen, true);
+    assert.equal(meFrozen.data.kyc.complete, false);
+    const order = await late.json('POST', `/me/accounts/${lateAcc}/orders`, { symbol: 'EURUSD', side: 'buy', type: 'market', lots: '0.01' });
+    assert.equal(order.data.code, 'trading_blocked', JSON.stringify(order.data));
+    const frozenRow = (await admin.json('GET', '/admin/kyc/deadlines')).data.find((r: any) => r.user.id === lateId);
+    assert.equal(frozenRow.frozen, true);
+
+    // uploading one document in each of the four groups unfreezes automatically
+    for (const [group, docType] of [['poi', 'passport'], ['por', 'utility_bill'], ['payment', 'card_front']] as const) {
+      const up = await late.json('POST', '/me/kyc/documents', upload(group, docType, PNG, 'image/png', `${group}.png`));
+      assert.ok([200, 201].includes(up.status), JSON.stringify(up.data));
+      assert.equal((await late.json('GET', '/auth/me')).data.kyc.frozen, true, 'still frozen until all four groups are in');
+    }
+    const last = await late.json('POST', '/me/kyc/documents', upload('other', 'source_of_funds', PNG, 'image/png', 'other.png'));
+    assert.ok([200, 201].includes(last.status));
+    const meOk = await late.json('GET', '/auth/me');
+    assert.equal(meOk.data.kyc.frozen, false);
+    assert.equal(meOk.data.kyc.complete, true);
+    assert.equal((await late.json('GET', `/me/accounts/${lateAcc}`)).data.tradingBlocked, false);
+    assert.ok(!(await admin.json('GET', '/admin/kyc/deadlines')).data.some((r: any) => r.user.id === lateId), 'complete clients leave the deadline list');
+
+    // admin unfreeze path on another client whose deadline passed
+    const stuck = new Session();
+    const stuckReg = await register(stuck, 'stuck');
+    await admin.json('PATCH', `/admin/users/${stuckReg.me.id}`, { kycDeadlineAt: past });
+    await admin.json('POST', '/admin/kyc/sweep');
+    assert.equal((await stuck.json('GET', '/auth/me')).data.kyc.frozen, true);
+    const un = await admin.json('POST', `/admin/kyc/users/${stuckReg.me.id}/unfreeze`);
+    assert.ok([200, 201].includes(un.status), JSON.stringify(un.data));
+    const meUn = await stuck.json('GET', '/auth/me');
+    assert.equal(meUn.data.kyc.frozen, false);
+    assert.ok(meUn.data.kyc.daysLeft >= 14, 'unfreeze grants a fresh 15-day window');
+    assert.equal((await client.json('POST', '/admin/kyc/sweep')).status, 403);
+    const audit = await admin.json('GET', '/admin/audit?limit=50');
+    assert.ok(audit.data.items.some((a: any) => a.action === 'kyc.unfreeze'));
+  });
+
+  it('dated account statement downloads as PDF and CSV for the owner only', async () => {
+    const to = new Date().toISOString().slice(0, 10);
+    const from = new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10);
+    const pdf = await client.raw('GET', `/me/accounts/${liveAccountId}/statement?from=${from}&to=${to}&format=pdf`);
+    assert.equal(pdf.status, 200, `statement pdf status ${pdf.status}`);
+    assert.equal(pdf.headers.get('content-type'), 'application/pdf');
+    assert.ok((pdf.headers.get('content-disposition') ?? '').includes('.pdf'));
+    const bytes = Buffer.from(await pdf.arrayBuffer());
+    assert.equal(bytes.subarray(0, 5).toString('ascii'), '%PDF-');
+    const csv = await client.raw('GET', `/me/accounts/${liveAccountId}/statement?from=${from}&to=${to}&format=csv`);
+    assert.equal(csv.status, 200);
+    const text = await csv.text();
+    assert.ok(text.includes('Opening balance') && text.includes('Closed trades') && text.includes('Ledger'));
+    assert.equal((await other.raw('GET', `/me/accounts/${liveAccountId}/statement?from=${from}&to=${to}`)).status, 404, 'not the owner');
+    assert.equal((await client.raw('GET', `/me/accounts/${liveAccountId}/statement?from=${to}&to=${from}`)).status, 400, 'end before start');
   });
 
   it('withdrawals: pending amounts reserve funds, cancel, approve, decline', async () => {

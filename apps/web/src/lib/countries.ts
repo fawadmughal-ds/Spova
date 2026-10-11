@@ -1,5 +1,6 @@
-/** Minimal list for the register form. Phase 4: full ISO list + blocked jurisdictions from config. */
+/** Country list for the register form (ISO 3166-1 alpha-2). Restricted jurisdictions are enforced server-side by compliance, not hidden here. */
 export const COUNTRIES: [string, string][] = [
+  ['US', 'United States'],
   ['AE', 'United Arab Emirates'],
   ['SA', 'Saudi Arabia'],
   ['QA', 'Qatar'],
@@ -40,4 +41,10 @@ export const COUNTRIES: [string, string][] = [
   ['AR', 'Argentina'],
   ['CL', 'Chile'],
   ['CO', 'Colombia'],
+  ['CA', 'Canada'],
+  ['JP', 'Japan'],
+  ['KR', 'South Korea'],
+  ['LK', 'Sri Lanka'],
+  ['NP', 'Nepal'],
+  ['HK', 'Hong Kong'],
 ];

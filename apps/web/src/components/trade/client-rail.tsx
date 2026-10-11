@@ -11,7 +11,7 @@ import { fmtNum } from './format';
 import { LANGUAGES, flagEmoji, setLang, useLang, useT, type Lang } from './i18n';
 
 /** Client-area modules that open as overlays over the terminal (the reference never leaves the chart). */
-export type RailPanel = 'deposit' | 'accounts' | 'payments' | 'documents' | 'statement' | 'help' | 'profile';
+export type RailPanel = 'dashboard' | 'deposit' | 'accounts' | 'payments' | 'documents' | 'statement' | 'help' | 'profile';
 
 /**
  * Client-area rail on the far left of the terminal: the white 88px column of the reference (Deposit,
@@ -36,9 +36,9 @@ export function ClientRail({ accounts, account, onSelectAccount, me, onLogout, o
 
       <ul className="trail-list">
         <li>
-          <Link href="/app" className="trail-item">
+          <button type="button" onClick={() => onOpen('dashboard')} className="trail-item">
             <LayoutDashboard /> {t('dashboard')}
-          </Link>
+          </button>
         </li>
         <li>
           <button type="button" onClick={() => onOpen('deposit')} className="trail-item trail-item-deposit">
@@ -210,8 +210,9 @@ function UkFlag() {
 }
 
 /** Links of the rail for the mobile "More" sheet (the rail itself is desktop-only). */
-export function railLinks(t: (k: 'deposit' | 'accounts' | 'payments' | 'documents' | 'statement' | 'help' | 'profile') => string): { label: string; sub: string; panel: RailPanel; icon: ReactNode }[] {
+export function railLinks(t: (k: 'dashboard' | 'deposit' | 'accounts' | 'payments' | 'documents' | 'statement' | 'help' | 'profile') => string): { label: string; sub: string; panel: RailPanel; icon: ReactNode }[] {
   return [
+    { label: t('dashboard'), sub: 'Balances, verification, recent activity', panel: 'dashboard', icon: <LayoutDashboard /> },
     { label: t('deposit'), sub: 'Fund the account', panel: 'deposit', icon: <CircleDollarSign /> },
     { label: t('accounts'), sub: 'Demo and live accounts', panel: 'accounts', icon: <Wallet /> },
     { label: t('payments'), sub: 'Deposit and withdrawal history', panel: 'payments', icon: <CreditCard /> },

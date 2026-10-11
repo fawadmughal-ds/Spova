@@ -5,6 +5,7 @@ import { memoryStorage } from 'multer';
 import { z } from 'zod';
 import { KYC_MAX_BYTES, kycReviewSchema, kycUploadMetaSchema, paginationSchema, type KycReviewInput, type KycUploadMeta } from '@spova/shared';
 import { KycService } from './kyc.service';
+import { KycDeadlineService } from './kyc-deadline.service';
 import { ClientIp, CurrentUser, Roles } from '../../common/auth/decorators';
 import { ADMIN_ROLES, type AuthUser } from '../../common/auth/auth.types';
 import { ZodPipe } from '../../common/pipes/zod.pipe';
@@ -57,7 +58,27 @@ export class KycController {
 @Controller('admin/kyc')
 @Roles('admin', 'superadmin')
 export class KycAdminController {
-  constructor(private readonly kyc: KycService) {}
+  constructor(
+    private readonly kyc: KycService,
+    private readonly deadline: KycDeadlineService,
+  ) {}
+
+  /** Clients still missing documents: frozen first, then by deadline. */
+  @Get('deadlines')
+  deadlines() {
+    return this.deadline.deadlines();
+  }
+
+  /** Run the reminder / freeze sweep now instead of waiting for the hourly tick. */
+  @Post('sweep')
+  sweep() {
+    return this.deadline.sweep();
+  }
+
+  @Post('users/:id/unfreeze')
+  unfreeze(@CurrentUser() actor: AuthUser, @ClientIp() ip: string, @Param('id') id: string) {
+    return this.deadline.unfreeze({ id: actor.id, ip }, id);
+  }
 
   @Get()
   queue(@Query(new ZodPipe(queueQuery)) q: z.infer<typeof queueQuery>) {

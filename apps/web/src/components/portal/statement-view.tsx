@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { fileUrl } from '@/lib/api';
+import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { ArrowLeft, Coins, FileDown, LineChart, Lock, Scale, WalletMinimal } from 'lucide-react';
 import type { AccountDto } from '@spova/shared';
@@ -13,6 +15,11 @@ import { AccountPlate } from '@/components/portal/account-plate';
 
 export function StatementView({ id, embedded = false }: { id: string; embedded?: boolean }) {
   const [acc, setAcc] = useState<AccountDto | null>(null);
+  const today = new Date().toISOString().slice(0, 10);
+  const [from, setFrom] = useState(new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10));
+  const [to, setTo] = useState(today);
+  const rangeOk = from <= to;
+  const dl = (format: 'pdf' | 'csv') => fileUrl(`/me/accounts/${id}/statement?from=${from}&to=${to}&format=${format}`);
   const [version, setVersion] = useState(0);
 
   useEffect(() => {
@@ -80,11 +87,25 @@ export function StatementView({ id, embedded = false }: { id: string; embedded?:
         title="Statement"
         className="animate-page-in mt-5 [animation-delay:380ms]"
         action={
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-white/10 px-2.5 py-1 text-[11px] text-ink-500">
-            <FileDown className="h-3.5 w-3.5" /> PDF export arrives with milestone 2
-          </span>
+          <form className="flex flex-wrap items-end gap-2" onSubmit={(e) => e.preventDefault()}>
+            <label className="text-[11px] text-ink-400">
+              From
+              <input type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} className="ml-1.5 h-8 rounded-lg border border-white/10 bg-white/[0.03] px-2 text-xs text-white outline-none focus:border-brand-400/60" />
+            </label>
+            <label className="text-[11px] text-ink-400">
+              To
+              <input type="date" value={to} min={from} max={today} onChange={(e) => setTo(e.target.value)} className="ml-1.5 h-8 rounded-lg border border-white/10 bg-white/[0.03] px-2 text-xs text-white outline-none focus:border-brand-400/60" />
+            </label>
+            <a href={rangeOk ? dl('pdf') : undefined} download aria-disabled={!rangeOk} className={cn('inline-flex h-8 items-center gap-1.5 rounded-full bg-brand-500 px-3 text-xs font-semibold text-[#ffffff] transition-transform hover:-translate-y-0.5', !rangeOk && 'pointer-events-none opacity-50')}>
+              <FileDown className="h-3.5 w-3.5" /> PDF
+            </a>
+            <a href={rangeOk ? dl('csv') : undefined} download aria-disabled={!rangeOk} className={cn('inline-flex h-8 items-center gap-1.5 rounded-full border border-white/15 px-3 text-xs font-semibold text-white transition-colors hover:border-brand-400/50', !rangeOk && 'pointer-events-none opacity-50')}>
+              <FileDown className="h-3.5 w-3.5" /> CSV
+            </a>
+          </form>
         }
       >
+        <p className="mb-3 text-xs text-ink-400">The download covers {from} to {to}: opening and closing balance, every deposit, withdrawal, credit and trade closed in the period. The table below is the live ledger.</p>
         <LedgerTable basePath={`/me/accounts/${id}`} version={version} />
       </Card>
     </>

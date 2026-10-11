@@ -8,6 +8,7 @@ import { get } from '@/lib/api';
 import { cn, fmtMoney } from '@/lib/utils';
 import { PageHeader } from '@/components/app-shell';
 import { Badge, Card, Spinner, Stat } from '@/components/ui';
+import { KycDeadlines } from '@/components/admin/kyc-deadlines';
 
 const link = (href: string, label: string) => (
   <span className="inline-flex items-center gap-1 text-brand-300">
@@ -59,7 +60,14 @@ export default function AdminHome() {
             <Stat label="Withdrawals today" value={fmtMoney(d.withdrawalsToday)} sub="Approved, USD" tone="down" />
             <Stat label="Live balances" value={fmtMoney(d.liveBalanceTotal)} sub="USD, client money" />
             <Stat label="Open positions" value={d.openPositions} sub={`Demo balances ${fmtMoney(d.demoBalanceTotal)} (virtual)`} />
+            <Link href="/admin/kyc" className="block rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/60">
+              <Stat label="Documents due in 3 days" value={d.kycDueSoon} sub="Clients reminded, not yet complete" tone={d.kycDueSoon > 0 ? 'down' : undefined} />
+            </Link>
+            <Link href="/admin/kyc" className="block rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/60">
+              <Stat label="Frozen for documents" value={d.kycFrozen} sub="Trading paused until uploads arrive" tone={d.kycFrozen > 0 ? 'down' : undefined} />
+            </Link>
           </div>
+          <KycDeadlines limit={6} className="mt-6" />
 
           <div className="mt-6 grid gap-5 lg:grid-cols-[1.3fr_1fr]">
             <Card title="Open exposure by instrument" action={<Link href="/admin/trades" className="text-xs text-brand-300">All positions</Link>}>

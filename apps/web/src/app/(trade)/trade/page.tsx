@@ -23,6 +23,8 @@ import { AccountsView } from '@/components/portal/accounts-view';
 import { StatementView } from '@/components/portal/statement-view';
 import { HelpView } from '@/components/portal/help-view';
 import { ProfileView } from '@/components/portal/profile-view';
+import { DashboardView } from '@/components/portal/dashboard-view';
+import { KycDeadlineBanner } from '@/components/kyc-deadline-banner';
 import { useT, type StringKey } from '@/components/trade/i18n';
 import { InfoPanel, MarketPanel, QuickTrade } from '@/components/trade/market-panel';
 import { ChartPanel } from '@/components/trade/chart-panel';
@@ -368,11 +370,12 @@ function Terminal() {
       {panel && <RailOverlay panel={panel} accountId={account?.id} onClose={() => setPanel(null)} />}
       <div className="terminal flex h-dvh min-w-0 flex-1 flex-col overflow-hidden" data-theme={settings.theme}>
       <div className="hidden lg:block">
-        <TopBar accounts={all} account={account} onSelectAccount={selectAccount} connected={connected} view={view} onView={setView} positions={openPositions} symbols={symbolMap} notices={notices} email={me?.email} onLogout={() => void logout()} />
+        <TopBar accounts={all} account={account} onSelectAccount={selectAccount} connected={connected} view={view} onView={setView} onDashboard={() => setPanel('dashboard')} positions={openPositions} symbols={symbolMap} notices={notices} email={me?.email} onLogout={() => void logout()} />
       </div>
       <MobileHeader className="lg:hidden" accounts={all} account={account} onSelectAccount={selectAccount} onDeposit={() => setPanel('deposit')} onMenu={() => setMtab('more')} bell={<BellMenu notices={notices} />} />
       <PlatformStrip />
-      {account?.tradingBlocked && <TradingBlockedBanner />}
+      <KycDeadlineBanner onDocuments={() => setPanel('documents')} />
+      {account?.tradingBlocked && !me?.kyc.frozen && <TradingBlockedBanner />}
       {marginCall && level !== null && <MarginCallStrip level={level} />}
       {stopOut && <StopOutCard notice={stopOut} onDismiss={() => setStopOut(null)} />}
 
@@ -457,18 +460,6 @@ function Terminal() {
           <section className="t-panel min-h-0 flex-1 lg:hidden" aria-label="More">
             <div className="t-bar !pl-4 text-[14px] font-semibold text-white">{t('more')}</div>
             <ul className="p-2">
-              <li>
-                <Link href="/app" className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-white/[0.04]">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-md bg-[var(--t-raised)] text-[var(--t-blue)] [&>svg]:h-4 [&>svg]:w-4">
-                    <LayoutDashboard />
-                  </span>
-                  <span className="leading-tight">
-                    <span className="block text-[14px] font-semibold text-white">{t('dashboard')}</span>
-                    <span className="block text-[12px] text-[var(--t-muted)]">Back to the client area</span>
-                  </span>
-                  <ChevronRight className="ml-auto h-4 w-4 text-[var(--t-muted)]" />
-                </Link>
-              </li>
               <li>
                 <button type="button" onClick={() => settingsStore.patch({ theme: settings.theme === 'dark' ? 'light' : 'dark' })} className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-white/[0.04]">
                   <span className="flex h-9 w-9 items-center justify-center rounded-md bg-[var(--t-raised)] text-[var(--t-text-2)] [&>svg]:h-4 [&>svg]:w-4">{settings.theme === 'dark' ? <Sun /> : <Moon />}</span>
@@ -569,7 +560,7 @@ export default function TradePage() {
   );
 }
 
-const PANEL_LABEL: Record<RailPanel, string> = { deposit: 'Deposit', accounts: 'Trading accounts', payments: 'Payments', documents: 'Documents', statement: 'Statement', help: 'Help', profile: 'Profile' };
+const PANEL_LABEL: Record<RailPanel, string> = { dashboard: 'Dashboard', deposit: 'Deposit', accounts: 'Trading accounts', payments: 'Payments', documents: 'Documents', statement: 'Statement', help: 'Help', profile: 'Profile' };
 
 /** Client-area module drawn over the terminal (light palette), like the reference's modal client area. */
 function RailOverlay({ panel, accountId, onClose }: { panel: RailPanel; accountId: string | undefined; onClose: () => void }) {
@@ -590,6 +581,7 @@ function RailOverlay({ panel, accountId, onClose }: { panel: RailPanel; accountI
               <X className="h-5 w-5" />
             </button>
             <Suspense fallback={<Skeleton className="h-96 rounded-2xl" />}>
+              {panel === 'dashboard' && <DashboardView />}
               {panel === 'deposit' && <PaymentsView embedded initialTab="deposit" />}
               {panel === 'payments' && <PaymentsView embedded initialTab="history" />}
               {panel === 'accounts' && <AccountsView />}

@@ -1,7 +1,9 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
-import { createAccountSchema, paginationSchema, type LedgerEntryDto } from '@spova/shared';
+import { Body, Controller, Get, Param, Post, Query, Res } from '@nestjs/common';
+import type { Response } from 'express';
+import { createAccountSchema, paginationSchema, statementQuerySchema, type LedgerEntryDto, type StatementQuery } from '@spova/shared';
 import { z } from 'zod';
 import { AccountsService } from './accounts.service';
+import { StatementService } from './statement.service';
 import { LedgerService } from '../ledger/ledger.service';
 import { CurrentUser } from '../../common/auth/decorators';
 import type { AuthUser } from '../../common/auth/auth.types';
@@ -28,6 +30,7 @@ export class AccountsController {
   constructor(
     private readonly accounts: AccountsService,
     private readonly ledger: LedgerService,
+    private readonly statement: StatementService,
   ) {}
 
   @Get()
@@ -47,6 +50,17 @@ export class AccountsController {
   async one(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     const acc = await this.accounts.getOwned(user.id, id);
     return this.accounts.toDto(acc);
+  }
+
+  /** Dated statement (PDF or CSV) of the client's own account. */
+  @Get(':id/statement')
+  async statementFile(@CurrentUser() user: AuthUser, @Param('id') id: string, @Query(new ZodPipe(statementQuerySchema)) q: StatementQuery, @Res() res: Response) {
+    await this.accounts.getOwned(user.id, id);
+    const out = await this.statement.build(id, q);
+    res.setHeader('Content-Type', out.mime);
+    res.setHeader('Content-Disposition', `attachment; filename="${out.filename}"`);
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.send(out.body);
   }
 
   @Get(':id/ledger')

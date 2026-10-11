@@ -47,7 +47,7 @@ export class AdminService {
     const weekAgo = new Date(Date.now() - 7 * 86400 * 1000);
     const dayAgo = new Date(Date.now() - 86400 * 1000);
     const todayUtc = new Date(new Date().toISOString().slice(0, 10));
-    const [clients, newClients7d, pendingKyc, pendingPayments, openPositions, demoSum, liveSum, openTickets, depToday, wdToday, pendDep, pendWd, active, exposureRows, feedStatus, platform] = await Promise.all([
+    const [clients, newClients7d, pendingKyc, pendingPayments, openPositions, demoSum, liveSum, openTickets, depToday, wdToday, pendDep, pendWd, active, exposureRows, feedStatus, platform, kycFrozen, dueSoonUsers] = await Promise.all([
       this.prisma.user.count({ where: { role: 'client' } }),
       this.prisma.user.count({ where: { role: 'client', createdAt: { gte: weekAgo } } }),
       this.prisma.kycDocument.count({ where: { status: 'pending' } }),
@@ -64,6 +64,8 @@ export class AdminService {
       this.prisma.position.groupBy({ by: ['symbolId', 'side'], where: { status: 'open' }, _sum: { lots: true }, _count: { _all: true } }),
       this.redis.client.mget('feed:binance:status', 'feed:finnhub:status', 'feed:oanda:status', 'feed:synthetic:status'),
       this.settings.get<{ tradingHalt?: { enabled?: boolean } }>('platform', {}),
+      this.prisma.user.count({ where: { role: 'client', status: 'active', kycFrozenAt: { not: null } } }),
+      this.prisma.user.findMany({ where: { role: 'client', status: 'active', kycFrozenAt: null, kycDeadlineAt: { lte: new Date(Date.now() + 3 * 86400 * 1000) } }, select: { id: true } }),
     ]);
     const bySymbol = new Map<string, { buy: number; sell: number; positions: number }>();
     for (const r of exposureRows) {
@@ -94,7 +96,18 @@ export class AdminService {
       exposure,
       feeds,
       tradingHalt: !!platform.tradingHalt?.enabled,
+      kycFrozen,
+      kycDueSoon: await this.countIncomplete(dueSoonUsers.map((u) => u.id)),
     };
+  }
+
+  /** How many of these users still miss at least one of the four document groups. */
+  private async countIncomplete(ids: string[]) {
+    if (ids.length === 0) return 0;
+    const docs = await this.prisma.kycDocument.groupBy({ by: ['userId', 'group'], where: { userId: { in: ids }, status: { not: 'rejected' } } });
+    const per = new Map<string, number>();
+    for (const d of docs) per.set(d.userId, (per.get(d.userId) ?? 0) + 1);
+    return ids.filter((id) => (per.get(id) ?? 0) < 4).length;
   }
 
   // ---------------------------------------------------------------- users
@@ -130,6 +143,8 @@ export class AdminService {
       email: u.email,
       role: u.role,
       status: u.status,
+      kycDeadlineAt: u.kycDeadlineAt?.toISOString() ?? null,
+      kycFrozen: !!u.kycFrozenAt,
       firstName: u.profile?.firstName ?? null,
       lastName: u.profile?.lastName ?? null,
       countryCode: u.profile?.countryCode ?? null,
@@ -145,12 +160,14 @@ export class AdminService {
   async getUser(id: string): Promise<AdminUserDetailDto> {
     const u = await this.prisma.user.findUnique({ where: { id }, include: { profile: true, accounts: { orderBy: { createdAt: 'asc' } } } });
     if (!u) throw ApiError.notFound('user_not_found', 'User not found');
-    const me = this.auth.toMe(u);
+    const me = await this.auth.toMe(u);
     return {
       id: u.id,
       email: u.email,
       role: u.role,
       status: u.status,
+      kycDeadlineAt: u.kycDeadlineAt?.toISOString() ?? null,
+      kycFrozen: !!u.kycFrozenAt,
       firstName: u.profile?.firstName ?? null,
       lastName: u.profile?.lastName ?? null,
       countryCode: u.profile?.countryCode ?? null,
@@ -166,7 +183,7 @@ export class AdminService {
     };
   }
 
-  async updateUser(actor: Actor, id: string, patch: { status?: 'active' | 'frozen' | 'closed'; notes?: string | null }) {
+  async updateUser(actor: Actor, id: string, patch: { status?: 'active' | 'frozen' | 'closed'; notes?: string | null; kycDeadlineAt?: string }) {
     const before = await this.prisma.user.findUnique({ where: { id }, select: { status: true, adminNotes: true, role: true } });
     if (!before) throw ApiError.notFound('user_not_found', 'User not found');
     if (before.role !== 'client' && actor.role !== 'superadmin') throw ApiError.forbidden('staff_protected', 'Only superadmin can modify staff');
@@ -177,6 +194,7 @@ export class AdminService {
         data: {
           ...(patch.status !== undefined && { status: patch.status }),
           ...(patch.notes !== undefined && { adminNotes: patch.notes }),
+          ...(patch.kycDeadlineAt !== undefined && { kycDeadlineAt: new Date(patch.kycDeadlineAt), kycReminderSentAt: null }),
         },
         select: { status: true, adminNotes: true },
       });

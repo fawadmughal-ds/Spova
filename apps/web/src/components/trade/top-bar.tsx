@@ -258,6 +258,7 @@ export function TopBar({
   notices,
   email,
   onLogout,
+  onDashboard,
 }: {
   accounts: AccountDto[];
   account: AccountDto | undefined;
@@ -270,6 +271,8 @@ export function TopBar({
   notices: NoticeItem[];
   email: string | undefined;
   onLogout: () => void;
+  /** opens the client dashboard as an overlay instead of leaving the terminal */
+  onDashboard?: () => void;
 }) {
   const { theme } = useSettings();
   const t = useT();
@@ -314,9 +317,9 @@ export function TopBar({
         <span className={cn('t-top-btn hidden sm:inline-flex', connected ? 'text-[var(--t-ok)]' : 'text-[var(--t-alert)]')} title={connected ? 'Connected to the price stream' : 'Reconnecting…'} aria-live="polite">
           {mounted && connected ? <Wifi /> : <WifiOff />}
         </span>
-        <Link href="/app" className="t-top-btn !w-auto gap-1.5 !px-2.5 text-[12px] font-semibold" title={t('dashboard')}>
+        <button type="button" onClick={onDashboard} className="t-top-btn !w-auto gap-1.5 !px-2.5 text-[12px] font-semibold" title={t('dashboard')}>
           <LayoutDashboard /> <span className="hidden md:inline">{t('dashboard')}</span>
-        </Link>
+        </button>
         <button type="button" onClick={() => settingsStore.patch({ theme: theme === 'dark' ? 'light' : 'dark' })} className="t-top-btn" title={theme === 'dark' ? 'Switch to the light theme' : 'Switch to the dark theme'} aria-pressed={theme === 'dark'}>
           {theme === 'dark' ? <Sun /> : <Moon />}
         </button>

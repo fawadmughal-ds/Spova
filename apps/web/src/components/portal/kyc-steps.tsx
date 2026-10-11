@@ -21,7 +21,7 @@ const fromGroup = (s: GroupStatus | undefined, done: boolean): Exclude<StepState
  */
 export function KycSteps({ poi, por, status, cta = true, className }: { poi: boolean; por: boolean; status?: KycStatusMap | null; cta?: boolean; className?: string }) {
   const steps: { label: string; hint: string; icon: LucideIcon; state: StepState }[] = [
-    { label: 'Registered', hint: 'Demo account ready', icon: UserCheck, state: 'done' },
+    { label: 'Registered', hint: 'Live account open', icon: UserCheck, state: 'done' },
     { label: 'Identity', hint: 'Passport or ID card', icon: FileUser, state: fromGroup(status?.poi, poi) },
     { label: 'Address', hint: 'Utility bill or statement', icon: Home, state: fromGroup(status?.por, por) },
     { label: 'Live trading', hint: 'Deposits and withdrawals', icon: Rocket, state: poi && por ? 'done' : 'todo' },
@@ -40,7 +40,7 @@ export function KycSteps({ poi, por, status, cta = true, className }: { poi: boo
     ? 'A document was rejected. Check the reason and upload a clearer copy.'
     : pending
       ? 'Our compliance team is checking your documents. This usually takes under one business day.'
-      : 'Upload your ID and proof of address to unlock live trading and withdrawals.';
+      : 'Upload your documents within 15 days of sign-up to keep trading and unlock withdrawals.';
   const tone = rejected ? 'down' : pending ? 'sky' : 'gold';
   const corner = rejected ? 'rgb(var(--down-rgb) / 0.4)' : pending ? 'rgb(2 132 199 / 0.4)' : 'rgb(var(--gold-rgb) / 0.4)';
 

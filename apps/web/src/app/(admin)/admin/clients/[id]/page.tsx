@@ -4,7 +4,7 @@ import { use, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Lock, Unlock } from 'lucide-react';
 import type { AccountDto, AdminUserDetailDto } from '@spova/shared';
-import { get, patch, ApiError } from '@/lib/api';
+import { get, patch, post, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { cn, fmtDate, fmtMoney } from '@/lib/utils';
 import { PageHeader } from '@/components/app-shell';
@@ -85,6 +85,11 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
             <Badge tone={statusTone[u.status]}>{u.status}</Badge>
             <Badge tone={u.kyc.poi ? 'success' : 'neutral'}>POI</Badge>
             <Badge tone={u.kyc.por ? 'success' : 'neutral'}>POR</Badge>
+            {u.kycFrozen ? (
+              <Badge tone="danger">Frozen: documents overdue</Badge>
+            ) : u.kycDeadlineAt ? (
+              <Badge tone={new Date(u.kycDeadlineAt).getTime() - Date.now() < 3 * 86_400_000 ? 'warning' : 'neutral'}>Documents due {fmtDate(u.kycDeadlineAt, false)}</Badge>
+            ) : null}
           </span>
         }
         action={
@@ -92,6 +97,28 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
             <Link href="/admin/clients" className="text-sm text-brand-300">
               ← Clients
             </Link>
+            {u.kycFrozen && (
+              <Button
+                size="sm"
+                variant="secondary"
+                loading={busy}
+                onClick={async () => {
+                  if (!confirm('Unfreeze trading and give the client 15 more days to upload the missing documents?')) return;
+                  setBusy(true);
+                  try {
+                    await post(`/admin/kyc/users/${id}/unfreeze`);
+                    toast({ title: 'Trading unfrozen', body: 'The client has 15 more days to upload the missing documents.', level: 'success' });
+                    await load();
+                  } catch (e) {
+                    toast({ title: 'Could not unfreeze', body: e instanceof ApiError ? e.message : undefined, level: 'danger' });
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+              >
+                <Unlock className="h-4 w-4" /> Unfreeze documents hold
+              </Button>
+            )}
             {u.status === 'frozen' ? (
               <Button size="sm" variant="secondary" loading={busy} onClick={() => void setStatus('active')}>
                 <Unlock className="h-4 w-4" /> Unfreeze

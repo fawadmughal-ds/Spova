@@ -43,7 +43,8 @@ describe('phase 3: quotes -> orders -> positions -> risk', () => {
     const a = await register(client, 'trader');
     await register(other, 'bystander');
     await adminLogin(admin);
-    accountId = a.me ? (await client.json('GET', '/me/accounts')).data.demo[0].id : '';
+    // trading tests run on a funded demo account (sign-up opens an empty live account)
+    accountId = a.me ? (await client.json('POST', '/me/accounts', { type: 'demo' })).data.id : '';
     await ensureQuote();
   });
 

@@ -9,6 +9,7 @@ import { buttonClass } from '@/lib/button';
 import { useAuth } from '@/lib/auth-context';
 import { Wordmark } from '@/components/logo';
 import { PlatformStrip } from '@/components/platform-notice';
+import { KycDeadlineBanner } from '@/components/kyc-deadline-banner';
 
 export interface NavItem {
   href: string;
@@ -264,6 +265,7 @@ export function AppShell({ nav, children, variant }: { nav: NavItem[]; children:
         <main key={path} className="animate-page-in relative flex-1 p-4 sm:p-6 lg:p-8">
           <div className="mx-auto max-w-[1320px]">
             {variant === 'client' && <PlatformStrip className="mb-5 overflow-hidden rounded-xl" />}
+            {variant === 'client' && <KycDeadlineBanner className="mb-5 overflow-hidden rounded-xl" />}
             {children}
           </div>
         </main>

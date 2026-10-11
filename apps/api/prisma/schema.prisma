@@ -153,6 +153,11 @@ model User {
   kycPoi          Boolean    @default(false) @map("kyc_poi")
   kycPor          Boolean    @default(false) @map("kyc_por")
   kycPayment      Boolean    @default(false) @map("kyc_payment")
+  /// documents must be uploaded by this time (15 days after sign-up); null for staff
+  kycDeadlineAt DateTime? @map("kyc_deadline_at") @db.Timestamptz
+  /// set when the deadline passed without all documents: trading is blocked until they arrive or an admin unfreezes
+  kycFrozenAt DateTime? @map("kyc_frozen_at") @db.Timestamptz
+  kycReminderSentAt DateTime? @map("kyc_reminder_sent_at") @db.Timestamptz
   tcAcceptedAt    DateTime?  @map("tc_accepted_at") @db.Timestamptz
   riskAcceptedAt  DateTime?  @map("risk_accepted_at") @db.Timestamptz
   lastLoginAt     DateTime?  @map("last_login_at") @db.Timestamptz

@@ -114,6 +114,8 @@ export const adminDebitSchema = z.object({
 export type AdminDebitInput = z.infer<typeof adminDebitSchema>;
 
 export const adminUpdateUserSchema = z.object({
+  /** move the document deadline (ISO datetime) */
+  kycDeadlineAt: z.string().datetime().optional(),
   status: z.enum(USER_STATUSES).optional(),
   notes: z.string().trim().max(2000).optional().nullable(),
 });
@@ -224,6 +226,15 @@ export const depositChannelsSchema = z.object({
   cashier: z.object({ enabled: z.boolean().default(true), footer: z.string().trim().max(1200).default('') }),
 });
 export type DepositChannels = z.infer<typeof depositChannelsSchema>;
+
+export const statementQuerySchema = z
+  .object({
+    from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'YYYY-MM-DD'),
+    to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'YYYY-MM-DD'),
+    format: z.enum(['pdf', 'csv']).default('pdf'),
+  })
+  .refine((v) => v.from <= v.to, { path: ['to'], message: 'End date is before the start date' });
+export type StatementQuery = z.infer<typeof statementQuerySchema>;
 
 export const cardIntentSchema = z.object({ accountId: z.string().uuid(), amount: moneySchema });
 export type CardIntentInput = z.infer<typeof cardIntentSchema>;

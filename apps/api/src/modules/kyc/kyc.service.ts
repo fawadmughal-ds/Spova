@@ -7,6 +7,7 @@ import { StorageService } from '../../infra/storage.service';
 import { MailService } from '../../infra/mail.service';
 import { RedisService } from '../../infra/redis.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
+import { KycDeadlineService } from './kyc-deadline.service';
 import { ApiError } from '../../common/errors';
 
 interface Actor {
@@ -49,6 +50,7 @@ export class KycService {
     private readonly mail: MailService,
     private readonly redis: RedisService,
     private readonly ws: RealtimeGateway,
+    private readonly deadline: KycDeadlineService,
   ) {}
 
   // ---------------------------------------------------------------- client
@@ -94,6 +96,8 @@ export class KycService {
     });
     this.ws.admin(WS_EVENTS.ADMIN_KYC_NEW, { id: doc.id, userId, group: doc.group, docType: doc.docType, email: user.email, createdAt: doc.createdAt.toISOString() });
     void this.mail.adminAlert('New KYC document', `${user.email} uploaded ${doc.group}/${doc.docType}. Review it in the back office.`).catch((e) => this.log.warn(e.message));
+    // a frozen client who now has every group uploaded gets trading back immediately
+    await this.deadline.unfreezeIfComplete(userId);
     return kycToDto(doc);
   }
 

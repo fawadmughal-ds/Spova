@@ -49,6 +49,8 @@ export class AuthService {
           riskAcceptedAt: now,
           lastLoginAt: now,
           lastLoginIp: meta.ip,
+          // every client gets 15 days to upload the four document groups (see KycDeadlineService)
+          kycDeadlineAt: new Date(now.getTime() + 15 * 86_400_000),
           profile: {
             create: {
               firstName: input.firstName,
@@ -61,14 +63,15 @@ export class AuthService {
         },
         include: { profile: true },
       });
-      const demo = await this.accounts.createInTx(tx, user.id, 'demo');
-      return { user, demo };
+      // sign-up opens a LIVE account straight away (the reference broker does the same); demo accounts are optional extras
+      const live = await this.accounts.createInTx(tx, user.id, 'live');
+      return { user, demo: live };
     });
 
     void this.mail.welcome(user.email, input.firstName, demo.loginCode).catch((e) => this.log.warn(e.message));
 
     const tokens = await this.issueTokens(user.id, user.role, meta);
-    return { me: this.toMe(user), tokens };
+    return { me: await this.toMe(user), tokens };
   }
 
   async login(input: LoginInput, meta: { ip: string; ua?: string }): Promise<{ me: MeDto; tokens: TokenPair }> {
@@ -90,7 +93,7 @@ export class AuthService {
     });
 
     const tokens = await this.issueTokens(user.id, user.role, meta);
-    return { me: this.toMe(user), tokens };
+    return { me: await this.toMe(user), tokens };
   }
 
   // ---------------------------------------------------------------- tokens
@@ -229,7 +232,7 @@ export class AuthService {
     return this.toMe(user);
   }
 
-  toMe(user: {
+  async toMe(user: {
     id: string;
     email: string;
     role: MeDto['role'];
@@ -237,6 +240,8 @@ export class AuthService {
     kycPoi: boolean;
     kycPor: boolean;
     kycPayment: boolean;
+    kycDeadlineAt?: Date | null;
+    kycFrozenAt?: Date | null;
     emailVerifiedAt: Date | null;
     profile: {
       firstName: string;
@@ -253,13 +258,23 @@ export class AuthService {
       notifPush: boolean;
       notifCalls: boolean;
     } | null;
-  }): MeDto {
+  }): Promise<MeDto> {
+    const groups = user.role === 'client' ? await this.prisma.kycDocument.findMany({ where: { userId: user.id, status: { not: 'rejected' } }, select: { group: true }, distinct: ['group'] }) : [];
+    const deadline = user.kycDeadlineAt ?? null;
     return {
       id: user.id,
       email: user.email,
       role: user.role,
       status: user.status,
-      kyc: { poi: user.kycPoi, por: user.kycPor, payment: user.kycPayment },
+      kyc: {
+        poi: user.kycPoi,
+        por: user.kycPor,
+        payment: user.kycPayment,
+        deadlineAt: deadline ? deadline.toISOString() : null,
+        daysLeft: deadline ? Math.ceil((deadline.getTime() - Date.now()) / 86_400_000) : null,
+        complete: groups.length >= 4,
+        frozen: !!user.kycFrozenAt,
+      },
       emailVerified: !!user.emailVerifiedAt,
       profile: user.profile
         ? {
