@@ -28,7 +28,7 @@ jobs:
       JWT_REFRESH_SECRET: ci-refresh-secret-ci-refresh-secret-ci-refresh-secret
       NEXT_PUBLIC_API_URL: http://localhost:4000
       NEXT_PUBLIC_WS_URL: http://localhost:4000
-      NEXT_PUBLIC_BRAND_NAME: XYZ
+      NEXT_PUBLIC_BRAND_NAME: Zerventa
       INTERNAL_TOKEN: ci-internal-token-ci-internal-token-ci
     steps:
       - uses: actions/checkout@v4
@@ -58,7 +58,7 @@ jobs:
           pnpm --filter @spova/api test:e2e || { cat api.log; exit 1; }
           kill %1 || true
         env:
-          SEED_ADMIN_EMAIL: admin@xyz.local
+          SEED_ADMIN_EMAIL: admin@zerventa.local
           SEED_ADMIN_PASSWORD: Admin@12345
           API_URL: http://localhost:4000
       - run: pnpm --filter @spova/web build
