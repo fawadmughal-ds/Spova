@@ -37,7 +37,7 @@ const schema = z.object({
   APP_DOMAIN: z.string().default('localhost'),
   MAIL_PROVIDER: z.enum(['console', 'resend']).default('console'),
   RESEND_API_KEY: z.string().optional().default(''),
-  MAIL_FROM: z.string().default('no-reply@localhost'),
+  MAIL_FROM: z.string().default('info@zerventa.com'),
   // phase 2: private file storage for KYC documents
   STORAGE_DRIVER: z.enum(['local', 's3']).default('local'),
   STORAGE_LOCAL_DIR: z.string().default('infra/data/uploads'),

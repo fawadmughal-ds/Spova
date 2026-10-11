@@ -83,13 +83,18 @@ export class KycDeadlineService implements OnModuleInit, OnModuleDestroy {
       if (deadline.getTime() <= now.getTime()) {
         await this.freeze(u.id, u.email, u.profile?.firstName ?? '', !!u.profile?.notifEmail);
         frozen++;
-      } else if (!u.kycReminderSentAt) {
+      } else {
+        // remind once per day while 3, 2 or 1 days remain (kycReminderSentAt holds the last reminder's date)
         const days = Math.max(1, KycDeadlineService.daysLeft(deadline, now.getTime()));
-        await this.prisma.user.update({ where: { id: u.id }, data: { kycReminderSentAt: now } });
-        await this.prisma.notification.create({ data: { userId: u.id, type: 'kyc', title: `${days} day${days === 1 ? '' : 's'} left to upload your documents`, body: 'Upload proof of identity, proof of residence, a payment document and any other requested document, or trading will be paused.' } });
-        this.ws.notice(u.id, { type: 'kyc', title: `${days} day${days === 1 ? '' : 's'} left to upload your documents`, body: 'Go to Documents to finish verification before the deadline.', level: 'warning' });
-        if (u.profile?.notifEmail !== false) void this.mail.kycReminder(u.email, u.profile?.firstName ?? '', days, deadline).catch((e) => this.log.warn(e.message));
-        reminded++;
+        const lastDay = u.kycReminderSentAt ? u.kycReminderSentAt.toISOString().slice(0, 10) : null;
+        const today = now.toISOString().slice(0, 10);
+        if (days <= KYC_REMINDER_DAYS && lastDay !== today) {
+          await this.prisma.user.update({ where: { id: u.id }, data: { kycReminderSentAt: now } });
+          await this.prisma.notification.create({ data: { userId: u.id, type: 'kyc', title: `${days} day${days === 1 ? '' : 's'} left to upload your documents`, body: 'Upload proof of identity, proof of residence, a payment document and any other requested document, or trading will be paused.' } });
+          this.ws.notice(u.id, { type: 'kyc', title: `${days} day${days === 1 ? '' : 's'} left to upload your documents`, body: 'Go to Documents to finish verification before the deadline.', level: 'warning' });
+          if (u.profile?.notifEmail !== false) void this.mail.kycReminder(u.email, u.profile?.firstName ?? '', days, deadline).catch((e) => this.log.warn(e.message));
+          reminded++;
+        }
       }
     }
     if (reminded || frozen) this.log.warn({ reminded, frozen }, 'kyc deadline sweep');

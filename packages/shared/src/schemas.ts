@@ -239,6 +239,22 @@ export const depositChannelsSchema = z.object({
 });
 export type DepositChannels = z.infer<typeof depositChannelsSchema>;
 
+/** Which notification emails the back office sends. Toggle each on/off from the admin dashboard. */
+export const EMAIL_TYPES = ['welcome', 'login', 'kycReminder', 'kycFrozen', 'kycUnfrozen', 'creditAdded', 'depositInvite'] as const;
+export type EmailType = (typeof EMAIL_TYPES)[number];
+export const emailSettingsSchema = z.object({
+  welcome: z.boolean().default(true),
+  login: z.boolean().default(true),
+  kycReminder: z.boolean().default(true),
+  kycFrozen: z.boolean().default(true),
+  kycUnfrozen: z.boolean().default(true),
+  creditAdded: z.boolean().default(true),
+  depositInvite: z.boolean().default(true),
+});
+export type EmailSettings = z.infer<typeof emailSettingsSchema>;
+export const DEFAULT_EMAIL_SETTINGS: EmailSettings = { welcome: true, login: true, kycReminder: true, kycFrozen: true, kycUnfrozen: true, creditAdded: true, depositInvite: true };
+export const EMAIL_SETTINGS_KEY = 'email_settings';
+
 export const statementQuerySchema = z
   .object({
     from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'YYYY-MM-DD'),

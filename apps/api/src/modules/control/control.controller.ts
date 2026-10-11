@@ -14,8 +14,7 @@ import {
   type RiskConfigInput,
   type StaffCreateInput,
   type StaffPatchInput,
-  type Tier,
-} from '@spova/shared';
+  type Tier, emailSettingsSchema, type EmailSettings } from '@spova/shared';
 import { ControlService } from './control.service';
 import { ClientIp, CurrentUser, Public, Roles } from '../../common/auth/decorators';
 import type { AuthUser } from '../../common/auth/auth.types';
@@ -56,6 +55,16 @@ export class ControlController {
   @Put('platform')
   setPlatform(@CurrentUser() actor: AuthUser, @ClientIp() ip: string, @Body(new ZodPipe(platformSettingsSchema)) body: PlatformSettings) {
     return this.control.setPlatform({ ...actor, ip }, body);
+  }
+
+  @Get('email-settings')
+  emailSettings() {
+    return this.control.emailSettings();
+  }
+
+  @Put('email-settings')
+  setEmailSettings(@CurrentUser() actor: AuthUser, @ClientIp() ip: string, @Body(new ZodPipe(emailSettingsSchema)) body: EmailSettings) {
+    return this.control.setEmailSettings({ ...actor, ip }, body);
   }
 
   @Get('staff')

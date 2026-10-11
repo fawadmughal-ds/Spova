@@ -494,6 +494,24 @@ describe('phase 2: kyc -> live account -> payments -> tickets', () => {
     assert.equal(removed.data.account.credit, '0.00');
   });
 
+  it('notification emails toggle from the back office, and a client can be sent a deposit email', async () => {
+    const defaults = await admin.json('GET', '/admin/email-settings');
+    assert.equal(defaults.status, 200);
+    assert.equal(defaults.data.welcome, true);
+    assert.equal(defaults.data.login, true);
+    const off = await admin.json('PUT', '/admin/email-settings', { ...defaults.data, login: false });
+    assert.equal(off.status, 200, JSON.stringify(off.data));
+    assert.equal(off.data.login, false);
+    assert.equal((await admin.json('GET', '/admin/email-settings')).data.login, false);
+    assert.equal((await admin.json('PUT', '/admin/email-settings', defaults.data)).status, 200, 'restore');
+    assert.equal((await client.json('GET', '/admin/email-settings')).status, 403, 'clients cannot read email settings');
+
+    const sent = await admin.json('POST', `/admin/users/${clientId}/deposit-email`);
+    assert.ok([200, 201].includes(sent.status), JSON.stringify(sent.data));
+    assert.equal(sent.data.sent, true);
+    assert.equal((await client.json('POST', `/admin/users/${clientId}/deposit-email`)).status, 403, 'clients cannot trigger emails');
+  });
+
   // ---------------------------------------------------------------- tickets
   it('support tickets round-trip between client and staff', async () => {
     assert.equal((await client.json('POST', '/me/tickets', { subject: 'Hi', message: 'short' })).status, 400);

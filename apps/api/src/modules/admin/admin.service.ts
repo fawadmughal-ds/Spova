@@ -291,7 +291,18 @@ export class AdminService {
     });
 
     await this.afterMoneyChange(result.account.userId, result.account, `+${money(amount)} ${result.account.currency} ${input.type}`, input.reason);
+    const cu = await this.prisma.user.findUnique({ where: { id: result.account.userId }, select: { email: true, profile: { select: { firstName: true, notifEmail: true } } } });
+    if (cu?.profile?.notifEmail !== false) void this.mail.creditAdded(cu!.email, cu!.profile?.firstName ?? '', money(amount), result.account.currency, result.account.loginCode, input.type).catch((e) => this.log.warn(e.message));
     return { entryId, account: await this.accounts.toDto(result.account) };
+  }
+
+  /** Admin button: email the client a prompt to fund their account. */
+  async sendDepositEmail(actor: Actor, userId: string) {
+    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { email: true, role: true, profile: { select: { firstName: true } } } });
+    if (user.role !== 'client') throw ApiError.badRequest('not_a_client', 'Deposit emails go to clients only');
+    await this.mail.depositInvite(user.email, user.profile?.firstName ?? '');
+    await this.prisma.adminAudit.create({ data: { actorId: actor.id, action: 'user.deposit_email', targetType: 'user', targetId: userId, ip: actor.ip } });
+    return { sent: true };
   }
 
   /** POST /admin/accounts/:id/debit  {amount, reason, type: withdraw|debit|fee, force?} */

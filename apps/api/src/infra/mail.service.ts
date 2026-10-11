@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Resend } from 'resend';
+import { DEFAULT_EMAIL_SETTINGS, EMAIL_SETTINGS_KEY, type EmailSettings, type EmailType } from '@spova/shared';
 import { env } from '../config/env';
+import { SettingsService } from './settings.service';
 
 interface Mail {
   to: string;
@@ -18,6 +20,14 @@ export class MailService {
   private readonly log = new Logger('Mail');
   private readonly resend = env.MAIL_PROVIDER === 'resend' && env.RESEND_API_KEY ? new Resend(env.RESEND_API_KEY) : null;
 
+  constructor(private readonly settings: SettingsService) {}
+
+  /** A notification type the admin can switch off from the dashboard. Transactional mail (password reset, payment result) is not gated. */
+  private async enabled(type: EmailType): Promise<boolean> {
+    const cfg = await this.settings.getCached<EmailSettings>(EMAIL_SETTINGS_KEY, DEFAULT_EMAIL_SETTINGS, 10000);
+    return cfg[type] !== false;
+  }
+
   async send(mail: Mail): Promise<void> {
     if (!this.resend) {
       this.log.log(`\n--- MAIL (console) ---\nTo: ${mail.to}\nSubject: ${mail.subject}\n\n${mail.text}\n----------------------`);
@@ -33,7 +43,8 @@ export class MailService {
     if (error) this.log.error(`resend failed: ${error.message}`);
   }
 
-  welcome(to: string, firstName: string, loginCode: number) {
+  async welcome(to: string, firstName: string, loginCode: number) {
+    if (!(await this.enabled('welcome'))) return;
     const brand = env.BRAND_NAME;
     return this.send({
       to,
@@ -106,7 +117,8 @@ ${disclaimer}`;
   }
 
   /** Back-office alert; silently skipped when ADMIN_NOTIFY_EMAIL is empty. */
-  kycReminder(to: string, firstName: string, days: number, deadline: Date) {
+  async kycReminder(to: string, firstName: string, days: number, deadline: Date) {
+    if (!(await this.enabled('kycReminder'))) return;
     const brand = env.BRAND_NAME;
     const when = deadline.toISOString().slice(0, 10);
     const link = `${env.WEB_ORIGIN.split(',')[0]}/app/documents`;
@@ -118,7 +130,8 @@ ${disclaimer}`;
     });
   }
 
-  kycFrozen(to: string, firstName: string) {
+  async kycFrozen(to: string, firstName: string) {
+    if (!(await this.enabled('kycFrozen'))) return;
     const brand = env.BRAND_NAME;
     const link = `${env.WEB_ORIGIN.split(',')[0]}/app/documents`;
     return this.send({
@@ -129,9 +142,41 @@ ${disclaimer}`;
     });
   }
 
-  kycUnfrozen(to: string, firstName: string) {
+  async kycUnfrozen(to: string, firstName: string) {
+    if (!(await this.enabled('kycUnfrozen'))) return;
     const brand = env.BRAND_NAME;
     return this.send({ to, subject: `${brand}: trading resumed`, text: `Hi ${firstName},\n\nTrading on your ${brand} account is open again.`, html: `<p>Hi ${esc(firstName)},</p><p>Trading on your ${esc(brand)} account is open again.</p>` });
+  }
+
+  /** New sign-in notice. */
+  async login(to: string, firstName: string, when: Date, ip?: string) {
+    if (!(await this.enabled('login'))) return;
+    const brand = env.BRAND_NAME;
+    const ts = when.toISOString().replace('T', ' ').slice(0, 16) + ' UTC';
+    const body = `Hi ${firstName},\n\nWe noticed a sign-in to your ${brand} account on ${ts}${ip ? ` from ${ip}` : ''}. If this was you, no action is needed. If not, reset your password immediately and contact support.`;
+    return this.send({ to, subject: `${brand}: new sign-in to your account`, text: body, html: `<p>Hi ${esc(firstName)},</p><p>We noticed a sign-in to your ${esc(brand)} account on <b>${ts}</b>${ip ? ` from <b>${esc(ip)}</b>` : ''}.</p><p>If this was you, no action is needed. If not, reset your password immediately and contact support.</p>` });
+  }
+
+  /** Credit / bonus / funds added to an account by the back office. */
+  async creditAdded(to: string, firstName: string, amount: string, currency: string, loginCode: number, typeLabel: string) {
+    if (!(await this.enabled('creditAdded'))) return;
+    const brand = env.BRAND_NAME;
+    const body = `Hi ${firstName},\n\n${amount} ${currency} ${typeLabel} has been added to your ${brand} account ${loginCode}. You can see it in your client area.`;
+    return this.send({ to, subject: `${brand}: ${amount} ${currency} ${typeLabel} added`, text: body, html: `<p>Hi ${esc(firstName)},</p><p><b>${esc(amount)} ${esc(currency)}</b> ${esc(typeLabel)} has been added to your ${esc(brand)} account <b>${loginCode}</b>. You can see it in your client area.</p>` });
+  }
+
+  /** Admin-triggered prompt inviting the client to fund their account, with a deposit button. */
+  async depositInvite(to: string, firstName: string) {
+    if (!(await this.enabled('depositInvite'))) return;
+    const brand = env.BRAND_NAME;
+    const link = `${env.WEB_ORIGIN.split(',')[0]}/app/payments`;
+    const body = `Hi ${firstName},\n\nYou can fund your ${brand} account to start trading. Make a deposit here: ${link}`;
+    return this.send({
+      to,
+      subject: `${brand}: fund your account`,
+      text: body,
+      html: `<p>Hi ${esc(firstName)},</p><p>You can fund your ${esc(brand)} account to start trading.</p><p><a href="${link}" style="display:inline-block;padding:10px 20px;background:#2e9e5b;color:#fff;border-radius:8px;text-decoration:none;font-weight:600">Make a deposit</a></p><p style="color:#888;font-size:12px">Or open: ${link}</p>`,
+    });
   }
 
   adminAlert(subject: string, body: string) {

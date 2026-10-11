@@ -2,7 +2,7 @@
 
 import { use, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Lock, Unlock } from 'lucide-react';
+import { Lock, Unlock, Mail } from 'lucide-react';
 import type { AccountDto, AdminUserDetailDto } from '@spova/shared';
 import { get, patch, post, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
@@ -97,6 +97,24 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
             <Link href="/admin/clients" className="text-sm text-brand-300">
               ← Clients
             </Link>
+            <Button
+              size="sm"
+              variant="secondary"
+              loading={busy}
+              onClick={async () => {
+                setBusy(true);
+                try {
+                  await post(`/admin/users/${id}/deposit-email`);
+                  toast({ title: 'Deposit email sent', body: 'The client was emailed a prompt with a deposit button.', level: 'success' });
+                } catch (e) {
+                  toast({ title: 'Could not send', body: e instanceof ApiError ? e.message : undefined, level: 'danger' });
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              <Mail className="h-4 w-4" /> Send deposit email
+            </Button>
             {u.kycFrozen && (
               <Button
                 size="sm"

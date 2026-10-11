@@ -52,6 +52,8 @@ services:
         value: Zerventa
       - key: MAIL_PROVIDER
         value: console
+      - key: MAIL_FROM
+        value: info@zerventa.com
       - key: STORAGE_DRIVER
         value: local
       - key: DEMO_START_BALANCE

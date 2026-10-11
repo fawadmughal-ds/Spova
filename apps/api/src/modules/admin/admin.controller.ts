@@ -50,6 +50,11 @@ export class AdminController {
     return this.admin.getUser(id);
   }
 
+  @Post('users/:id/deposit-email')
+  sendDepositEmail(@CurrentUser() actor: AuthUser, @ClientIp() ip: string, @Param('id') id: string) {
+    return this.admin.sendDepositEmail({ ...actor, ip }, id);
+  }
+
   @Patch('users/:id')
   updateUser(
     @CurrentUser() actor: AuthUser,

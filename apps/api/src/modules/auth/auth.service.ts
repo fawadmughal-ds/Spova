@@ -70,6 +70,8 @@ export class AuthService {
 
     void this.mail.welcome(user.email, input.firstName, demo.loginCode).catch((e) => this.log.warn(e.message));
 
+    if (user.role === 'client' && user.profile?.notifEmail !== false) void this.mail.login(user.email, user.profile?.firstName ?? '', new Date(), meta.ip).catch((e) => this.log.warn(e.message));
+
     const tokens = await this.issueTokens(user.id, user.role, meta);
     return { me: await this.toMe(user), tokens };
   }
