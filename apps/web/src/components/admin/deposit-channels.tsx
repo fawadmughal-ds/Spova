@@ -11,9 +11,17 @@ import { Textarea } from './queue-bits';
 import { friendlyError } from '@/components/portal/api-error';
 
 type Key = Exclude<keyof DepositChannels, 'cashier'>;
-const TITLES: Record<Key, string> = { bank: 'Bank transfer', upi: 'UPI', binance: 'Binance Pay', crypto_usdt: 'Crypto (USDT)', card: 'Card' };
+const TITLES: Record<Key, string> = { bank: 'Bank transfer', rtgs: 'RTGS', upi: 'UPI', binance: 'Binance Pay', crypto_usdt: 'Crypto (USDT)', card: 'Card' };
 const FIELDS: Record<Key, { name: string; label: string; placeholder?: string }[]> = {
   bank: [
+    { name: 'bankName', label: 'Bank name' },
+    { name: 'accountName', label: 'Account name' },
+    { name: 'accountNumber', label: 'Account number' },
+    { name: 'ifsc', label: 'IFSC' },
+    { name: 'swift', label: 'SWIFT (international)' },
+    { name: 'currency', label: 'Currency the client pays in', placeholder: 'INR' },
+  ],
+  rtgs: [
     { name: 'bankName', label: 'Bank name' },
     { name: 'accountName', label: 'Account name' },
     { name: 'accountNumber', label: 'Account number' },

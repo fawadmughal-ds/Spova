@@ -76,6 +76,20 @@ export class MailService {
     return this.send({ to, subject: `${env.BRAND_NAME} - ${kind} ${status}`, text: body, html: `<p>${esc(body)}</p>` });
   }
 
+  /** Bank / RTGS deposit: finance confirmation with the pay-to details. */
+  depositInstructions(to: string, methodLabel: string, amount: string, currency: string, loginCode: number, ch: { title: string; fields: { label: string; value: string }[]; note?: string }) {
+    const brand = env.BRAND_NAME;
+    const lines = ch.fields.map((f) => `${f.label}: ${f.value}`).join('\n');
+    const body = `We have received your ${methodLabel} deposit request for ${amount} ${currency} on account ${loginCode}. Our finance team is reviewing it.\n\nPay to these details and your balance is credited once the transfer is confirmed:\n\n${ch.title}\n${lines}${ch.note ? `\n\n${ch.note}` : ''}\n\nAfter paying, you can attach the receipt from the Payments history in your client area.`;
+    const htmlRows = ch.fields.map((f) => `<tr><td style="padding:2px 12px 2px 0;color:#667">${esc(f.label)}</td><td style="padding:2px 0"><b>${esc(f.value)}</b></td></tr>`).join('');
+    return this.send({
+      to,
+      subject: `${brand} - your ${methodLabel} deposit details`,
+      text: body,
+      html: `<p>We have received your ${esc(methodLabel)} deposit request for <b>${esc(amount)} ${esc(currency)}</b> on account ${loginCode}. Our finance team is reviewing it.</p><p>Pay to these details and your balance is credited once the transfer is confirmed:</p><p><b>${esc(ch.title)}</b></p><table>${htmlRows}</table>${ch.note ? `<p>${esc(ch.note)}</p>` : ''}<p>After paying, attach the receipt from the Payments history in your client area.</p>`,
+    });
+  }
+
   /** Sent when a client submits a withdrawal; carries the profit-and-loss responsibility disclaimer. */
   withdrawReceived(to: string, amount: string, currency: string, loginCode: number) {
     const brand = env.BRAND_NAME;

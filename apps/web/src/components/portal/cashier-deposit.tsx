@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { loadStripe, type Stripe, type StripeCardNumberElement, type StripeElements } from '@stripe/stripe-js';
 import { CardCvcElement, CardExpiryElement, CardNumberElement, Elements, useElements, useStripe } from '@stripe/react-stripe-js';
-import { ChevronLeft, ChevronRight, CreditCard, Landmark, Lock, PencilLine, Wallet } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, CreditCard, Landmark, Lock, PencilLine, Wallet } from 'lucide-react';
 import { cardIntentSchema, depositRequestSchema, type AccountDto, type CardIntentDto, type CashierInfoDto, type PaymentMethodDto, type PaymentRequestDto } from '@spova/shared';
 import { useAuth } from '@/lib/auth-context';
 import { get, post, upload } from '@/lib/api';
@@ -16,7 +16,11 @@ import { PayToPanel, ProofPicker } from './deposit-channel';
 import { RequestDone } from './request-done';
 import { friendlyError } from './api-error';
 
-const PRESETS = ['200', '500', '1000'];
+/** Three quick-pick amounts from the method minimum: e.g. min 2000 -> 2000 / 5000 / 10000. */
+const presetsFor = (min: string): string[] => {
+  const m = Math.max(1, Math.round(Number(min) || 0));
+  return [m, m * 2.5, m * 5].map((n) => String(Math.round(n)));
+};
 type Group = 'main' | 'alt';
 interface Tile {
   id: string;
@@ -68,9 +72,10 @@ function BankMark() {
 const TILE_META: Record<string, { label: string; group: Group; logo: ReactNode; order: number }> = {
   card: { label: 'Credit or Debit Card', group: 'main', logo: <VisaMc />, order: 0 },
   upi: { label: 'UPI', group: 'main', logo: <UpiMark />, order: 1 },
-  bank: { label: 'Bank Transfer (RTGS)', group: 'main', logo: <BankMark />, order: 2 },
-  binance: { label: 'Binance Pay', group: 'alt', logo: <BinanceMark />, order: 3 },
-  crypto_usdt: { label: 'Crypto (USDT)', group: 'alt', logo: <CryptoMark />, order: 4 },
+  bank: { label: 'Bank Transfer', group: 'main', logo: <BankMark />, order: 2 },
+  rtgs: { label: 'RTGS', group: 'main', logo: <BankMark />, order: 3 },
+  binance: { label: 'Binance Pay', group: 'alt', logo: <BinanceMark />, order: 4 },
+  crypto_usdt: { label: 'Crypto (USDT)', group: 'alt', logo: <CryptoMark />, order: 5 },
 };
 
 const stripeLoaders = new Map<string, Promise<Stripe | null>>();
@@ -215,7 +220,7 @@ function AmountBlock({ amount, setAmount, error, account, setAccount, accounts, 
       </OutlinedField>
       {error ? <p className="mt-1.5 text-xs text-down">{error}</p> : <p className="mt-1.5 text-[11px] text-ink-500">Min {fmtMoney(min)} · {Number(max) > 0 ? `Max ${fmtMoney(max)} USD` : 'No maximum'}</p>}
       <div className="mt-3 flex flex-wrap gap-2">
-        {PRESETS.map((p) => (
+        {presetsFor(min).map((p) => (
           <button key={p} type="button" onClick={() => setAmount(p)} className={cn('rounded-full px-5 py-1.5 text-[14px] font-medium transition-colors', amount === p ? 'bg-[#0b1220] text-[#ffffff]' : 'bg-ink-900 text-white hover:bg-ink-800')}>
             $ {Number(p).toLocaleString('en-US')}
           </button>
@@ -271,6 +276,8 @@ function ManualForm({ method, label, accounts, fx, onCreated, onHistory }: { met
   const [proof, setProof] = useState<File | null>(null);
   const [proofErr, setProofErr] = useState<string | undefined>();
   const [done, setDone] = useState<PaymentRequestDto | null>(null);
+  const [financeModal, setFinanceModal] = useState<PaymentRequestDto | null>(null);
+  const financeHandled = method.id === 'bank' || method.id === 'rtgs';
   const channel = method.deposit;
   const charged = chargedLine(amount, channel?.currency ?? 'USD', fx);
 
@@ -281,8 +288,10 @@ function ManualForm({ method, label, accounts, fx, onCreated, onHistory }: { met
     setErr(undefined);
     setBusy(true);
     try {
-      setReq(await post<PaymentRequestDto>('/me/payments/deposit', parsed.data));
+      const r = await post<PaymentRequestDto>('/me/payments/deposit', parsed.data);
       onCreated();
+      if (financeHandled) setFinanceModal(r);
+      else setReq(r);
     } catch (e2) {
       const f = friendlyError(e2);
       setErr(f.body ?? f.title);
@@ -338,14 +347,37 @@ function ManualForm({ method, label, accounts, fx, onCreated, onHistory }: { met
     );
 
   return (
-    <form onSubmit={submit} noValidate className="max-w-[420px]">
-      <h2 className="text-[22px] font-bold leading-tight text-white">Secure deposit using {label}</h2>
-      <div className="mt-6">
-        <AmountBlock amount={amount} setAmount={setAmount} error={err} account={account} setAccount={setAccount} accounts={accounts} min={method.minDeposit} max={method.maxDeposit} charged={charged} />
-      </div>
-      <Declaration checked={agree} onChange={setAgree} />
-      <DepositButton loading={busy} disabled={!agree || !account} />
-    </form>
+    <>
+      <form onSubmit={submit} noValidate className="max-w-[420px]">
+        <h2 className="text-[22px] font-bold leading-tight text-white">Secure deposit using {label}</h2>
+        <div className="mt-6">
+          <AmountBlock amount={amount} setAmount={setAmount} error={err} account={account} setAccount={setAccount} accounts={accounts} min={method.minDeposit} max={method.maxDeposit} charged={charged} />
+        </div>
+        <Declaration checked={agree} onChange={setAgree} />
+        <DepositButton loading={busy} disabled={!agree || !account} />
+      </form>
+      {financeModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" onClick={() => setFinanceModal(null)}>
+          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-md rounded-2xl border border-white/10 bg-paper p-6 text-center shadow-2xl">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-up/15 text-up">
+              <Check className="h-7 w-7" strokeWidth={2.5} />
+            </div>
+            <h3 className="mt-4 text-[20px] font-bold text-white">Request sent to finance</h3>
+            <p className="mt-2 text-sm leading-relaxed text-ink-300">
+              Your {label} deposit request for <strong className="text-white">{fmtMoney(financeModal.amount)} {financeModal.currency}</strong> has gone to our finance team. We&apos;ve emailed you the payment details. Your balance is credited once your transfer is confirmed.
+            </p>
+            <div className="mt-6 flex justify-center gap-3">
+              <Button onClick={() => { setFinanceModal(null); setAmount(''); onHistory(); }} style={{ background: '#2e9e5b', backgroundImage: 'none', color: '#ffffff', boxShadow: 'none' }}>
+                View my requests
+              </Button>
+              <Button variant="outline" onClick={() => { setFinanceModal(null); setAmount(''); }}>
+                New deposit
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 

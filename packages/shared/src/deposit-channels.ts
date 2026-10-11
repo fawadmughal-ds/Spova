@@ -22,6 +22,24 @@ export function depositChannelPublic(id: string, cfg: DepositChannels, brand: st
         currency: c.currency || 'INR',
       };
     }
+    case 'rtgs': {
+      const c = cfg.rtgs;
+      return {
+        title: 'RTGS transfer details',
+        fields: [
+          { label: 'Bank', value: c.bankName },
+          { label: 'Account name', value: c.accountName || brand, copy: true },
+          { label: 'Account number', value: c.accountNumber, copy: true },
+          { label: 'IFSC', value: c.ifsc, copy: true },
+          { label: 'SWIFT', value: c.swift, copy: true },
+        ].filter((f) => f.value),
+        qr: null,
+        qrKind: null,
+        note: c.note,
+        proofRequired: true,
+        currency: c.currency || 'INR',
+      };
+    }
     case 'upi': {
       const c = cfg.upi;
       const pn = encodeURIComponent(c.payeeName || brand);

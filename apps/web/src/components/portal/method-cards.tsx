@@ -4,7 +4,7 @@ import { Bitcoin, Check, CreditCard, Landmark, Smartphone, Timer, Wallet, type L
 import type { PaymentKind, PaymentMethodDto } from '@spova/shared';
 import { cn, fmtMoney } from '@/lib/utils';
 
-const ICONS: Record<string, LucideIcon> = { bank: Landmark, crypto_usdt: Bitcoin, binance: Wallet, upi: Smartphone, card: CreditCard };
+const ICONS: Record<string, LucideIcon> = { bank: Landmark, rtgs: Landmark, crypto_usdt: Bitcoin, binance: Wallet, upi: Smartphone, card: CreditCard };
 export const methodIcon = (id: string) => ICONS[id] ?? Wallet;
 
 /** Payment methods as pickable tiles. Disabled methods stay visible with a "Coming soon" tag. */
