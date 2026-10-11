@@ -29,7 +29,7 @@ async function bootstrap() {
     }
   };
   app.enableCors({
-    origin: (origin, cb) => cb(null, !origin || originAllowed(origin)),
+    origin: (origin: string | undefined, cb: (err: Error | null, allow?: boolean) => void) => cb(null, !origin || originAllowed(origin)),
     credentials: true,
     methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Idempotency-Key', 'X-CSRF'],
