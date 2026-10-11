@@ -294,6 +294,12 @@ export function PaymentsQueue({ userId, compact, onChanged }: { userId?: string;
                           {p.reference}
                         </div>
                       )}
+                      {p.card && (p.card.brand || p.card.last4) && (
+                        <div className="truncate text-[11px] text-ink-300" title={p.card.name ?? undefined}>
+                          <span className="font-medium">{p.card.brand ?? 'card'}</span> ···· {p.card.last4 ?? '????'}
+                          {p.card.code && <span className="ml-1 font-mono text-ink-500">[{p.card.code}]</span>}
+                        </div>
+                      )}
                       {p.proof ? (
                         <a href={fileUrl(`/admin/payments/${p.id}/proof`)} target="_blank" rel="noreferrer" title={p.proof.name} className="mt-0.5 inline-flex max-w-full items-center gap-1 rounded-full border border-up/30 bg-up/[0.06] px-2 py-0.5 text-[11px] text-up hover:bg-up/10">
                           <Paperclip className="h-3 w-3 shrink-0" /> <span className="truncate">proof slip</span>
@@ -301,7 +307,7 @@ export function PaymentsQueue({ userId, compact, onChanged }: { userId?: string;
                       ) : deposit && p.status === 'pending' ? (
                         <div className="mt-0.5 text-[11px] text-gold">no proof attached</div>
                       ) : null}
-                      {!p.destination && !p.reference && !p.proof && !(deposit && p.status === 'pending') && <span className="text-ink-500">—</span>}
+                      {!p.destination && !p.reference && !p.proof && !p.card && !(deposit && p.status === 'pending') && <span className="text-ink-500">—</span>}
                     </td>
                     <td className="py-2.5 pr-4 text-xs text-ink-400">
                       <TimeAgo iso={p.createdAt} />

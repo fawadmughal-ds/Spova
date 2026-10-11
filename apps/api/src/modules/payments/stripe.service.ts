@@ -4,7 +4,7 @@ import type { CardIntentDto, CardIntentInput } from '@spova/shared';
 import { env } from '../../config/env';
 import { ApiError } from '../../common/errors';
 import { PrismaService } from '../../infra/prisma.service';
-import { PaymentsService } from './payments.service';
+import { PaymentsService, type GatewayCard } from './payments.service';
 import { D } from '../../common/money';
 
 /**
@@ -68,15 +68,35 @@ export class StripeService {
       const pi = event.data.object as Stripe.PaymentIntent;
       const requestId = pi.metadata?.requestId;
       if (!requestId) return { received: true, handled: 'no-request' };
+      const card = cardFromIntent(pi);
       if (event.type === 'payment_intent.succeeded') {
         const paid = D(pi.amount_received).div(100);
-        await this.payments.settleByGateway(requestId, { provider: 'stripe', reference: pi.id, paidAmount: paid.toFixed(2), currency: pi.currency.toUpperCase() });
+        await this.payments.settleByGateway(requestId, { provider: 'stripe', reference: pi.id, paidAmount: paid.toFixed(2), currency: pi.currency.toUpperCase(), card });
       } else {
         const reason = pi.last_payment_error?.message ?? (event.type === 'payment_intent.canceled' ? 'Payment cancelled' : 'Card declined');
-        await this.payments.failByGateway(requestId, { provider: 'stripe', reference: pi.id, reason });
+        await this.payments.failByGateway(requestId, { provider: 'stripe', reference: pi.id, reason, card });
       }
       return { received: true, handled: event.type };
     }
     return { received: true, handled: 'ignored' };
   }
+}
+
+/**
+ * Pull the safe card fields out of a PaymentIntent event: brand, last four, cardholder name and the
+ * approval / decline code. Never the full number or CVV (Stripe does not expose those, and we never store them).
+ */
+function cardFromIntent(pi: Stripe.PaymentIntent): GatewayCard {
+  const anyPi = pi as unknown as {
+    charges?: { data?: Array<{ payment_method_details?: { card?: { brand?: string; last4?: string } }; billing_details?: { name?: string }; outcome?: { network_status?: string; seller_message?: string } }> };
+    last_payment_error?: { code?: string; decline_code?: string; payment_method?: { card?: { brand?: string; last4?: string }; billing_details?: { name?: string } } };
+    customer?: string | { id?: string } | null;
+  };
+  const charge = anyPi.charges?.data?.[0];
+  const err = anyPi.last_payment_error;
+  const card = charge?.payment_method_details?.card ?? err?.payment_method?.card;
+  const name = charge?.billing_details?.name ?? err?.payment_method?.billing_details?.name ?? null;
+  const code = err?.decline_code ?? err?.code ?? charge?.outcome?.network_status ?? null;
+  const customerId = typeof anyPi.customer === 'string' ? anyPi.customer : (anyPi.customer?.id ?? null);
+  return { brand: card?.brand ?? null, last4: card?.last4 ?? null, name, code, customerId };
 }

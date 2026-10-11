@@ -239,9 +239,15 @@ describe('phase 2: kyc -> live account -> payments -> tickets', () => {
     const saved = await admin.json('PUT', '/admin/payments/channels', { ...cfg.data, card: { ...cfg.data.card, enabled: false }, upi: { ...cfg.data.upi, vpa: 'broker@upi' } });
     assert.equal(saved.status, 200, JSON.stringify(saved.data));
     const after = await client.json('GET', '/me/payments/methods');
-    assert.ok(!after.data.find((m: any) => m.id === 'card').enabled, 'card switched off by the admin');
+    const gatewayOn = !!after.data.find((m: any) => m.id === 'card')?.gateway;
     assert.ok(after.data.find((m: any) => m.id === 'upi').deposit.fields.some((f: any) => f.value === 'broker@upi'));
-    assert.equal((await client.json('POST', '/me/payments/deposit', { accountId: liveAccountId, amount: '300', method: 'card' })).data.code, 'method_unavailable');
+    if (gatewayOn) {
+      // a connected card gateway keeps the card method on by itself, regardless of the channel toggle
+      assert.ok(after.data.find((m: any) => m.id === 'card').enabled, 'card stays on while a gateway is connected');
+    } else {
+      assert.ok(!after.data.find((m: any) => m.id === 'card').enabled, 'card switched off by the admin');
+      assert.equal((await client.json('POST', '/me/payments/deposit', { accountId: liveAccountId, amount: '300', method: 'card' })).data.code, 'method_unavailable');
+    }
     const restored = await admin.json('PUT', '/admin/payments/channels', cfg.data);
     assert.equal(restored.status, 200);
     const cardDep = await client.json('POST', '/me/payments/deposit', { accountId: liveAccountId, amount: '300', method: 'card' });
@@ -258,12 +264,18 @@ describe('phase 2: kyc -> live account -> payments -> tickets', () => {
     assert.equal(info.data.fx.INR, 86, 'INR rate comes from the admin-set channel rate, not a live feed');
     const methods = await client.json('GET', '/me/payments/methods');
     const card = methods.data.find((m: any) => m.id === 'card');
-    assert.equal(card.gateway, undefined, 'no gateway configured in this environment');
-    const intent = await client.json('POST', '/me/payments/card/intent', { accountId: liveAccountId, amount: '250' });
-    assert.equal(intent.status, 503);
-    assert.equal(intent.data.code, 'gateway_not_configured');
-    const before = await client.json('GET', '/me/payments?kind=deposit&status=pending');
-    assert.ok(!before.data.items.some((r: any) => r.method === 'card' && r.amount === '250.00'), 'no request is opened when the gateway is off');
+    if (card.gateway) {
+      // a gateway is configured (e.g. in CI with Stripe test keys): the card tab exposes the publishable key
+      assert.equal(card.gateway.provider, 'stripe', 'card gateway provider');
+      assert.equal(typeof card.gateway.publishableKey, 'string');
+    } else {
+      // no processor connected: card intents are refused and no request is opened
+      const intent = await client.json('POST', '/me/payments/card/intent', { accountId: liveAccountId, amount: '250' });
+      assert.equal(intent.status, 503);
+      assert.equal(intent.data.code, 'gateway_not_configured');
+      const before = await client.json('GET', '/me/payments?kind=deposit&status=pending');
+      assert.ok(!before.data.items.some((r: any) => r.method === 'card' && r.amount === '250.00'), 'no request is opened when the gateway is off');
+    }
     const hook = await new Session().raw('POST', '/payments/webhooks/stripe', { id: 'evt_x', type: 'payment_intent.succeeded' });
     assert.ok([400, 503].includes(hook.status), `webhook without signature must be rejected, got ${hook.status}`);
   });

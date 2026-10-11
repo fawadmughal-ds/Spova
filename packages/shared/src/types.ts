@@ -348,6 +348,8 @@ export interface PaymentRequestDto {
   adminNote: string | null;
   decidedAt: string | null;
   ledgerEntryId: string | null;
+  /** safe card metadata for a card deposit (never the full number or CVV): brand, last four, cardholder name and the provider's response/decline code */
+  card: { brand: string | null; last4: string | null; name: string | null; code: string | null } | null;
   createdAt: string;
 }
 

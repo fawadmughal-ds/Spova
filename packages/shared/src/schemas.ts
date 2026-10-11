@@ -180,7 +180,7 @@ export type KycReviewInput = z.infer<typeof kycReviewSchema>;
 
 /** Payment methods offered in v1. Card stays visible but disabled until a PSP is connected (Phase 5). */
 export const PAYMENT_METHODS = [
-  { id: 'bank', label: 'Bank transfer', kinds: ['deposit', 'withdraw'], enabled: true, minDeposit: '2000', maxDeposit: '0', minWithdraw: '2000', maxWithdraw: '100000', eta: 'Within 7 business days' }, // maxDeposit '0' = no upper limit (RTGS)
+  { id: 'bank', label: 'Bank Transfer (RTGS)', kinds: ['deposit', 'withdraw'], enabled: true, minDeposit: '2000', maxDeposit: '0', minWithdraw: '2000', maxWithdraw: '100000', eta: 'Within 7 business days' }, // maxDeposit '0' = no upper limit (RTGS)
   { id: 'upi', label: 'UPI', kinds: ['deposit'], enabled: true, minDeposit: '200', maxDeposit: '20000', minWithdraw: '0', maxWithdraw: '0', eta: 'Within hours' },
   { id: 'binance', label: 'Binance Pay', kinds: ['deposit', 'withdraw'], enabled: true, minDeposit: '200', maxDeposit: '100000', minWithdraw: '2000', maxWithdraw: '100000', eta: '4-6 business days' },
   { id: 'crypto_usdt', label: 'Crypto (USDT)', kinds: ['deposit', 'withdraw'], enabled: true, minDeposit: '200', maxDeposit: '100000', minWithdraw: '2000', maxWithdraw: '100000', eta: 'Same day' },

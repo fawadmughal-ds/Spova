@@ -68,7 +68,7 @@ function BankMark() {
 const TILE_META: Record<string, { label: string; group: Group; logo: ReactNode; order: number }> = {
   card: { label: 'Credit or Debit Card', group: 'main', logo: <VisaMc />, order: 0 },
   upi: { label: 'UPI', group: 'main', logo: <UpiMark />, order: 1 },
-  bank: { label: 'Local Bank Transfer', group: 'main', logo: <BankMark />, order: 2 },
+  bank: { label: 'Bank Transfer (RTGS)', group: 'main', logo: <BankMark />, order: 2 },
   binance: { label: 'Binance Pay', group: 'alt', logo: <BinanceMark />, order: 3 },
   crypto_usdt: { label: 'Crypto (USDT)', group: 'alt', logo: <CryptoMark />, order: 4 },
 };
@@ -419,11 +419,11 @@ function CardFormInner({ method, accounts, fx, onCreated, onHistory, gateway }: 
       const intent = await post<CardIntentDto>('/me/payments/card/intent', parsed.data);
       const res = await stripe.confirmCardPayment(intent.clientSecret, { payment_method: { card: number, billing_details: { name: `${first} ${last}`.trim(), email: me?.email } } });
       if (res.error) {
-        setCardErr({ title: 'Card not charged', body: res.error.message ?? 'The card was declined.' });
+        setCardErr({ title: 'Payment rejected', body: res.error.message ?? 'The card was declined. Check the details and try again, or use another method.' });
         return;
       }
       toast({ title: 'Payment confirmed', body: `${fmtMoney(amount)} USD · the balance updates as soon as the gateway reports it (seconds).`, level: 'success' });
-      setDone({ id: intent.requestId, accountId: account!, accountLogin: live.find((a) => a.id === account)?.loginCode ?? 0, kind: 'deposit', amount: Number(amount).toFixed(2), currency: 'USD', method: 'card', destination: null, reference: res.paymentIntent?.id ?? null, proof: null, status: 'pending', adminNote: null, decidedAt: null, ledgerEntryId: null, createdAt: new Date().toISOString() });
+      setDone({ id: intent.requestId, accountId: account!, accountLogin: live.find((a) => a.id === account)?.loginCode ?? 0, kind: 'deposit', amount: Number(amount).toFixed(2), currency: 'USD', method: 'card', destination: null, reference: res.paymentIntent?.id ?? null, proof: null, status: 'pending', adminNote: null, decidedAt: null, ledgerEntryId: null, card: null, createdAt: new Date().toISOString() });
       onCreated();
     } catch (e2) {
       setCardErr(friendlyError(e2));

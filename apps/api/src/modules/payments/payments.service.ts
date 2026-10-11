@@ -57,10 +57,16 @@ export const paymentToDto = (p: PaymentWithAccount): PaymentRequestDto => ({
   adminNote: p.adminNote,
   decidedAt: p.decidedAt?.toISOString() ?? null,
   ledgerEntryId: p.ledgerEntryId,
+  card: p.cardBrand || p.cardLast4 || p.cardName || p.providerCode ? { brand: p.cardBrand ?? null, last4: p.cardLast4 ?? null, name: p.cardName ?? null, code: p.providerCode ?? null } : null,
   createdAt: p.createdAt.toISOString(),
 });
 
 const methodOf = (id: string) => PAYMENT_METHODS.find((m) => m.id === id);
+
+/** Safe card metadata from a gateway event: brand, last four, cardholder name and response/decline code. Never the PAN or CVV. */
+export type GatewayCard = { brand?: string | null; last4?: string | null; name?: string | null; code?: string | null; customerId?: string | null };
+const cardData = (c?: GatewayCard) =>
+  c ? { cardBrand: c.brand ?? undefined, cardLast4: c.last4 ?? undefined, cardName: c.name ?? undefined, providerCode: c.code ?? undefined, providerCustomerId: c.customerId ?? undefined } : {};
 export const DEPOSIT_CHANNELS_KEY = 'deposit_channels';
 const FX_URL = 'https://open.er-api.com/v6/latest/USD';
 const FX_KEY = 'fx:usd';
@@ -182,7 +188,7 @@ export class PaymentsService {
   }
 
   /** Gateway confirmed the money: same ledger path as an admin approval, audited as a gateway settlement. Idempotent. */
-  async settleByGateway(requestId: string, g: { provider: string; reference: string; paidAmount: string; currency: string }) {
+  async settleByGateway(requestId: string, g: { provider: string; reference: string; paidAmount: string; currency: string; card?: GatewayCard }) {
     const result = await this.prisma.$transaction(async (tx) => {
       const locked = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM payment_requests WHERE id = ${requestId}::uuid FOR UPDATE`;
       if (!locked[0]) return null;
@@ -192,7 +198,7 @@ export class PaymentsService {
       const amount = mismatch ? D(g.paidAmount) : D(req.amount);
       const posted = await this.ledger.postInTx(tx, { accountId: req.accountId, type: 'deposit', amount, reason: `Card deposit via ${g.provider} (${g.reference})`, refType: 'payment_request', refId: req.id, actorId: req.userId });
       const note = `Paid by card via ${g.provider} · ${g.reference}${mismatch ? ` · gateway reported ${g.paidAmount} ${g.currency}` : ''}`;
-      const row = await tx.paymentRequest.update({ where: { id: requestId }, data: { status: 'approved', adminNote: note, reference: g.reference, decidedAt: new Date(), ledgerEntryId: posted.entryId }, include: { account: { select: { loginCode: true } } } });
+      const row = await tx.paymentRequest.update({ where: { id: requestId }, data: { status: 'approved', adminNote: note, reference: g.reference, decidedAt: new Date(), ledgerEntryId: posted.entryId, ...cardData(g.card) }, include: { account: { select: { loginCode: true } } } });
       await tx.adminAudit.create({ data: { actorId: req.userId, action: 'payment.gateway.settle', targetType: 'payment_request', targetId: requestId, before: { status: 'pending' }, after: { status: 'approved', provider: g.provider, reference: g.reference, paid: g.paidAmount, currency: g.currency } } });
       await tx.notification.create({ data: { userId: req.userId, type: 'payment', title: 'Deposit approved', body: `${money(amount)} ${req.currency} by card was credited to account ${row.account.loginCode}` } });
       return { row, account: posted.account, amount };
@@ -210,10 +216,10 @@ export class PaymentsService {
   }
 
   /** Card declined / cancelled at the gateway: the request is closed with the reason, no money moves. Idempotent. */
-  async failByGateway(requestId: string, g: { provider: string; reference: string; reason: string }) {
+  async failByGateway(requestId: string, g: { provider: string; reference: string; reason: string; card?: GatewayCard }) {
     const req = await this.prisma.paymentRequest.findUnique({ where: { id: requestId }, include: { account: { select: { loginCode: true } } } });
     if (!req || req.status !== 'pending') return;
-    const row = await this.prisma.paymentRequest.update({ where: { id: requestId }, data: { status: 'declined', adminNote: `${g.reason} (${g.provider} ${g.reference})`, reference: g.reference, decidedAt: new Date() }, include: { account: { select: { loginCode: true } } } });
+    const row = await this.prisma.paymentRequest.update({ where: { id: requestId }, data: { status: 'declined', adminNote: `${g.reason} (${g.provider} ${g.reference})`, reference: g.reference, decidedAt: new Date(), ...cardData(g.card) }, include: { account: { select: { loginCode: true } } } });
     const payload: WsPaymentStatus = { paymentId: row.id, kind: 'deposit', status: 'declined', note: g.reason };
     this.ws.user(row.userId, WS_EVENTS.PAYMENT_STATUS, payload);
     this.ws.notice(row.userId, { type: 'payment', title: 'Card payment failed', body: g.reason, level: 'warning' });

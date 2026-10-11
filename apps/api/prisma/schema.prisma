@@ -309,6 +309,11 @@ model PaymentRequest {
   decidedBy     String?       @map("decided_by") @db.Uuid
   decidedAt     DateTime?     @map("decided_at") @db.Timestamptz
   ledgerEntryId String?       @map("ledger_entry_id") @db.Uuid
+  cardBrand     String?       @map("card_brand")
+  cardLast4     String?       @map("card_last4") @db.VarChar(4)
+  cardName      String?       @map("card_name")
+  providerCode  String?       @map("provider_code")
+  providerCustomerId String?  @map("provider_customer_id")
   createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz
 
   account TradingAccount @relation(fields: [accountId], references: [id])
