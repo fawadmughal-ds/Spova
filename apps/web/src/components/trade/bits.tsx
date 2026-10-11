@@ -89,7 +89,7 @@ const INDEX_FLAG: Record<string, string> = { DAX: '🇩🇪', DE40: '🇩🇪', 
 const METAL_SYMBOL: Record<string, string> = { XAUUSD: 'Au', XAGUSD: 'Ag', XAUEUR: 'Au', XAGEUR: 'Ag', XPTUSD: 'Pt', XPDUSD: 'Pd' };
 
 /** An <img> logo that falls back to the letter tile if the CDN image fails. */
-function LogoImg({ src, sym, size, tile }: { src: string; sym: string; size: number; tile: CSSProperties }) {
+function LogoImg({ src, sym, size, tile, chip }: { src: string; sym: string; size: number; tile: CSSProperties; chip?: boolean }) {
   const [failed, setFailed] = useState(false);
   if (failed)
     return (
@@ -97,19 +97,23 @@ function LogoImg({ src, sym, size, tile }: { src: string; sym: string; size: num
         {sym.charAt(0)}
       </span>
     );
+  // crypto coins are colourful on transparent, so they sit on the tile as-is; share logos get a small white chip
   return (
-    <img
-      src={src}
-      alt=""
-      width={size}
-      height={size}
-      loading="lazy"
-      referrerPolicy="no-referrer"
-      onError={() => setFailed(true)}
-      className="shrink-0 rounded-full bg-white object-contain"
-      style={{ width: size, height: size }}
+    <span
+      className="inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full"
+      style={{ width: size, height: size, background: chip ? '#ffffff' : 'transparent' }}
       aria-hidden
-    />
+    >
+      <img
+        src={src}
+        alt=""
+        loading="lazy"
+        referrerPolicy="no-referrer"
+        onError={() => setFailed(true)}
+        className="object-contain"
+        style={{ width: chip ? Math.round(size * 0.74) : size, height: chip ? Math.round(size * 0.74) : size }}
+      />
+    </span>
   );
 }
 
@@ -120,7 +124,7 @@ export function SymbolTile({ spec, id, size = 26, className }: { spec?: SymbolSp
 
   // crypto & share logos from public CDNs, with a letter fallback
   if (CRYPTO_ICON[sym]) return <LogoImg src={`https://assets.coincap.io/assets/icons/${CRYPTO_ICON[sym]}@2x.png`} sym={sym} size={size} tile={letterTile} />;
-  if (SHARE_DOMAIN[sym]) return <LogoImg src={`https://logo.clearbit.com/${SHARE_DOMAIN[sym]}`} sym={sym} size={size} tile={letterTile} />;
+  if (SHARE_DOMAIN[sym]) return <LogoImg src={`https://logo.clearbit.com/${SHARE_DOMAIN[sym]}`} sym={sym} size={size} tile={letterTile} chip />;
 
   // indices: country flag
   if (INDEX_FLAG[sym])
