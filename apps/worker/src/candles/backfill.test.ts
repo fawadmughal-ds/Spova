@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import pino from 'pino';
-import { TIMEFRAMES, TF_SECONDS } from '@spova/shared';
+import { TIMEFRAMES, bucketStart } from '@spova/shared';
 import type { Db } from '../db';
 import { isSessionOpen } from '../feeds/sessions';
 import { stepPrice } from '../feeds/synthetic';
@@ -26,7 +26,7 @@ test('synthetic history stays bounded, ends at the current price and is time-asc
       const prev = bars[i - 1]!;
       const b = bars[i]!;
       assert.ok(b.t > prev.t, `${tf} ascending`);
-      assert.equal((b.t - prev.t) % TF_SECONDS[tf], 0, `${tf} aligned`);
+      assert.equal(bucketStart(b.t * 1000, tf), b.t, `${tf} aligned`);
       assert.equal(b.o, prev.c, `${tf} continuous`);
       assert.ok(Number(b.l) <= Math.min(Number(b.o), Number(b.c)) && Number(b.h) >= Math.max(Number(b.o), Number(b.c)), `${tf} ohlc sane`);
       assert.ok(Number(b.l) > 0.5 && Number(b.h) < 2.2, `${tf} bounded: ${b.l}..${b.h}`);

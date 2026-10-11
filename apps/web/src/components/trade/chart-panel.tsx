@@ -21,7 +21,7 @@ import {
   type Time,
   type UTCTimestamp,
 } from 'lightweight-charts';
-import { TIMEFRAMES, WS_EVENTS, bucketStart, type CandleDto, type PositionDto, type Timeframe, type WsCandle } from '@spova/shared';
+import { TF_NAME, TF_SECONDS, TIMEFRAMES, WS_EVENTS, bucketStart, type CandleDto, type PositionDto, type WsCandle } from '@spova/shared';
 import { get } from '@/lib/api';
 import { useSocket } from '@/lib/ws';
 import { cn } from '@/lib/utils';
@@ -60,8 +60,6 @@ const chartTheme = () => ({
 const seriesColors = (type: ChartType) =>
   type === 'line' ? { color: P.blue } : type === 'area' ? { lineColor: P.blue, topColor: hexAlpha(P.blue, 0.28), bottomColor: hexAlpha(P.blue, 0.02) } : type === 'bars' ? { upColor: P.up, downColor: P.down } : { upColor: P.up, downColor: P.down, wickUpColor: P.up, wickDownColor: P.down };
 const hexAlpha = (hex: string, a: number) => (/^#[0-9a-f]{6}$/i.test(hex) ? `rgba(${parseInt(hex.slice(1, 3), 16)}, ${parseInt(hex.slice(3, 5), 16)}, ${parseInt(hex.slice(5, 7), 16)}, ${a})` : hex);
-const TF_NAME: Record<Timeframe, string> = { m1: 'M1', m5: 'M5', m15: 'M15', h1: 'H1', h4: 'H4', d1: 'D1' };
-const TF_SECS: Record<Timeframe, number> = { m1: 60, m5: 300, m15: 900, h1: 3600, h4: 14400, d1: 86400 };
 
 interface Bar {
   time: UTCTimestamp;
@@ -628,7 +626,7 @@ export function ChartPanel({ spec, positions, className, footer }: ChartPanelPro
 
   const shown = hover ?? last(bars.current) ?? null;
   const d = spec.digits;
-  const measureInfo = measure.a && measure.b ? { dp: measure.b.price - measure.a.price, pct: ((measure.b.price - measure.a.price) / measure.a.price) * 100, bars: Math.round(Math.abs(measure.b.time - measure.a.time) / TF_SECS[tf]), ms: Math.abs(measure.b.time - measure.a.time) * 1000 } : null;
+  const measureInfo = measure.a && measure.b ? { dp: measure.b.price - measure.a.price, pct: ((measure.b.price - measure.a.price) / measure.a.price) * 100, bars: Math.round(Math.abs(measure.b.time - measure.a.time) / TF_SECONDS[tf]), ms: Math.abs(measure.b.time - measure.a.time) * 1000 } : null;
   const soon = 'Coming soon';
 
   return (
@@ -640,9 +638,10 @@ export function ChartPanel({ spec, positions, className, footer }: ChartPanelPro
           <SymbolPnlBadge spec={spec} positions={positions} />
         </span>
         <div className="flex-1" />
-        <Dropdown title="Timeframe" buttonClassName="t-icon-btn !w-auto !px-2 text-[14px] font-semibold" button={() => TF_NAME[tf]}>
+        <Dropdown title="Time interval" buttonClassName="t-icon-btn !w-auto !px-2 text-[14px] font-semibold" button={() => TF_NAME[tf]}>
           {(close) => (
             <div className="w-36">
+              <div className="t-menu-head">Time interval</div>
               {TIMEFRAMES.map((t) => (
                 <button
                   key={t}

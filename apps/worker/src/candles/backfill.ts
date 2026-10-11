@@ -1,4 +1,4 @@
-import { bucketStart, TIMEFRAMES, TF_LABEL, TF_SECONDS, type Timeframe } from '@spova/shared';
+import { bucketShift, bucketStart, TIMEFRAMES, TF_LABEL, TF_SECONDS, type Timeframe } from '@spova/shared';
 import type { Db } from '../db';
 import { ANNUAL_VOL, gaussian, stepPrice, SYNTHETIC_BASE } from '../feeds/synthetic';
 import type { Logger } from '../logger';
@@ -10,7 +10,7 @@ const BINANCE_REST = 'https://api.binance.com/api/v3/klines';
 const BINANCE_PAGE = 1000; // hard max per request
 const OANDA_PAGE = 5000; // hard max per request
 /** our timeframe -> OANDA granularity */
-export const OANDA_GRANULARITY: Record<Timeframe, string> = { m1: 'M1', m5: 'M5', m15: 'M15', h1: 'H1', h4: 'H4', d1: 'D' };
+export const OANDA_GRANULARITY: Record<Timeframe, string> = { m1: 'M1', m5: 'M5', m15: 'M15', m30: 'M30', h1: 'H1', h4: 'H4', d1: 'D', w1: 'W', mn1: 'M' };
 
 interface OandaCandle {
   time: string;
@@ -162,13 +162,15 @@ export class CandleBackfill {
     const sigma = annualVol * Math.sqrt(secs / (365 * 24 * 3600));
 
     // 1) collect the open buckets going back from the last closed bucket
+    // (weekly/monthly buckets always contain an open session, so they are never skipped)
     const times: number[] = [];
-    let t = bucketStart(Date.now(), tf) - secs;
+    const calendar = tf === 'w1' || tf === 'mn1';
+    let t = bucketShift(bucketStart(Date.now(), tf), tf, -1);
     let scanned = 0;
     while (times.length < this.opts.bars && scanned < this.opts.bars * 8) {
       scanned++;
-      if (this.symbols.isOpen(symbol, new Date(t * 1000))) times.push(t);
-      t -= secs;
+      if (calendar || this.symbols.isOpen(symbol, new Date(t * 1000))) times.push(t);
+      t = bucketShift(t, tf, -1);
     }
     times.reverse();
 

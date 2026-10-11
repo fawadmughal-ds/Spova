@@ -1,4 +1,4 @@
-import { bucketStart, TIMEFRAMES, TF_SECONDS, type Timeframe } from '@spova/shared';
+import { bucketEnd, bucketStart, TIMEFRAMES, type Timeframe } from '@spova/shared';
 
 export interface Bar {
   s: string;
@@ -61,7 +61,7 @@ export class CandleAggregator {
   closeExpired(nowMs: number): Bar[] {
     const out: Bar[] = [];
     for (const [k, bar] of this.bars) {
-      if (bar.t + TF_SECONDS[bar.tf] <= Math.floor(nowMs / 1000)) {
+      if (bucketEnd(bar.t, bar.tf) <= Math.floor(nowMs / 1000)) {
         out.push(bar);
         this.bars.delete(k);
       }

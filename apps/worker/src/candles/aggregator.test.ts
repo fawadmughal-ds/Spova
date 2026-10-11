@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { bucketEnd, bucketShift, bucketStart } from '@spova/shared';
 import { CandleAggregator } from './aggregator';
 
 const T0 = Date.UTC(2026, 9, 8, 12, 0, 0); // 12:00:00 UTC, aligned to every tf except h4/d1 (12:00 is 4h aligned too)
@@ -8,7 +9,7 @@ test('first tick opens a bar per timeframe with o=h=l=c', () => {
   const agg = new CandleAggregator();
   const { live, closed } = agg.update('EURUSD', '1.08420', T0);
   assert.equal(closed.length, 0);
-  assert.equal(live.length, 6);
+  assert.equal(live.length, 9);
   for (const b of live) {
     assert.equal(b.o, '1.08420');
     assert.equal(b.h, '1.08420');
@@ -72,4 +73,24 @@ test('symbols are independent', () => {
   agg.update('B', '2', T0);
   assert.equal(agg.get('A', 'm1')!.c, '1');
   assert.equal(agg.get('B', 'm1')!.c, '2');
+});
+
+test('calendar buckets: W1 starts Monday 00:00 UTC, MN1 on the 1st, and shift crosses the year end', () => {
+  const sun = Date.UTC(2026, 9, 11, 15, 30); // Sunday 11 Oct 2026
+  assert.equal(new Date(bucketStart(sun, 'w1') * 1000).toISOString(), '2026-10-05T00:00:00.000Z');
+  assert.equal(new Date(bucketStart(sun, 'mn1') * 1000).toISOString(), '2026-10-01T00:00:00.000Z');
+  assert.equal(new Date(bucketStart(Date.UTC(2026, 9, 5, 0, 0), 'w1') * 1000).toISOString(), '2026-10-05T00:00:00.000Z');
+  assert.equal(new Date(bucketStart(sun, 'm30') * 1000).toISOString(), '2026-10-11T15:30:00.000Z');
+  const dec = bucketStart(Date.UTC(2026, 11, 20), 'mn1');
+  assert.equal(new Date(bucketEnd(dec, 'mn1') * 1000).toISOString(), '2027-01-01T00:00:00.000Z');
+  assert.equal(new Date(bucketShift(dec, 'mn1', -2) * 1000).toISOString(), '2026-10-01T00:00:00.000Z');
+  assert.equal(bucketEnd(bucketStart(sun, 'w1'), 'w1') - bucketStart(sun, 'w1'), 7 * 86400);
+});
+
+test('closeExpired uses the calendar end for monthly bars', () => {
+  const agg = new CandleAggregator(['mn1']);
+  const feb1 = Date.UTC(2028, 1, 1, 10); // 2028 is a leap year: Feb has 29 days
+  agg.update('X', '100', feb1);
+  assert.equal(agg.closeExpired(Date.UTC(2028, 1, 29, 23, 59)).length, 0);
+  assert.equal(agg.closeExpired(Date.UTC(2028, 2, 1)).length, 1);
 });

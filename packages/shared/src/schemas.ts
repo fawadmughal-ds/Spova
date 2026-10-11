@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ACCOUNT_TYPES, KYC_GROUPS, KycGroup, LEDGER_TYPES, ORDER_SIDES, ORDER_TYPES, USER_STATUSES } from './enums';
+import { ACCOUNT_TYPES, KYC_GROUPS, KycGroup, LEDGER_TYPES, ORDER_SIDES, ORDER_TYPES, USER_STATUSES, TIMEFRAMES } from './enums';
 
 // Password policy (matches Spova hint): 8-32 chars, upper, lower, digit, special.
 export const passwordSchema = z
@@ -363,7 +363,7 @@ export const closePositionSchema = z.object({ lots: lotsSchema.optional() });
 export type ClosePositionInput = z.infer<typeof closePositionSchema>;
 
 export const candlesQuerySchema = z.object({
-  tf: z.enum(['m1', 'm5', 'm15', 'h1', 'h4', 'd1']).default('m1'),
+  tf: z.enum(TIMEFRAMES).default('m1'),
   from: z.coerce.number().int().optional(),
   to: z.coerce.number().int().optional(),
   limit: z.coerce.number().int().min(1).max(1500).default(500),

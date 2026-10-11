@@ -1,3 +1,4 @@
+import type { Timeframe } from './enums';
 import type {
   AssetClass,
   AccountStatus,
@@ -423,7 +424,7 @@ export interface CandleDto {
 
 export interface WsCandle extends CandleDto {
   s: string;
-  tf: 'm1' | 'm5' | 'm15' | 'h1' | 'h4' | 'd1';
+  tf: Timeframe;
   /** true when this bar has closed */
   closed?: boolean;
 }

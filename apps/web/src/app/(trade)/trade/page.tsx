@@ -339,19 +339,28 @@ function Terminal() {
   }, []);
   const show = (on: boolean) => (on ? 'flex' : 'hidden');
 
-  // bottom panel drag handle
-  const dragging = useRef<{ y: number; h: number } | null>(null);
+  // bottom panel drag handle: drag the bar to resize (it stays where you drop it); a plain click on the chevron collapses/expands
+  const dragging = useRef<{ y: number; h: number; moved: boolean; chevron: boolean } | null>(null);
   const onDragStart = (e: PointerEvent) => {
-    dragging.current = { y: e.clientY, h: settings.bottomCollapsed ? MIN_BOTTOM : settings.bottomHeight };
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    dragging.current = { y: e.clientY, h: settings.bottomCollapsed ? MIN_BOTTOM : settings.bottomHeight, moved: false, chevron: !!(e.target as HTMLElement).closest('span') };
+    e.currentTarget.setPointerCapture(e.pointerId);
   };
   const onDrag = (e: PointerEvent) => {
-    if (!dragging.current) return;
-    const h = Math.max(MIN_BOTTOM, Math.min(window.innerHeight - 260, dragging.current.h - (e.clientY - dragging.current.y)));
+    const d = dragging.current;
+    if (!d) return;
+    const dy = e.clientY - d.y;
+    if (!d.moved && Math.abs(dy) < 3) return;
+    d.moved = true;
+    const h = Math.max(MIN_BOTTOM, Math.min(window.innerHeight - 260, d.h - dy));
     settingsStore.patch({ bottomHeight: h, bottomCollapsed: h <= MIN_BOTTOM + 4 });
   };
   const onDragEnd = () => {
+    const d = dragging.current;
     dragging.current = null;
+    if (!d || d.moved || !d.chevron) return;
+    // plain click on the chevron: toggle; expanding from a fully dragged-down panel restores a usable height
+    if (settings.bottomCollapsed) settingsStore.patch({ bottomCollapsed: false, ...(settings.bottomHeight <= MIN_BOTTOM + 4 ? { bottomHeight: 330 } : {}) });
+    else settingsStore.patch({ bottomCollapsed: true });
   };
   const bottomHeight = settings.bottomCollapsed ? MIN_BOTTOM : settings.bottomHeight;
 
@@ -434,7 +443,7 @@ function Terminal() {
                 </div>
               )}
               <div className="t-drag hidden lg:flex" onPointerDown={onDragStart} onPointerMove={onDrag} onPointerUp={onDragEnd} onPointerCancel={onDragEnd} role="separator" aria-orientation="horizontal" aria-label="Resize the positions panel">
-                <span onClick={() => settingsStore.patch({ bottomCollapsed: !settings.bottomCollapsed })} title={settings.bottomCollapsed ? 'Expand' : 'Collapse'}>
+                <span title={settings.bottomCollapsed ? 'Expand' : 'Collapse'}>
                   {settings.bottomCollapsed ? <ChevronUp /> : <ChevronDown />}
                 </span>
               </div>

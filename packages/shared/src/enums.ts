@@ -60,7 +60,7 @@ export type PositionStatus = (typeof POSITION_STATUSES)[number];
 export const CLOSE_REASONS = ['user', 'sl', 'tp', 'stopout', 'admin', 'expiry'] as const;
 export type CloseReason = (typeof CLOSE_REASONS)[number];
 
-export const TIMEFRAMES = ['m1', 'm5', 'm15', 'h1', 'h4', 'd1'] as const;
+export const TIMEFRAMES = ['m1', 'm5', 'm15', 'm30', 'h1', 'h4', 'd1', 'w1', 'mn1'] as const;
 export type Timeframe = (typeof TIMEFRAMES)[number];
 
 export const TICKET_STATUSES = ['open', 'answered', 'closed'] as const;

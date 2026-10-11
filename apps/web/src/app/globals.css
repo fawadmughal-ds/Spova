@@ -1476,11 +1476,18 @@ body:has(.terminal[data-theme='light']) {
   }
   .t-drag {
     display: flex;
-    height: 10px;
+    height: 12px;
     flex-shrink: 0;
     align-items: center;
     justify-content: center;
     cursor: row-resize;
+    touch-action: none;
+    user-select: none;
+  }
+  .t-drag:hover > span,
+  .t-drag:active > span {
+    background: var(--t-raised-2);
+    color: var(--t-text-2);
   }
   .t-drag > span {
     display: inline-flex;
