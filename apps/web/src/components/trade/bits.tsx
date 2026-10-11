@@ -150,12 +150,23 @@ export function SymbolTile({ spec, id, size = 26, className }: { spec?: SymbolSp
     );
   }
 
-  // metals: chemical symbol on a gold / silver tile
+  // metals: a gold / silver / platinum ingot (bar) block
   if (METAL_SYMBOL[sym]) {
-    const silver = METAL_SYMBOL[sym] === 'Ag';
+    const m = METAL_SYMBOL[sym];
+    const bar = m === 'Ag' ? ['#f1f3f6', '#c7ccd4', '#9aa2ad'] : m === 'Pt' || m === 'Pd' ? ['#e9edf2', '#cdd6df', '#9fb0bd'] : ['#ffe9a8', '#e8b94e', '#b9822a'];
     return (
-      <span className={cn('t-tile', className)} style={{ background: silver ? '#c7ccd4' : '#e0a526', color: '#1c2128', width: size, height: size, fontSize: Math.round(size * 0.44) }} aria-hidden>
-        {METAL_SYMBOL[sym]}
+      <span className={cn('t-tile', className)} style={{ background: '#1c2128', boxShadow: 'inset 0 0 0 1px var(--t-raised-2)', width: size, height: size }} aria-hidden>
+        <svg viewBox="0 0 24 24" width={Math.round(size * 0.78)} height={Math.round(size * 0.78)}>
+          <defs>
+            <linearGradient id={`ingot-${m}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stopColor={bar[0]} />
+              <stop offset="0.5" stopColor={bar[1]} />
+              <stop offset="1" stopColor={bar[2]} />
+            </linearGradient>
+          </defs>
+          <path d="M6.5 15.5 L8.5 9.5 L15.5 9.5 L17.5 15.5 Z" fill={`url(#ingot-${m})`} stroke={bar[2]} strokeWidth="0.6" strokeLinejoin="round" />
+          <path d="M8.5 9.5 L15.5 9.5 L14.8 11 L9.2 11 Z" fill={bar[0]} opacity="0.75" />
+        </svg>
       </span>
     );
   }
