@@ -158,7 +158,13 @@ describe('phase 2: kyc -> live account -> payments -> tickets', () => {
     const otherAcc = await other.json('POST', '/me/payments/deposit', { accountId: liveAccountId, amount: '500', method: 'bank' });
     assert.equal(otherAcc.status, 404, 'cannot deposit to someone else\'s account');
 
-    const dep = await client.json('POST', '/me/payments/deposit', { accountId: liveAccountId, amount: '500', method: 'bank', reference: 'TRX-1' });
+    // bank deposit is RTGS: minimum 2000, no maximum
+    assert.equal((await client.json('POST', '/me/payments/deposit', { accountId: liveAccountId, amount: '1000', method: 'bank' })).data.code, 'amount_min', 'RTGS bank minimum is 2000');
+    const big = await client.json('POST', '/me/payments/deposit', { accountId: liveAccountId, amount: '5000000', method: 'bank', reference: 'RTGS-BIG' });
+    assert.ok([200, 201].includes(big.status), `RTGS bank has no maximum: ${JSON.stringify(big.data)}`);
+    await client.json('POST', `/me/payments/${big.data.id}/cancel`);
+
+    const dep = await client.json('POST', '/me/payments/deposit', { accountId: liveAccountId, amount: '500', method: 'upi', reference: 'UTR-1' });
     assert.ok([200, 201].includes(dep.status), JSON.stringify(dep.data));
     assert.equal(dep.data.status, 'pending');
     assert.equal(dep.data.amount, '500.00');
@@ -408,7 +414,7 @@ describe('phase 2: kyc -> live account -> payments -> tickets', () => {
 
   it('withdrawals: pending amounts reserve funds, cancel, approve, decline', async () => {
     // top the account up so amounts clear the 2000 USD minimum withdrawal; balance 500 -> 10000
-    const topUp = await admin.json('POST', `/admin/accounts/${liveAccountId}/credit`, { amount: '9500', reason: 'E2E top-up' });
+    const topUp = await admin.json('POST', `/admin/accounts/${liveAccountId}/credit`, { amount: '9500', type: 'deposit', reason: 'E2E top-up' });
     assert.ok([200, 201].includes(topUp.status), JSON.stringify(topUp.data));
     assert.equal((await client.json('GET', `/me/accounts/${liveAccountId}`)).data.balance, '10000.00');
 
@@ -454,6 +460,26 @@ describe('phase 2: kyc -> live account -> payments -> tickets', () => {
     assert.equal(still.data.items[0].id, w.data.id, 'request stays pending');
     assert.equal((await client.json('GET', `/me/accounts/${liveAccountId}`)).data.balance, '7950.00');
     await admin.json('PATCH', `/admin/payments/${w.data.id}`, { status: 'declined', note: 'Balance changed' });
+  });
+
+  it('admin-given credit counts toward equity but is not withdrawable', async () => {
+    const before = (await client.json('GET', `/me/accounts/${liveAccountId}`)).data;
+    const bal = before.balance; // 7950.00 from the previous test
+    const credited = await admin.json('POST', `/admin/accounts/${liveAccountId}/credit`, { amount: '3000', type: 'credit', reason: 'Promo credit' });
+    assert.ok([200, 201].includes(credited.status), JSON.stringify(credited.data));
+    assert.equal(credited.data.account.credit, '3000.00', 'credit lands in the credit bucket');
+    assert.equal(credited.data.account.balance, bal, 'credit does not add to the withdrawable balance');
+
+    // the 3000 credit cannot be taken out: withdrawable stays capped at the cash balance
+    const over = await client.json('POST', '/me/payments/withdraw', { accountId: liveAccountId, amount: String(Number(bal) + 2000), method: 'bank' });
+    assert.equal(over.status, 422, JSON.stringify(over.data));
+    assert.equal(over.data.code, 'insufficient_funds');
+    assert.equal(over.data.details.available, bal, 'credit is excluded from what can be withdrawn');
+
+    // the admin can pull the credit back out of the credit bucket
+    const removed = await admin.json('POST', `/admin/accounts/${liveAccountId}/remove-credit`, { amount: '3000', reason: 'Promo ended' });
+    assert.ok([200, 201].includes(removed.status), JSON.stringify(removed.data));
+    assert.equal(removed.data.account.credit, '0.00');
   });
 
   // ---------------------------------------------------------------- tickets

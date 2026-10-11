@@ -20,7 +20,7 @@ export function WalletPanel({ account, superadmin, onChanged }: { account: Accou
   const f = useForm<z.infer<typeof adminCreditSchema> | z.infer<typeof adminDebitSchema>>(schema as never, { type: mode === 'credit' ? 'deposit' : 'debit' });
 
   const amount = Number(f.values.amount ?? 0) || 0;
-  const bucket = f.values.type === 'bonus' ? 'credit' : 'balance';
+  const bucket = f.values.type === 'bonus' || f.values.type === 'credit' ? 'credit' : 'balance';
   const preview =
     mode === 'credit'
       ? bucket === 'credit'
@@ -59,9 +59,9 @@ export function WalletPanel({ account, superadmin, onChanged }: { account: Accou
         <Select label="Type" {...f.bind('type')}>
           {mode === 'credit' ? (
             <>
-              <option value="deposit">Deposit (cash balance)</option>
-              <option value="credit">Credit (cash balance)</option>
-              <option value="bonus">Bonus (credit bucket, not withdrawable)</option>
+              <option value="deposit">Deposit (cash, withdrawable)</option>
+              <option value="credit">Credit (not withdrawable)</option>
+              <option value="bonus">Bonus (not withdrawable)</option>
             </>
           ) : (
             <>

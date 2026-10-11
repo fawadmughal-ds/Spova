@@ -213,7 +213,7 @@ function AmountBlock({ amount, setAmount, error, account, setAccount, accounts, 
       <OutlinedField label="Amount">
         <input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^\d.]/g, ''))} className={cn(fieldCls, error && 'border-down')} placeholder="0" />
       </OutlinedField>
-      {error ? <p className="mt-1.5 text-xs text-down">{error}</p> : <p className="mt-1.5 text-[11px] text-ink-500">Min {fmtMoney(min)} · Max {fmtMoney(max)} USD</p>}
+      {error ? <p className="mt-1.5 text-xs text-down">{error}</p> : <p className="mt-1.5 text-[11px] text-ink-500">Min {fmtMoney(min)} · {Number(max) > 0 ? `Max ${fmtMoney(max)} USD` : 'No maximum'}</p>}
       <div className="mt-3 flex flex-wrap gap-2">
         {PRESETS.map((p) => (
           <button key={p} type="button" onClick={() => setAmount(p)} className={cn('rounded-full px-5 py-1.5 text-[14px] font-medium transition-colors', amount === p ? 'bg-[#0b1220] text-[#ffffff]' : 'bg-ink-900 text-white hover:bg-ink-800')}>

@@ -263,7 +263,7 @@ export class AdminService {
   /** POST /admin/accounts/:id/credit  {amount, reason, type: deposit|credit|bonus} */
   async credit(actor: Actor, accountId: string, input: AdminCreditInput) {
     const amount = D(input.amount);
-    const bucket = input.type === 'bonus' ? 'credit' : 'balance';
+    const bucket = input.type === 'bonus' || input.type === 'credit' ? 'credit' : 'balance';
 
     const { result, entryId } = await this.prisma.$transaction(async (tx) => {
       const result = await this.ledger.postInTx(tx, {

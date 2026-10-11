@@ -130,7 +130,7 @@ export function MobileStats({ account, positions, symbols, onSearch, className }
           {(
             [
               ['Balance', fmtNum(account.balance)],
-              ['Credit', fmtNum(account.credit)],
+              ...(Number(account.credit) > 0 ? [['Credit', fmtNum(account.credit)]] : []),
               ['Used margin', fmtNum(account.usedMargin)],
               ['Free margin', fmtNum(account.freeMargin)],
               ['Margin level', account.marginLevel === null || account.marginLevel === undefined ? '—' : `${fmtNum(account.marginLevel)}%`],

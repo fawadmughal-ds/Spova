@@ -167,7 +167,7 @@ export function DashboardView() {
               { label: 'Equity', value: account.equity, sub: 'Balance + credit + floating P/L', icon: <Scale className="h-4 w-4" /> },
               { label: 'Free margin', value: account.freeMargin, sub: 'Available for new positions', icon: <WalletMinimal className="h-4 w-4" /> },
               { label: 'Used margin', value: account.usedMargin, sub: 'Held by open positions', icon: <Lock className="h-4 w-4" /> },
-              { label: 'Credit', value: account.credit, sub: 'Counts toward equity', icon: <Coins className="h-4 w-4" /> },
+              ...(Number(account.credit) > 0 ? [{ label: 'Credit', value: account.credit, sub: 'Bonus, not withdrawable', icon: <Coins className="h-4 w-4" /> }] : []),
             ].map((s, i) => (
               <div key={s.label} className="animate-page-in" style={{ animationDelay: `${160 + i * 70}ms` }}>
                 <Stat label={s.label} icon={s.icon} value={<AnimatedNumber key={account.id} value={s.value} mountFrom={0} />} sub={s.sub} />

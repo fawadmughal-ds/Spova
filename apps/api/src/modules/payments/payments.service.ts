@@ -154,7 +154,7 @@ export class PaymentsService {
     if (!method || !(method.kinds as readonly string[]).includes('deposit') || !depositEnabled(method.id, cfg)) throw ApiError.badRequest('method_unavailable', 'This deposit method is not available');
     const amount = D(input.amount);
     if (amount.lt(method.minDeposit)) throw ApiError.badRequest('amount_min', `Minimum deposit by ${method.label} is ${method.minDeposit} USD`);
-    if (amount.gt(method.maxDeposit)) throw ApiError.badRequest('amount_max', `Maximum deposit by ${method.label} is ${method.maxDeposit} USD`);
+    if (D(method.maxDeposit).gt(0) && amount.gt(method.maxDeposit)) throw ApiError.badRequest('amount_max', `Maximum deposit by ${method.label} is ${method.maxDeposit} USD`);
 
     const row = await this.prisma.paymentRequest.create({
       data: { userId, accountId: acc.id, kind: 'deposit', amount: amount.toFixed(2), currency: acc.currency, method: input.method, reference: input.reference ?? null },

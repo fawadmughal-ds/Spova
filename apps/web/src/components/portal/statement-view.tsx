@@ -72,7 +72,7 @@ export function StatementView({ id, embedded = false }: { id: string; embedded?:
         <div className="grid grid-cols-2 gap-4">
           {[
             { label: 'Equity', value: acc.equity, sub: acc.currency, icon: <Scale className="h-4 w-4" /> },
-            { label: 'Credit', value: acc.credit, sub: 'Counts toward equity', icon: <Coins className="h-4 w-4" /> },
+            ...(Number(acc.credit) > 0 ? [{ label: 'Credit', value: acc.credit, sub: 'Bonus, not withdrawable', icon: <Coins className="h-4 w-4" /> }] : []),
             { label: 'Free margin', value: acc.freeMargin, sub: 'Available for new positions', icon: <WalletMinimal className="h-4 w-4" /> },
             { label: 'Used margin', value: acc.usedMargin, sub: acc.marginLevel ? `Margin level ${acc.marginLevel}%` : 'No open positions', icon: <Lock className="h-4 w-4" /> },
           ].map((s, i) => (

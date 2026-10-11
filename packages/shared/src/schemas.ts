@@ -180,7 +180,7 @@ export type KycReviewInput = z.infer<typeof kycReviewSchema>;
 
 /** Payment methods offered in v1. Card stays visible but disabled until a PSP is connected (Phase 5). */
 export const PAYMENT_METHODS = [
-  { id: 'bank', label: 'Bank transfer', kinds: ['deposit', 'withdraw'], enabled: true, minDeposit: '200', maxDeposit: '100000', minWithdraw: '2000', maxWithdraw: '100000', eta: 'Within 7 business days' },
+  { id: 'bank', label: 'Bank transfer', kinds: ['deposit', 'withdraw'], enabled: true, minDeposit: '2000', maxDeposit: '0', minWithdraw: '2000', maxWithdraw: '100000', eta: 'Within 7 business days' }, // maxDeposit '0' = no upper limit (RTGS)
   { id: 'upi', label: 'UPI', kinds: ['deposit'], enabled: true, minDeposit: '200', maxDeposit: '20000', minWithdraw: '0', maxWithdraw: '0', eta: 'Within hours' },
   { id: 'binance', label: 'Binance Pay', kinds: ['deposit', 'withdraw'], enabled: true, minDeposit: '200', maxDeposit: '100000', minWithdraw: '2000', maxWithdraw: '100000', eta: '4-6 business days' },
   { id: 'crypto_usdt', label: 'Crypto (USDT)', kinds: ['deposit', 'withdraw'], enabled: true, minDeposit: '200', maxDeposit: '100000', minWithdraw: '2000', maxWithdraw: '100000', eta: 'Same day' },
@@ -250,7 +250,7 @@ export const cardIntentSchema = z.object({ accountId: z.string().uuid(), amount:
 export type CardIntentInput = z.infer<typeof cardIntentSchema>;
 
 export const DEFAULT_DEPOSIT_CHANNELS: DepositChannels = {
-  bank: { enabled: true, bankName: 'HDFC Bank', accountName: 'Zerventa Ltd', accountNumber: '50200012345678', ifsc: 'HDFC0001234', swift: 'HDFCINBB', currency: 'INR', note: 'Use your account login as the transfer remark. INR transfers are converted at the rate of the day.' },
+  bank: { enabled: true, bankName: 'HDFC Bank', accountName: 'Zerventa Ltd', accountNumber: '50200012345678', ifsc: 'HDFC0001234', swift: 'HDFCINBB', currency: 'INR', note: 'Bank/RTGS transfer. Use your account login as the transfer remark. INR transfers are converted at the rate you see above.' },
   upi: { enabled: true, vpa: 'zerventa@hdfcbank', payeeName: 'Zerventa', currency: 'INR', note: 'Scan the QR with any UPI app (GPay, PhonePe, Paytm) or pay to the UPI ID. Keep the screenshot of the success screen.' },
   binance: { enabled: true, payId: '123456789', email: 'pay@zerventa.com', qrLink: '', note: 'Binance app → Pay → Send → enter the Pay ID (or scan). Send USDT. Zero fee inside Binance.' },
   crypto_usdt: { enabled: true, address: 'TXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX', network: 'TRC20', note: 'Send USDT on the TRC20 network only. Transfers on another network cannot be recovered.' },

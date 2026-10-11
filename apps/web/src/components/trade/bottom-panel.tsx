@@ -527,7 +527,7 @@ function FinanceTab({ account, ledgerVersion }: { account: AccountDto; ledgerVer
   const figures: [string, string, string?][] = [
     ['Balance', fmtNum(account.balance)],
     ['Equity', fmtNum(account.equity)],
-    ['Credit', fmtNum(account.credit)],
+    ...((Number(account.credit) > 0 ? [['Credit', fmtNum(account.credit)]] : []) as [string, string][]),
     ['Margin', fmtNum(account.usedMargin)],
     ['Free margin', fmtNum(account.freeMargin)],
     ['Margin level', level === null ? '—' : `${fmtNum(level)}%`, level === null ? undefined : level <= 100 ? 't-pnl-down' : level <= 200 ? 'text-[var(--t-alert)]' : 't-pnl-up'],
