@@ -29,7 +29,7 @@ function LoginForm() {
       // only a same-origin path: "//host" and "/\\host" are protocol-relative redirects
       const safeNext = next && /^\/(?![\/\\])/.test(next) ? next : null;
       // clients land in the client area; staff in the back office
-      router.replace(safeNext ?? (isAdmin ? '/admin' : '/app'));
+      router.replace(safeNext ?? (isAdmin ? '/admin' : '/client-area'));
     });
   };
 

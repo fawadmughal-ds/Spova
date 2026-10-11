@@ -141,7 +141,7 @@ export function DashboardView() {
               <Tilt max={3} className="h-full">
                 <AccountPlate a={account} size="lg" countUp className="h-full">
                   <Link
-                    href={`/trade?acc=${account.id}`}
+                    href={`/client-area?acc=${account.id}`}
                     className="group/a inline-flex h-9 items-center gap-2 rounded-full bg-white px-4 text-sm font-semibold text-ink-950 transition-transform duration-300 hover:-translate-y-0.5"
                   >
                     <LineChart className="h-4 w-4" /> Trade this account
@@ -186,7 +186,7 @@ export function DashboardView() {
 
             <Card title="Quick actions" className="animate-page-in [animation-delay:500ms]">
               <div className="grid gap-2.5">
-                <ActionTile href={`/trade?acc=${account.id}`} icon={<LineChart className="h-5 w-5" />} title="Open terminal" hint="Charts, orders and positions" primary />
+                <ActionTile href={`/client-area?acc=${account.id}`} icon={<LineChart className="h-5 w-5" />} title="Open terminal" hint="Charts, orders and positions" primary />
                 <ActionTile href="/app/payments" icon={<ArrowDownToLine className="h-5 w-5" />} title="Deposit" hint="Fund your account" />
                 {account.type === 'demo' ? (
                   <ActionTile icon={<ArrowUpFromLine className="h-5 w-5" />} title="Withdraw" hint="Withdrawals are available on live accounts only." />

@@ -9,7 +9,6 @@ const nextConfig: NextConfig = {
     return [
       // "Get started" entry point used by the public site and campaigns
       { source: '/onboarding', destination: '/register', permanent: false },
-      { source: '/client-area/:path*', destination: '/login', permanent: false },
     ];
   },
   async headers() {
@@ -25,7 +24,7 @@ const nextConfig: NextConfig = {
       { source: '/(.*)', headers: security },
       {
         // Private surfaces must never be indexed.
-        source: '/(app|trade|admin)(.*)',
+        source: '/(app|trade|client-area|admin)(.*)',
         headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }],
       },
     ];

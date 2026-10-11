@@ -62,7 +62,7 @@ export function StatementView({ id, embedded = false }: { id: string; embedded?:
         <div className="animate-page-in">
           <AccountPlate a={acc} countUp className="h-full">
             <Link
-              href={`/trade?acc=${acc.id}`}
+              href={`/client-area?acc=${acc.id}`}
               className="inline-flex h-9 items-center gap-2 rounded-full bg-white px-4 text-sm font-semibold text-ink-950 transition-transform duration-300 hover:-translate-y-0.5"
             >
               <LineChart className="h-4 w-4" /> Trade this account

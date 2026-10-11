@@ -233,7 +233,7 @@ function UserMenu({ email, onLogout }: { email: string | undefined; onLogout: ()
           <Link href="/app/profile" className="t-menu-item" onClick={close}>
             <UserRound /> Profile
           </Link>
-          <Link href="/app" className="t-menu-item" onClick={close}>
+          <Link href="/client-area" className="t-menu-item" onClick={close}>
             <LayoutDashboard /> Client area
           </Link>
           <div className="my-1 border-t border-[var(--t-raised-2)]" />
@@ -283,7 +283,7 @@ export function TopBar({
   return (
     <header className="relative z-40 flex h-[52px] shrink-0 items-center gap-1.5 px-2 sm:gap-3 sm:px-4 lg:h-[56px]">
       {/* logo */}
-      <Link href="/app" className="flex shrink-0 items-center text-white" title="Client area">
+      <Link href="/client-area" className="flex shrink-0 items-center text-white" title="Client area">
         <Wordmark size={24} className="hidden sm:inline-flex [&>span]:text-[17px]" />
         <Logo size={26} className="sm:hidden" />
       </Link>

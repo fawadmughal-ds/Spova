@@ -15,13 +15,22 @@ function roleFrom(token: string | undefined): string | null {
   }
 }
 
+/** The client area is a single page (/client-area). Old /app/* deep links open the matching panel there. */
+const PANEL_FOR: Record<string, string> = {
+  documents: 'documents',
+  payments: 'payments',
+  accounts: 'accounts',
+  profile: 'profile',
+  help: 'help',
+};
+
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const access = req.cookies.get(ACCESS)?.value;
   const refresh = req.cookies.get(REFRESH)?.value;
   const signedIn = !!(access || refresh);
 
-  const isPrivate = pathname.startsWith('/app') || pathname.startsWith('/trade') || pathname.startsWith('/admin');
+  const isPrivate = pathname.startsWith('/app') || pathname.startsWith('/client-area') || pathname.startsWith('/admin');
   const isAuthPage = pathname === '/login' || pathname === '/register';
 
   if (isPrivate && !signedIn) {
@@ -31,21 +40,31 @@ export function middleware(req: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // /app no longer exists: everything lives in the client-area terminal. Map old links to the right panel.
+  if (pathname === '/app' || pathname.startsWith('/app/')) {
+    const url = req.nextUrl.clone();
+    url.pathname = '/client-area';
+    const seg = pathname.split('/')[2]; // /app/<seg>
+    const panel = seg ? PANEL_FOR[seg] : undefined;
+    if (panel) url.searchParams.set('panel', panel);
+    return NextResponse.redirect(url);
+  }
+
   if (pathname.startsWith('/admin') && access) {
     const role = roleFrom(access);
     if (role && role !== 'admin' && role !== 'superadmin') {
-      return NextResponse.redirect(new URL('/app', req.url));
+      return NextResponse.redirect(new URL('/client-area', req.url));
     }
   }
 
   if (isAuthPage && signedIn && access) {
     const role = roleFrom(access);
-    return NextResponse.redirect(new URL(role === 'admin' || role === 'superadmin' ? '/admin' : '/app', req.url));
+    return NextResponse.redirect(new URL(role === 'admin' || role === 'superadmin' ? '/admin' : '/client-area', req.url));
   }
 
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ['/app/:path*', '/trade/:path*', '/admin/:path*', '/login', '/register'],
+  matcher: ['/app/:path*', '/client-area/:path*', '/admin/:path*', '/login', '/register'],
 };

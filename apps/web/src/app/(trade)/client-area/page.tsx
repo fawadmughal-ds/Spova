@@ -324,7 +324,12 @@ function Terminal() {
 
   // ---------------------------------------------------------------- layout
   const [view, setView] = useState<TerminalView>('trade');
-  const [panel, setPanel] = useState<RailPanel | null>(null);
+  const RAIL_PANELS: RailPanel[] = ['dashboard', 'deposit', 'accounts', 'payments', 'documents', 'statement', 'help', 'profile'];
+  const initialPanel = ((): RailPanel | null => {
+    const q = params.get('panel');
+    return q && (RAIL_PANELS as string[]).includes(q) ? (q as RailPanel) : null;
+  })();
+  const [panel, setPanel] = useState<RailPanel | null>(initialPanel);
   const t = useT();
   const [mtab, setMtab] = useState<MobileTab>('trade');
   const desktop = useIsDesktop();

@@ -250,12 +250,12 @@ export function AppShell({ nav, children, variant }: { nav: NavItem[]; children:
                 <Link href="/app/payments" className={buttonClass('ghost', 'sm', 'hidden h-9 rounded-full px-3.5 md:inline-flex')}>
                   Deposit
                 </Link>
-                <Link href="/trade" className={buttonClass('primary', 'sm', 'group h-9 rounded-full px-4')}>
+                <Link href="/client-area" className={buttonClass('primary', 'sm', 'group h-9 rounded-full px-4')}>
                   Terminal <ArrowUpRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
                 </Link>
               </>
             ) : (
-              <Link href="/app" className={buttonClass('outline', 'sm', 'group h-9 rounded-full px-4')}>
+              <Link href="/client-area" className={buttonClass('outline', 'sm', 'group h-9 rounded-full px-4')}>
                 Client view <ArrowUpRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
               </Link>
             )}

@@ -21,7 +21,7 @@ function AccountCard({ a, index }: { a: AccountDto; index: number }) {
     <div className="animate-page-in" style={{ animationDelay: `${index * 90}ms` }}>
       <AccountPlate a={a} className="h-full">
         <Link
-          href={`/trade?acc=${a.id}`}
+          href={`/client-area?acc=${a.id}`}
           className="group/a inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-full bg-white px-4 text-sm font-semibold text-ink-950 transition-transform duration-300 hover:-translate-y-0.5"
         >
           <LineChart className="h-4 w-4" /> Trade
