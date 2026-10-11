@@ -277,7 +277,7 @@ function ManualForm({ method, label, accounts, fx, onCreated, onHistory }: { met
   const [proofErr, setProofErr] = useState<string | undefined>();
   const [done, setDone] = useState<PaymentRequestDto | null>(null);
   const [financeModal, setFinanceModal] = useState<PaymentRequestDto | null>(null);
-  const financeHandled = method.id === 'bank' || method.id === 'rtgs';
+  const financeHandled = method.id === 'rtgs';
   const channel = method.deposit;
   const charged = chargedLine(amount, channel?.currency ?? 'USD', fx);
 

@@ -159,11 +159,15 @@ describe('phase 2: kyc -> live account -> payments -> tickets', () => {
     const otherAcc = await other.json('POST', '/me/payments/deposit', { accountId: liveAccountId, amount: '500', method: 'bank' });
     assert.equal(otherAcc.status, 404, 'cannot deposit to someone else\'s account');
 
-    // bank deposit is RTGS: minimum 2000, no maximum
-    assert.equal((await client.json('POST', '/me/payments/deposit', { accountId: liveAccountId, amount: '1000', method: 'bank' })).data.code, 'amount_min', 'RTGS bank minimum is 2000');
-    const big = await client.json('POST', '/me/payments/deposit', { accountId: liveAccountId, amount: '5000000', method: 'bank', reference: 'RTGS-BIG' });
-    assert.ok([200, 201].includes(big.status), `RTGS bank has no maximum: ${JSON.stringify(big.data)}`);
+    // bank deposit minimum 200, no maximum; RTGS minimum 2000
+    assert.equal((await client.json('POST', '/me/payments/deposit', { accountId: liveAccountId, amount: '1000', method: 'rtgs' })).data.code, 'amount_min', 'RTGS minimum is 2000');
+    assert.ok([200, 201].includes((await client.json('POST', '/me/payments/deposit', { accountId: liveAccountId, amount: '1000', method: 'bank' })).status), 'bank minimum is 200');
+    const big = await client.json('POST', '/me/payments/deposit', { accountId: liveAccountId, amount: '5000000', method: 'bank', reference: 'BANK-BIG' });
+    assert.ok([200, 201].includes(big.status), `bank has no maximum: ${JSON.stringify(big.data)}`);
     await client.json('POST', `/me/payments/${big.data.id}/cancel`);
+    // the two accepted bank deposits above are extra pending rows; cancel the first one so the count stays 1 later
+    const extra = await client.json('GET', '/me/payments?kind=deposit&status=pending');
+    for (const r of extra.data.items) await client.json('POST', `/me/payments/${r.id}/cancel`);
 
     const dep = await client.json('POST', '/me/payments/deposit', { accountId: liveAccountId, amount: '500', method: 'upi', reference: 'UTR-1' });
     assert.ok([200, 201].includes(dep.status), JSON.stringify(dep.data));

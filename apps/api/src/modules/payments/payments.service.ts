@@ -168,7 +168,7 @@ export class PaymentsService {
     });
     this.afterNew(row, user.email);
     // bank / RTGS: finance confirms and emails the pay-to details, so send them now
-    if ((input.method === 'bank' || input.method === 'rtgs') && user.profile?.notifEmail) {
+    if (input.method === 'rtgs' && user.profile?.notifEmail) {
       const ch = depositChannelPublic(input.method, cfg, env.BRAND_NAME);
       if (ch) void this.mail.depositInstructions(user.email, method.label, money(row.amount), row.currency, row.account.loginCode, ch).catch((e) => this.log.warn(e.message));
     }

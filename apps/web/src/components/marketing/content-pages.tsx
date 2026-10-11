@@ -388,7 +388,7 @@ function About({ copy }: { copy: ContentCopy }) {
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 function Contact({ copy }: { copy: ContentCopy }) {
-  const [text, pending] = splitPlaceholder(copy.paragraphs[0]);
+  const [text] = splitPlaceholder(copy.paragraphs[0]);
   // "Support: support@[domain] - 24/5 live chat from the client area."
   const email = text.match(/\S+@\S+/)?.[0] ?? 'info@zerventa.com';
   return (
@@ -443,37 +443,6 @@ function Contact({ copy }: { copy: ContentCopy }) {
           </Spotlight>
 
         </Reveal>
-
-        {/* phone lines and office: all waiting on the client */}
-        <div className="mt-16">
-          <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-            <Reveal variant="stagger">
-              <span className="eyebrow">International support</span>
-              <h2 className="mt-4 font-display text-3xl font-bold tracking-tight sm:text-4xl">
-                Prefer to <span className="accent text-4xl sm:text-5xl">call?</span>
-              </h2>
-            </Reveal>
-            {pending && (
-              <Reveal variant="fade" delay={200}>
-                <Pending>{pending}</Pending>
-              </Reveal>
-            )}
-          </div>
-          <Reveal variant="stagger" step={90} className="grid gap-4 md:grid-cols-3">
-            {[
-              { icon: Globe, label: 'International line', note: 'One number that reaches the support desk from anywhere.', mark: '[PLACEHOLDER - international support number]' },
-              { icon: PhoneCall, label: 'Local numbers', note: 'Country lines, listed here with their hours.', mark: '[PLACEHOLDER - local support numbers by country]' },
-              { icon: Building2, label: 'Online broker', note: 'Every account matter is handled from the client area and by email. There is no walk-in office.', mark: '[PLACEHOLDER - support hours by region]' },
-            ].map((c) => (
-              <div key={c.label} className="group rounded-[1.25rem] border border-dashed border-white/12 p-7 transition-colors duration-300 hover:border-white/25">
-                <ChannelIcon icon={c.icon} muted />
-                <div className="mt-7 font-display text-xl font-bold tracking-tight">{c.label}</div>
-                <p className="mt-1.5 text-sm text-ink-400">{c.note}</p>
-                <Pending className="mt-4">{c.mark}</Pending>
-              </div>
-            ))}
-          </Reveal>
-        </div>
 
         {/* contact form: drawn but switched off until the support endpoint exists */}
         <Reveal variant="scale" className="mt-16">
