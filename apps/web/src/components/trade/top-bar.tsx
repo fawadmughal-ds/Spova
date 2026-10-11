@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { Bell, BellOff, ChartNoAxesColumn, ChartPie, Check, ChevronDown, CircleUser, Compass, LayoutDashboard, LogOut, Moon, Sun, UserRound, Volume2, VolumeX, Wifi, WifiOff } from 'lucide-react';
+import { TierTag } from '@/components/trade/tier-tag';
 import type { AccountDto, PositionDto } from '@spova/shared';
 import { cn } from '@/lib/utils';
 import { Logo, Wordmark } from '@/components/logo';
@@ -28,10 +29,6 @@ const VIEWS: { value: TerminalView; label: StringKey; icon: typeof Compass }[] =
   { value: 'explore', label: 'explore', icon: Compass },
 ];
 
-function TypeTag({ type }: { type: AccountDto['type'] }) {
-  return <span className={cn('rounded px-1.5 py-px text-[10px] font-bold uppercase leading-4 tracking-wide', type === 'live' ? 'bg-[var(--t-blue-deep)] text-white' : 'bg-[var(--t-pos-bg)] text-[var(--t-pos-text)]')}>{type}</span>;
-}
-
 /** "DEMO 746181 ▾": the account chip with a dropdown of every account the user owns. */
 function AccountChip({ accounts, account, onSelect }: { accounts: AccountDto[]; account: AccountDto | undefined; onSelect: (id: string) => void }) {
   if (!account) return <div className="skeleton h-8 w-32 rounded-md" />;
@@ -41,7 +38,7 @@ function AccountChip({ accounts, account, onSelect }: { accounts: AccountDto[]; 
       buttonClassName="flex h-9 items-center gap-2 rounded-md px-2 text-[14px] font-semibold text-white transition-colors hover:bg-white/[0.06]"
       button={(open) => (
         <>
-          <TypeTag type={account.type} />
+          <TierTag tier={account.tier} demo={account.type === 'demo'} />
           <span>{account.loginCode}</span>
           <ChevronDown className={cn('h-3.5 w-3.5 text-[var(--t-muted)] transition-transform', open && 'rotate-180')} />
         </>
@@ -63,12 +60,9 @@ function AccountChip({ accounts, account, onSelect }: { accounts: AccountDto[]; 
               }}
               className="t-menu-item"
             >
-              <TypeTag type={a.type} />
+              <TierTag tier={a.tier} demo={a.type === 'demo'} />
               <span className="min-w-0 flex-1">
-                <span className="flex items-center gap-2 font-semibold text-white">
-                  {a.loginCode}
-                  <span className="text-[10px] font-medium uppercase tracking-wider text-[var(--t-muted)]">{a.tier}</span>
-                </span>
+                <span className="block font-semibold text-white">{a.loginCode}</span>
                 <span className="block text-[11px] text-[var(--t-muted)]">
                   {fmtNum(a.balance)} {a.currency} · 1:{a.leverage}
                   {a.status !== 'enabled' && <span className="text-[var(--t-alert)]"> · {a.status}</span>}
@@ -78,7 +72,7 @@ function AccountChip({ accounts, account, onSelect }: { accounts: AccountDto[]; 
             </button>
           ))}
           <div className="mt-1 border-t border-[var(--t-raised-2)] pt-1">
-            <Link href="/app/accounts" className="t-menu-item">
+            <Link href="/client-area?panel=accounts" className="t-menu-item">
               <LayoutDashboard /> Manage accounts
             </Link>
           </div>
@@ -230,14 +224,14 @@ function UserMenu({ email, onLogout }: { email: string | undefined; onLogout: ()
       {(close) => (
         <div className="w-56">
           {email && <div className="truncate px-2.5 pb-1 pt-2 text-[11px] text-[var(--t-muted)]">{email}</div>}
-          <Link href="/app/profile" className="t-menu-item" onClick={close}>
+          <Link href="/client-area?panel=profile" className="t-menu-item" onClick={close}>
             <UserRound /> Profile
           </Link>
           <Link href="/client-area" className="t-menu-item" onClick={close}>
             <LayoutDashboard /> Client area
           </Link>
           <div className="my-1 border-t border-[var(--t-raised-2)]" />
-          <button type="button" className="t-menu-item" onClick={onLogout}>
+          <button type="button" className="t-menu-item t-menu-item-danger" onClick={onLogout}>
             <LogOut /> Log out
           </button>
         </div>

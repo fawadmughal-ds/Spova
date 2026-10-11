@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useLayoutEffect, useState, type CSSProperties, type ReactNode, type RefObject } from 'react';
 import { Check, ChevronRight, CircleDollarSign, CircleHelp, CircleUser, CreditCard, FileText, IdCard, LayoutDashboard, LogOut, Wallet } from 'lucide-react';
+import { TierTag } from '@/components/trade/tier-tag';
 import type { AccountDto, MeDto } from '@spova/shared';
 import { cn, initials } from '@/lib/utils';
 import { Logo } from '@/components/logo';
@@ -107,11 +108,11 @@ function useAnchor(open: boolean, ref: RefObject<HTMLElement | null>, side: 'bel
 function AccountPill({ accounts, account, onSelect, onOpenAccounts }: { accounts: AccountDto[]; account: AccountDto | undefined; onSelect: (id: string) => void; onOpenAccounts: () => void }) {
   const [open, setOpen, ref] = useDismiss<HTMLDivElement>();
   const anchor = useAnchor(open, ref, 'below');
-  const label = account ? (account.type === 'live' ? 'Live' : 'Demo') : '…';
+
   return (
     <div ref={ref} className="relative">
       <button type="button" onClick={() => setOpen((v) => !v)} aria-haspopup="menu" aria-expanded={open} title="Switch account" className="trail-pill">
-        {label} <ChevronRight strokeWidth={3} />
+        {account ? <TierTag tier={account.tier} demo={account.type === 'demo'} /> : <span className="text-[11px] text-[#55617a]">…</span>} <ChevronRight strokeWidth={3} />
       </button>
       {open && (
         <div role="menu" className="trail-menu w-64" style={anchor}>
@@ -129,7 +130,7 @@ function AccountPill({ accounts, account, onSelect, onOpenAccounts }: { accounts
               }}
               className="trail-menu-item"
             >
-              <span className={cn('rounded px-1.5 py-px text-[10px] font-bold uppercase tracking-wide', a.type === 'live' ? 'bg-[#2563eb] text-white' : 'bg-[#15803d]/15 text-[#15803d]')}>{a.type}</span>
+              <TierTag tier={a.tier} demo={a.type === 'demo'} />
               <span className="min-w-0 flex-1 text-left">
                 <span className="block font-semibold text-[#141b2c]">{a.loginCode}</span>
                 <span className="block text-[11px] text-[#55617a]">
