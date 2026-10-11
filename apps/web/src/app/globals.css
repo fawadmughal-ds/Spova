@@ -209,6 +209,12 @@
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
+    overscroll-behavior: none;
+  }
+  /* the terminal is a full-viewport app: pin the body so mobile never rubber-bands a white gap below it */
+  body:has(.terminal) {
+    overflow: hidden;
+    height: 100dvh;
   }
   h1,
   h2,

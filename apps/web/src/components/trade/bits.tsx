@@ -126,22 +126,29 @@ export function SymbolTile({ spec, id, size = 26, className }: { spec?: SymbolSp
   if (CRYPTO_ICON[sym]) return <LogoImg src={`https://assets.coincap.io/assets/icons/${CRYPTO_ICON[sym]}@2x.png`} sym={sym} size={size} tile={letterTile} />;
   if (SHARE_DOMAIN[sym]) return <LogoImg src={`https://logo.clearbit.com/${SHARE_DOMAIN[sym]}`} sym={sym} size={size} tile={letterTile} chip />;
 
-  // indices: country flag
+  // indices: a single flag "coin"
   if (INDEX_FLAG[sym])
     return (
-      <span className={cn('t-tile', className)} style={{ background: '#0f1115', boxShadow: 'inset 0 0 0 1px var(--t-raised-2)', width: size, height: size, fontSize: Math.round(size * 0.58), lineHeight: 1 }} aria-hidden>
+      <span className={cn('inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-white', className)} style={{ width: size, height: size, fontSize: Math.round(size * 0.72), lineHeight: 1 }} aria-hidden>
         {INDEX_FLAG[sym]}
       </span>
     );
 
-  // forex pair: base + quote flags
-  if (cls === 'forex' && sym.length === 6 && CCY_FLAG[sym.slice(0, 3)] && CCY_FLAG[sym.slice(3)])
+  // forex pair: two overlapping flag "coins" (base front-left, quote behind-right)
+  if (cls === 'forex' && sym.length === 6 && CCY_FLAG[sym.slice(0, 3)] && CCY_FLAG[sym.slice(3)]) {
+    const d = Math.round(size * 0.68);
+    const flag: CSSProperties = { width: d, height: d, fontSize: Math.round(d * 0.82), lineHeight: 1 };
     return (
-      <span className={cn('t-tile', className)} style={{ background: '#0f1115', boxShadow: 'inset 0 0 0 1px var(--t-raised-2)', width: size, height: size, fontSize: Math.round(size * 0.42), letterSpacing: '-0.08em', lineHeight: 1 }} aria-hidden>
-        {CCY_FLAG[sym.slice(0, 3)]}
-        {CCY_FLAG[sym.slice(3)]}
+      <span className={cn('relative inline-block shrink-0', className)} style={{ width: size, height: size }} aria-hidden>
+        <span className="absolute left-0 top-0 flex items-center justify-center overflow-hidden rounded-full bg-white" style={flag}>
+          {CCY_FLAG[sym.slice(0, 3)]}
+        </span>
+        <span className="absolute bottom-0 right-0 flex items-center justify-center overflow-hidden rounded-full bg-white" style={{ ...flag, boxShadow: '0 0 0 1.5px var(--t-bg)' }}>
+          {CCY_FLAG[sym.slice(3)]}
+        </span>
       </span>
     );
+  }
 
   // metals: chemical symbol on a gold / silver tile
   if (METAL_SYMBOL[sym]) {
