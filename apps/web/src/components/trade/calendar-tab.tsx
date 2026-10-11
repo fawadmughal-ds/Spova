@@ -68,7 +68,6 @@ export function CalendarTab({ className }: { className?: string }) {
         <button type="button" data-on={onlyHigh} onClick={() => setOnlyHigh(true)} className="t-chip">
           <span className="mr-1 inline-block h-2 w-2 rounded-full bg-[var(--t-sell)]" /> {t('highImpact')}
         </button>
-        <span className="ml-auto text-[11px] text-[var(--t-muted)]">{Intl.DateTimeFormat().resolvedOptions().timeZone.replace('_', ' ')}</span>
       </div>
       {events === null ? (
         <ul className="animate-pulse space-y-2 p-3">
