@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ArrowUpRight } from 'lucide-react';
+import { ArrowUpRight, Facebook, Instagram } from 'lucide-react';
 import { BRAND } from '@/lib/utils';
 import { MARKET_LIST } from '@/lib/markets';
 import { COMPANY_LINKS, EDUCATION_LINKS, TIER_LINKS, TRADING_LINKS, tierHref } from '@/lib/site-nav';
@@ -17,6 +17,39 @@ const COLS: { title: string; links: [href: string, label: string][] }[] = [
   { title: 'Education', links: EDUCATION_LINKS.map((l) => [l.href, l.label]) },
   { title: 'Company', links: COMPANY_LINKS.map((l) => [l.href, l.label]) },
 ];
+
+const SOCIALS: { label: string; href: string; icon: 'facebook' | 'instagram' | 'x' }[] = [
+  { label: 'Facebook', href: 'https://www.facebook.com/zerventa', icon: 'facebook' },
+  { label: 'Instagram', href: 'https://www.instagram.com/zerventa', icon: 'instagram' },
+  { label: 'X', href: 'https://x.com/zerventa', icon: 'x' },
+];
+
+function XMark({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden className={className} fill="currentColor">
+      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24h-6.656l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+    </svg>
+  );
+}
+
+function SocialLinks({ className = '' }: { className?: string }) {
+  return (
+    <div className={`flex items-center gap-2.5 ${className}`}>
+      {SOCIALS.map((sLink) => (
+        <a
+          key={sLink.label}
+          href={sLink.href}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={sLink.label}
+          className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 text-ink-300 transition-colors hover:border-brand-400/50 hover:text-white"
+        >
+          {sLink.icon === 'facebook' ? <Facebook className="h-4 w-4" /> : sLink.icon === 'instagram' ? <Instagram className="h-4 w-4" /> : <XMark className="h-[15px] w-[15px]" />}
+        </a>
+      ))}
+    </div>
+  );
+}
 
 export function SiteFooter() {
   return (
@@ -36,6 +69,7 @@ export function SiteFooter() {
               <ArrowUpRight className="h-4 w-4 transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
             </Link>
             <NewsletterForm className="mt-8 max-w-sm" />
+            <SocialLinks className="mt-7" />
           </div>
           {COLS.map((c) => (
             <div key={c.title}>
@@ -61,11 +95,9 @@ export function SiteFooter() {
             you understand how CFDs work and whether you can afford to take the high risk of losing your money. Past performance is not a reliable indicator of future results.
           </p>
           <p>
-            {BRAND} does not offer services to residents of certain jurisdictions where CFD trading is restricted. Regulatory and legal entity details will be published here once confirmed. [PLACEHOLDER]
+            <strong className="text-ink-300">Regional Restrictions:</strong> {BRAND} does not offer its services to residents of the European Union, UAE, GCC countries or to any other jurisdiction where such distribution would be contrary to local laws and regulations.
           </p>
-          <p className="font-mono text-[11px] uppercase tracking-[0.14em]">
-            © {new Date().getFullYear()} {BRAND}. All rights reserved.
-          </p>
+          <p className="font-mono text-[11px] uppercase tracking-[0.14em]">© {BRAND}. All rights reserved.</p>
         </Reveal>
       </div>
 
