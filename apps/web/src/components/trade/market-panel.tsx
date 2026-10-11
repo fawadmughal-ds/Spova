@@ -1,6 +1,6 @@
 'use client';
 
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { Building2, Calendar, ChartColumn, Check, ChevronDown, Flame, Info, LayoutGrid, Minus, Moon, Plus, Search, Star, X } from 'lucide-react';
 import { dec, effectiveLeverage, notional, quoteCurrency, requiredMarginUsd, toUsd, validateLots, type AccountDto, type CandleDto, type OrderSide, type PlaceOrderResult } from '@spova/shared';
 import { get, post } from '@/lib/api';
@@ -509,11 +509,11 @@ function MarketTab({ spec }: { spec: SymbolSpec | undefined }) {
   );
 }
 
-export function InfoPanel({ spec, account, className }: { symbols?: SymbolSpec[]; spec: SymbolSpec | undefined; sessions?: Map<string, SessionRow[]>; account?: AccountDto; className?: string }) {
+export function InfoPanel({ spec, account, className, style }: { symbols?: SymbolSpec[]; spec: SymbolSpec | undefined; sessions?: Map<string, SessionRow[]>; account?: AccountDto; className?: string; style?: CSSProperties }) {
   const [tab, setTab] = useState<InfoTab>('calendar');
   const t = useT();
   return (
-    <section className={cn('t-panel', className)} aria-label="Market information">
+    <section className={cn('t-panel', className)} style={style} aria-label="Market information">
       <div className="t-bar">
         <button type="button" role="tab" aria-selected={tab === 'calendar'} data-on={tab === 'calendar'} onClick={() => setTab('calendar')} className="t-tab">
           <Calendar /> {t('calendar')}

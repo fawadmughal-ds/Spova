@@ -63,8 +63,11 @@ export interface TerminalSettings {
   /** height of the bottom panel on desktop */
   bottomHeight: number;
   bottomCollapsed: boolean;
-  /** information panel (Calendar / Market / Symbol info) expanded over the instrument list */
-  infoTall: boolean;
+  /** information panel (Calendar / Market / Symbol info): free height + collapsed state, desktop and phone */
+  infoHeight: number;
+  infoCollapsed: boolean;
+  calHeight: number;
+  calCollapsed: boolean;
 }
 export const DEFAULT_SETTINGS: TerminalSettings = {
   confirmOrders: false,
@@ -79,7 +82,10 @@ export const DEFAULT_SETTINGS: TerminalSettings = {
   bollinger: false,
   bottomHeight: 330,
   bottomCollapsed: false,
-  infoTall: false,
+  infoHeight: 270,
+  infoCollapsed: false,
+  calHeight: 300,
+  calCollapsed: false,
 };
 const CHART_TYPES: ChartType[] = ['candles', 'bars', 'line', 'area'];
 /** A stale / hand-edited localStorage value must never blank the chart: fall back per field. */
@@ -89,6 +95,8 @@ const sanitizeSettings = (v: TerminalSettings): TerminalSettings => ({
   theme: v.theme === 'dark' || v.theme === 'light' ? v.theme : DEFAULT_SETTINGS.theme,
   tf: (TIMEFRAMES as readonly string[]).includes(v.tf) ? v.tf : DEFAULT_SETTINGS.tf,
   bottomHeight: Number.isFinite(v.bottomHeight) && v.bottomHeight > 0 ? v.bottomHeight : DEFAULT_SETTINGS.bottomHeight,
+  infoHeight: Number.isFinite(v.infoHeight) && v.infoHeight > 0 ? v.infoHeight : DEFAULT_SETTINGS.infoHeight,
+  calHeight: Number.isFinite(v.calHeight) && v.calHeight > 0 ? v.calHeight : DEFAULT_SETTINGS.calHeight,
 });
 export const settingsStore = createLocalStore<TerminalSettings>('wt-settings', DEFAULT_SETTINGS, sanitizeSettings);
 export const useSettings = settingsStore.use;

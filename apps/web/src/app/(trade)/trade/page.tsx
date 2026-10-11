@@ -67,6 +67,8 @@ const QUOTE_POLL_MS = 15_000;
 const DEFAULT_SYMBOL = 'BTCUSD';
 const EMPTY: never[] = [];
 const MIN_BOTTOM = 43;
+const MIN_INFO = 46;
+const MIN_CAL = 46;
 
 let noticeSeq = 1;
 
@@ -325,7 +327,6 @@ function Terminal() {
   const [panel, setPanel] = useState<RailPanel | null>(null);
   const t = useT();
   const [mtab, setMtab] = useState<MobileTab>('trade');
-  const [calOpen, setCalOpen] = useState(true);
   const desktop = useIsDesktop();
   // phones drive Analytics / Explore from the tab bar, desktop from the top bar
   const activeView: TerminalView = desktop ? view : mtab === 'analytics' ? 'analytics' : mtab === 'explore' ? 'explore' : 'trade';
@@ -364,6 +365,54 @@ function Terminal() {
   };
   const bottomHeight = settings.bottomCollapsed ? MIN_BOTTOM : settings.bottomHeight;
 
+  // desktop info panel (Calendar / Market / Symbol info) sits at the bottom of the aside and grows upward
+  const infoDrag = useRef<{ y: number; h: number; moved: boolean; chevron: boolean } | null>(null);
+  const onInfoDragStart = (e: PointerEvent) => {
+    infoDrag.current = { y: e.clientY, h: settings.infoCollapsed ? MIN_INFO : settings.infoHeight, moved: false, chevron: !!(e.target as HTMLElement).closest('span') };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+  const onInfoDrag = (e: PointerEvent) => {
+    const d = infoDrag.current;
+    if (!d) return;
+    const dy = e.clientY - d.y;
+    if (!d.moved && Math.abs(dy) < 3) return;
+    d.moved = true;
+    const h = Math.max(MIN_INFO, Math.min(window.innerHeight - 200, d.h - dy));
+    settingsStore.patch({ infoHeight: h, infoCollapsed: h <= MIN_INFO + 4 });
+  };
+  const onInfoDragEnd = () => {
+    const d = infoDrag.current;
+    infoDrag.current = null;
+    if (!d || d.moved || !d.chevron) return;
+    if (settings.infoCollapsed) settingsStore.patch({ infoCollapsed: false, ...(settings.infoHeight <= MIN_INFO + 4 ? { infoHeight: 270 } : {}) });
+    else settingsStore.patch({ infoCollapsed: true });
+  };
+  const infoHeight = settings.infoCollapsed ? MIN_INFO : settings.infoHeight;
+
+  // phone info panel sits above the watchlist; its handle is at the bottom, so it grows downward
+  const calDrag = useRef<{ y: number; h: number; moved: boolean; chevron: boolean } | null>(null);
+  const onCalDragStart = (e: PointerEvent) => {
+    calDrag.current = { y: e.clientY, h: settings.calCollapsed ? MIN_CAL : settings.calHeight, moved: false, chevron: !!(e.target as HTMLElement).closest('span') };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+  const onCalDrag = (e: PointerEvent) => {
+    const d = calDrag.current;
+    if (!d) return;
+    const dy = e.clientY - d.y;
+    if (!d.moved && Math.abs(dy) < 3) return;
+    d.moved = true;
+    const h = Math.max(MIN_CAL, Math.min(window.innerHeight - 260, d.h + dy));
+    settingsStore.patch({ calHeight: h, calCollapsed: h <= MIN_CAL + 4 });
+  };
+  const onCalDragEnd = () => {
+    const d = calDrag.current;
+    calDrag.current = null;
+    if (!d || d.moved || !d.chevron) return;
+    if (settings.calCollapsed) settingsStore.patch({ calCollapsed: false, ...(settings.calHeight <= MIN_CAL + 4 ? { calHeight: 300 } : {}) });
+    else settingsStore.patch({ calCollapsed: true });
+  };
+  const calHeight = settings.calCollapsed ? MIN_CAL : settings.calHeight;
+
   const panelSkeleton = (cls: string) => (
     <div className={cn('t-panel gap-2 p-3', cls)}>
       <Skeleton className="h-6 w-48" />
@@ -398,19 +447,23 @@ function Terminal() {
                 <MobileStats account={account} positions={openPositions} symbols={symbolMap} />
                 {symbols && (
                   <div className="relative">
-                    <InfoPanel spec={spec} account={account} className={cn('shrink-0 overflow-hidden transition-[height] duration-300', calOpen ? 'h-[300px]' : 'h-[46px]')} />
-                    <button type="button" onClick={() => setCalOpen((v) => !v)} aria-label={calOpen ? 'Collapse the calendar' : 'Expand the calendar'} className="absolute -bottom-[7px] left-1/2 z-10 flex h-[14px] w-[38px] -translate-x-1/2 items-center justify-center rounded-full bg-[var(--t-raised-2)] text-[var(--t-text-2)]">
-                      <ChevronsUpDown className="h-3 w-3" />
-                    </button>
+                    <InfoPanel spec={spec} account={account} className="shrink-0 overflow-hidden" style={{ height: calHeight }} />
+                    <div onPointerDown={onCalDragStart} onPointerMove={onCalDrag} onPointerUp={onCalDragEnd} onPointerCancel={onCalDragEnd} role="separator" aria-orientation="horizontal" aria-label="Resize the calendar panel" className="absolute -bottom-[7px] left-1/2 z-10 flex h-[16px] w-[52px] -translate-x-1/2 cursor-row-resize touch-none select-none items-center justify-center">
+                      <span title={settings.calCollapsed ? 'Expand' : 'Collapse'} className="flex h-[14px] w-[38px] items-center justify-center rounded-full bg-[var(--t-raised-2)] text-[var(--t-text-2)]">
+                        <ChevronsUpDown className="h-3 w-3" />
+                      </span>
+                    </div>
                   </div>
                 )}
               </div>
               <MarketPanel symbols={symbolsError ? [] : symbols} selected={selected} onSelect={pick} account={account} onPlaced={onPlaced} onAdvanced={(s, side, lots) => setTicket({ spec: s, side, lots })} sessions={sessions} className="min-h-0 flex-1" />
               {/* handle: swap the space between the instrument list and the info panel */}
-              <button type="button" onClick={() => settingsStore.patch({ infoTall: !settings.infoTall })} aria-label={settings.infoTall ? 'Shrink the information panel' : 'Expand the information panel'} className="absolute left-1/2 z-10 hidden h-[14px] w-[38px] -translate-x-1/2 items-center justify-center rounded-full bg-[var(--t-raised)] text-[var(--t-muted)] hover:text-white lg:flex" style={{ bottom: (settings.infoTall ? 520 : 270) + 1 }}>
-                <ChevronsUpDown className="h-3 w-3" />
-              </button>
-              {symbols && <InfoPanel spec={spec} account={account} className={cn('hidden shrink-0 lg:flex', settings.infoTall ? 'h-[520px]' : 'h-[270px]')} />}
+              <div onPointerDown={onInfoDragStart} onPointerMove={onInfoDrag} onPointerUp={onInfoDragEnd} onPointerCancel={onInfoDragEnd} role="separator" aria-orientation="horizontal" aria-label="Resize the information panel" className="absolute left-1/2 z-10 hidden h-[16px] w-[52px] -translate-x-1/2 cursor-row-resize touch-none select-none items-center justify-center lg:flex" style={{ bottom: infoHeight + 1 }}>
+                <span title={settings.infoCollapsed ? 'Expand' : 'Collapse'} className="flex h-[14px] w-[38px] items-center justify-center rounded-full bg-[var(--t-raised)] text-[var(--t-muted)] hover:text-white">
+                  <ChevronsUpDown className="h-3 w-3" />
+                </span>
+              </div>
+              {symbols && <InfoPanel spec={spec} account={account} className="hidden shrink-0 lg:flex" style={{ height: infoHeight }} />}
             </aside>
             {/* sidebar collapse handle (desktop) */}
             <button type="button" onClick={() => setSidebar((v) => !v)} aria-label={sidebar ? 'Collapse the instrument panel' : 'Expand the instrument panel'} className={cn('absolute top-1/2 z-20 hidden h-9 w-[14px] -translate-y-1/2 items-center justify-center rounded-md bg-[var(--t-raised)] text-[var(--t-text-2)] hover:text-white lg:flex', sidebar ? 'left-[385px]' : 'left-[3px]')}>
