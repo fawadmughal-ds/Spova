@@ -347,6 +347,12 @@
       0 1px 2px rgb(var(--tint) / 0.04),
       0 24px 50px -26px rgb(var(--brand-rgb) / 0.45);
   }
+  .card-hover:active {
+    translate: 0 -1px;
+    box-shadow:
+      0 1px 2px rgb(var(--tint) / 0.05),
+      0 10px 24px -18px rgb(var(--brand-rgb) / 0.4);
+  }
   .glass {
     background: rgb(var(--paper-rgb) / 0.86);
     backdrop-filter: blur(18px) saturate(1.4);

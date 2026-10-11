@@ -81,12 +81,85 @@ export function Dropdown({ button, buttonClassName, children, align = 'left', cl
 }
 
 /** Square tile with the symbol's first letter: white for most markets, black for crypto / shares, gold for metals (like the reference). */
+/** Asset icons. Crypto / share logos are referenced from public CDNs (not redrawn); forex & indices use Unicode flags. */
+const CRYPTO_ICON: Record<string, string> = { BTCUSD: 'btc', ETHUSD: 'eth', LTCUSD: 'ltc', SOLUSD: 'sol', XRPUSD: 'xrp', BCHUSD: 'bch', ADAUSD: 'ada', DOGUSD: 'doge', DOTUSD: 'dot', BNBUSD: 'bnb' };
+const SHARE_DOMAIN: Record<string, string> = { AAPL: 'apple.com', AMZN: 'amazon.com', NVDA: 'nvidia.com', TSLA: 'tesla.com', MSFT: 'microsoft.com', GOOGL: 'abc.xyz', META: 'meta.com', NFLX: 'netflix.com' };
+const CCY_FLAG: Record<string, string> = { USD: '🇺🇸', EUR: '🇪🇺', GBP: '🇬🇧', JPY: '🇯🇵', AUD: '🇦🇺', NZD: '🇳🇿', CAD: '🇨🇦', CHF: '🇨🇭', CNY: '🇨🇳' };
+const INDEX_FLAG: Record<string, string> = { DAX: '🇩🇪', DE40: '🇩🇪', FTSE: '🇬🇧', UK100: '🇬🇧', DJI: '🇺🇸', US30: '🇺🇸', NDX: '🇺🇸', US100: '🇺🇸', SPX: '🇺🇸', US500: '🇺🇸', JP225: '🇯🇵', N225: '🇯🇵' };
+const METAL_SYMBOL: Record<string, string> = { XAUUSD: 'Au', XAGUSD: 'Ag', XAUEUR: 'Au', XAGEUR: 'Ag', XPTUSD: 'Pt', XPDUSD: 'Pd' };
+
+/** An <img> logo that falls back to the letter tile if the CDN image fails. */
+function LogoImg({ src, sym, size, tile }: { src: string; sym: string; size: number; tile: CSSProperties }) {
+  const [failed, setFailed] = useState(false);
+  if (failed)
+    return (
+      <span className="t-tile" style={{ ...tile, width: size, height: size, fontSize: Math.round(size * 0.5) }} aria-hidden>
+        {sym.charAt(0)}
+      </span>
+    );
+  return (
+    <img
+      src={src}
+      alt=""
+      width={size}
+      height={size}
+      loading="lazy"
+      referrerPolicy="no-referrer"
+      onError={() => setFailed(true)}
+      className="shrink-0 rounded-full bg-white object-contain"
+      style={{ width: size, height: size }}
+      aria-hidden
+    />
+  );
+}
+
 export function SymbolTile({ spec, id, size = 26, className }: { spec?: SymbolSpec | null; id?: string; size?: number; className?: string }) {
   const sym = spec?.id ?? id ?? '?';
   const cls = spec?.assetClass;
-  const style: CSSProperties = cls === 'crypto' || cls === 'stock' ? { background: '#0f1115', color: '#fff', boxShadow: 'inset 0 0 0 1px var(--t-raised-2)' } : cls === 'metal' ? { background: '#e0a526', color: '#1c2128' } : cls === 'commodity' ? { background: '#1c2128', color: '#fff', boxShadow: 'inset 0 0 0 1px var(--t-raised-2)' } : { background: '#f3f5f8', color: '#1c2128' };
+  const letterTile: CSSProperties = cls === 'crypto' || cls === 'stock' ? { background: '#0f1115', color: '#fff', boxShadow: 'inset 0 0 0 1px var(--t-raised-2)' } : cls === 'metal' ? { background: '#e0a526', color: '#1c2128' } : cls === 'commodity' ? { background: '#1c2128', color: '#fff', boxShadow: 'inset 0 0 0 1px var(--t-raised-2)' } : { background: '#f3f5f8', color: '#1c2128' };
+
+  // crypto & share logos from public CDNs, with a letter fallback
+  if (CRYPTO_ICON[sym]) return <LogoImg src={`https://assets.coincap.io/assets/icons/${CRYPTO_ICON[sym]}@2x.png`} sym={sym} size={size} tile={letterTile} />;
+  if (SHARE_DOMAIN[sym]) return <LogoImg src={`https://logo.clearbit.com/${SHARE_DOMAIN[sym]}`} sym={sym} size={size} tile={letterTile} />;
+
+  // indices: country flag
+  if (INDEX_FLAG[sym])
+    return (
+      <span className={cn('t-tile', className)} style={{ background: '#0f1115', boxShadow: 'inset 0 0 0 1px var(--t-raised-2)', width: size, height: size, fontSize: Math.round(size * 0.58), lineHeight: 1 }} aria-hidden>
+        {INDEX_FLAG[sym]}
+      </span>
+    );
+
+  // forex pair: base + quote flags
+  if (cls === 'forex' && sym.length === 6 && CCY_FLAG[sym.slice(0, 3)] && CCY_FLAG[sym.slice(3)])
+    return (
+      <span className={cn('t-tile', className)} style={{ background: '#0f1115', boxShadow: 'inset 0 0 0 1px var(--t-raised-2)', width: size, height: size, fontSize: Math.round(size * 0.42), letterSpacing: '-0.08em', lineHeight: 1 }} aria-hidden>
+        {CCY_FLAG[sym.slice(0, 3)]}
+        {CCY_FLAG[sym.slice(3)]}
+      </span>
+    );
+
+  // metals: chemical symbol on a gold / silver tile
+  if (METAL_SYMBOL[sym]) {
+    const silver = METAL_SYMBOL[sym] === 'Ag';
+    return (
+      <span className={cn('t-tile', className)} style={{ background: silver ? '#c7ccd4' : '#e0a526', color: '#1c2128', width: size, height: size, fontSize: Math.round(size * 0.44) }} aria-hidden>
+        {METAL_SYMBOL[sym]}
+      </span>
+    );
+  }
+
+  // commodities: oil / gas glyph
+  if (cls === 'commodity')
+    return (
+      <span className={cn('t-tile', className)} style={{ background: '#1c2128', boxShadow: 'inset 0 0 0 1px var(--t-raised-2)', width: size, height: size, fontSize: Math.round(size * 0.52), lineHeight: 1 }} aria-hidden>
+        {sym.includes('GAS') ? '🔥' : '🛢️'}
+      </span>
+    );
+
+  // fallback: first letter
   return (
-    <span className={cn('t-tile', className)} style={{ ...style, width: size, height: size, fontSize: Math.round(size * 0.5) }} aria-hidden>
+    <span className={cn('t-tile', className)} style={{ ...letterTile, width: size, height: size, fontSize: Math.round(size * 0.5) }} aria-hidden>
       {sym.charAt(0)}
     </span>
   );

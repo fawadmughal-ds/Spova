@@ -156,7 +156,7 @@ export function DashboardView() {
                 </AccountPlate>
               </Tilt>
             </div>
-            <Card title="Margin level" className="animate-page-in flex flex-col [animation-delay:90ms]" action={<span className="tabular font-mono text-[11px] text-ink-400">1:{account.leverage}</span>}>
+            <Card title="Margin level" className="animate-page-in card-hover flex flex-col [animation-delay:90ms]" action={<span className="tabular font-mono text-[11px] text-ink-400">1:{account.leverage}</span>}>
               <MarginGauge key={account.id} level={account.marginLevel} usedMargin={account.usedMargin} freeMargin={account.freeMargin} />
             </Card>
           </div>
@@ -178,13 +178,13 @@ export function DashboardView() {
           <div className="mt-5 grid gap-5 lg:grid-cols-3">
             <Card
               title="Balance history"
-              className="animate-page-in [animation-delay:420ms] lg:col-span-2"
+              className="animate-page-in card-hover [animation-delay:420ms] lg:col-span-2"
               action={<span className="label">{ledger && ledger.length > 0 ? `last ${ledger.length} ${ledger.length === 1 ? 'entry' : 'entries'}` : 'ledger'}</span>}
             >
               {ledger === null ? <Skeleton className="h-52 rounded-xl" /> : <BalanceChart key={`${account.id}-${ledger[0]?.id ?? 'none'}`} entries={ledger} currency={account.currency} />}
             </Card>
 
-            <Card title="Quick actions" className="animate-page-in [animation-delay:500ms]">
+            <Card title="Quick actions" className="animate-page-in card-hover [animation-delay:500ms]">
               <div className="grid gap-2.5">
                 <ActionTile href={`/client-area?acc=${account.id}`} icon={<LineChart className="h-5 w-5" />} title="Open terminal" hint="Charts, orders and positions" primary />
                 <ActionTile href="/app/payments" icon={<ArrowDownToLine className="h-5 w-5" />} title="Deposit" hint="Fund your account" />
@@ -200,7 +200,7 @@ export function DashboardView() {
           <div className="mt-5 grid gap-5 lg:grid-cols-3">
           <Card
             title="Recent transactions"
-            className="animate-page-in min-w-0 [animation-delay:580ms] lg:col-span-2"
+            className="animate-page-in card-hover min-w-0 [animation-delay:580ms] lg:col-span-2"
             action={
               <Link href={`/app/accounts/${account.id}`} className="group inline-flex items-center gap-1.5 text-xs text-brand-300">
                 <span className="link-underline">
@@ -252,7 +252,7 @@ export function DashboardView() {
 
           <Card
             title="Recent requests"
-            className="animate-page-in min-w-0 [animation-delay:640ms]"
+            className="animate-page-in card-hover min-w-0 [animation-delay:640ms]"
             action={
               <Link href="/app/payments?tab=history" className="group inline-flex items-center gap-1.5 text-xs text-brand-300">
                 <span className="link-underline">All requests</span>
