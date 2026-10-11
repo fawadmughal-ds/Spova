@@ -253,7 +253,8 @@ const chargedLine = (amount: string, currency: string, fx: Record<string, number
   if (!n || !currency || currency === 'USD') return null;
   const rate = fx[currency];
   if (!rate) return null;
-  return `${(n * rate).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`;
+  const locale = currency === 'INR' ? 'en-IN' : 'en-US';
+  return `${(n * rate).toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`;
 };
 
 /* ---------- bank / UPI / Binance / USDT: request, then pay-to details + proof */
