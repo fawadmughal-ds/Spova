@@ -36,7 +36,7 @@ export default function RegisterPage() {
     void f.submit(async (data) => {
       const me = await api<MeDto>('/auth/register', { method: 'POST', body: data, noRetry: true });
       setMe(me);
-      router.replace('/trade?welcome=1');
+      router.replace('/app?welcome=1');
     });
   };
 
