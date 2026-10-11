@@ -163,9 +163,10 @@ describe('phase 2: kyc -> live account -> payments -> tickets', () => {
     assert.equal(dep.data.status, 'pending');
     assert.equal(dep.data.amount, '500.00');
 
-    const wd = await client.json('POST', '/me/payments/withdraw', { accountId: liveAccountId, amount: '100', method: 'bank', destination: { label: 'My bank', details: 'AE07 0331 2345 6789 0123 456' } });
+    const wd = await client.json('POST', '/me/payments/withdraw', { accountId: liveAccountId, amount: '2000', method: 'bank' });
     assert.equal(wd.status, 422);
     assert.equal(wd.data.code, 'insufficient_funds');
+    assert.equal((await client.json('POST', '/me/payments/withdraw', { accountId: liveAccountId, amount: '100', method: 'bank' })).data.code, 'amount_min', 'minimum withdrawal is enforced');
 
     const list = await client.json('GET', '/me/payments?status=pending');
     assert.equal(list.data.total, 1, 'the cancelled card request is not pending');
@@ -248,6 +249,7 @@ describe('phase 2: kyc -> live account -> payments -> tickets', () => {
     assert.equal(info.status, 200);
     assert.equal(typeof info.data.footer, 'string');
     assert.equal(info.data.fx.USD, 1);
+    assert.equal(info.data.fx.INR, 86, 'INR rate comes from the admin-set channel rate, not a live feed');
     const methods = await client.json('GET', '/me/payments/methods');
     const card = methods.data.find((m: any) => m.id === 'card');
     assert.equal(card.gateway, undefined, 'no gateway configured in this environment');
@@ -405,29 +407,34 @@ describe('phase 2: kyc -> live account -> payments -> tickets', () => {
   });
 
   it('withdrawals: pending amounts reserve funds, cancel, approve, decline', async () => {
-    const w1 = await client.json('POST', '/me/payments/withdraw', { accountId: liveAccountId, amount: '100', method: 'bank', destination: { label: 'My bank', details: 'AE07 0331 2345 6789 0123 456' } });
+    // top the account up so amounts clear the 2000 USD minimum withdrawal; balance 500 -> 10000
+    const topUp = await admin.json('POST', `/admin/accounts/${liveAccountId}/credit`, { amount: '9500', reason: 'E2E top-up' });
+    assert.ok([200, 201].includes(topUp.status), JSON.stringify(topUp.data));
+    assert.equal((await client.json('GET', `/me/accounts/${liveAccountId}`)).data.balance, '10000.00');
+
+    const w1 = await client.json('POST', '/me/payments/withdraw', { accountId: liveAccountId, amount: '2000', method: 'bank' });
     assert.ok([200, 201].includes(w1.status), JSON.stringify(w1.data));
-    const tooMuch = await client.json('POST', '/me/payments/withdraw', { accountId: liveAccountId, amount: '450', method: 'bank', destination: { label: 'My bank', details: 'AE07 0331 2345 6789 0123 456' } });
+    const tooMuch = await client.json('POST', '/me/payments/withdraw', { accountId: liveAccountId, amount: '8500', method: 'bank' });
     assert.equal(tooMuch.status, 422);
-    assert.equal(tooMuch.data.details.available, '400.00');
+    assert.equal(tooMuch.data.details.available, '8000.00');
 
     const cancelled = await client.json('POST', `/me/payments/${w1.data.id}/cancel`);
     assert.equal(cancelled.data.status, 'cancelled');
     assert.equal((await client.json('POST', `/me/payments/${w1.data.id}/cancel`)).status, 409);
     assert.equal((await other.json('POST', `/me/payments/${w1.data.id}/cancel`)).status, 404);
 
-    const w2 = await client.json('POST', '/me/payments/withdraw', { accountId: liveAccountId, amount: '100', method: 'crypto_usdt', destination: { label: 'USDT TRC20', details: 'TXYZabc123def456ghi789' } });
+    const w2 = await client.json('POST', '/me/payments/withdraw', { accountId: liveAccountId, amount: '2000', method: 'crypto_usdt' });
     assert.ok([200, 201].includes(w2.status));
     const approved = await admin.json('PATCH', `/admin/payments/${w2.data.id}`, { status: 'approved' });
     assert.equal(approved.status, 200, JSON.stringify(approved.data));
-    assert.equal((await client.json('GET', `/me/accounts/${liveAccountId}`)).data.balance, '400.00');
+    assert.equal((await client.json('GET', `/me/accounts/${liveAccountId}`)).data.balance, '8000.00');
 
-    const w3 = await client.json('POST', '/me/payments/withdraw', { accountId: liveAccountId, amount: '50', method: 'bank', destination: { label: 'My bank', details: 'AE07 0331 2345 6789 0123 456' } });
+    const w3 = await client.json('POST', '/me/payments/withdraw', { accountId: liveAccountId, amount: '2000', method: 'bank' });
     assert.equal((await admin.json('PATCH', `/admin/payments/${w3.data.id}`, { status: 'declined' })).status, 400, 'decline needs a note');
     const declined = await admin.json('PATCH', `/admin/payments/${w3.data.id}`, { status: 'declined', note: 'Bank details incomplete' });
     assert.equal(declined.data.status, 'declined');
     assert.equal(declined.data.adminNote, 'Bank details incomplete');
-    assert.equal((await client.json('GET', `/me/accounts/${liveAccountId}`)).data.balance, '400.00');
+    assert.equal((await client.json('GET', `/me/accounts/${liveAccountId}`)).data.balance, '8000.00');
 
     const history = await client.json('GET', '/me/payments?kind=withdraw');
     assert.equal(history.data.total, 3);
@@ -435,7 +442,7 @@ describe('phase 2: kyc -> live account -> payments -> tickets', () => {
   });
 
   it('an approval that would overdraw is refused and leaves the request pending', async () => {
-    const w = await client.json('POST', '/me/payments/withdraw', { accountId: liveAccountId, amount: '400', method: 'bank', destination: { label: 'My bank', details: 'AE07 0331 2345 6789 0123 456' } });
+    const w = await client.json('POST', '/me/payments/withdraw', { accountId: liveAccountId, amount: '8000', method: 'bank' });
     assert.ok([200, 201].includes(w.status));
     // debit the account behind the request's back, as an admin correction would
     const debit = await admin.json('POST', `/admin/accounts/${liveAccountId}/debit`, { amount: '50', reason: 'E2E correction' });
@@ -445,7 +452,7 @@ describe('phase 2: kyc -> live account -> payments -> tickets', () => {
     assert.equal(approve.data.code, 'insufficient_balance');
     const still = await admin.json('GET', `/admin/payments?status=pending&userId=${clientId}`);
     assert.equal(still.data.items[0].id, w.data.id, 'request stays pending');
-    assert.equal((await client.json('GET', `/me/accounts/${liveAccountId}`)).data.balance, '350.00');
+    assert.equal((await client.json('GET', `/me/accounts/${liveAccountId}`)).data.balance, '7950.00');
     await admin.json('PATCH', `/admin/payments/${w.data.id}`, { status: 'declined', note: 'Balance changed' });
   });
 

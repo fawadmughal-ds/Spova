@@ -76,6 +76,16 @@ export class MailService {
     return this.send({ to, subject: `${env.BRAND_NAME} - ${kind} ${status}`, text: body, html: `<p>${esc(body)}</p>` });
   }
 
+  /** Sent when a client submits a withdrawal; carries the profit-and-loss responsibility disclaimer. */
+  withdrawReceived(to: string, amount: string, currency: string, loginCode: number) {
+    const brand = env.BRAND_NAME;
+    const disclaimer = `${brand} is not responsible for any profit or loss arising from your trading decisions. Trading CFDs carries a high risk of losing money and may not be suitable for everyone. You trade entirely at your own risk.`;
+    const body = `We have received your withdrawal request for ${amount} ${currency} from account ${loginCode}. It is now pending review and you will be notified once it is processed.
+
+${disclaimer}`;
+    return this.send({ to, subject: `${brand} - withdrawal request received`, text: body, html: `<p>${esc(body).replace(/\n/g, '<br>')}</p>` });
+  }
+
   ticketReply(to: string, subject: string, body: string) {
     const text = `A support agent replied to your ticket "${subject}":\n\n${body}\n\nReply from the Help section of your client area.`;
     return this.send({ to, subject: `${env.BRAND_NAME} - reply to your ticket`, text, html: `<p>${esc(text).replace(/\n/g, '<br>')}</p>` });

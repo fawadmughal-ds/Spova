@@ -180,10 +180,10 @@ export type KycReviewInput = z.infer<typeof kycReviewSchema>;
 
 /** Payment methods offered in v1. Card stays visible but disabled until a PSP is connected (Phase 5). */
 export const PAYMENT_METHODS = [
-  { id: 'bank', label: 'Bank transfer', kinds: ['deposit', 'withdraw'], enabled: true, minDeposit: '200', maxDeposit: '100000', minWithdraw: '50', maxWithdraw: '100000', eta: '1-3 business days' },
+  { id: 'bank', label: 'Bank transfer', kinds: ['deposit', 'withdraw'], enabled: true, minDeposit: '200', maxDeposit: '100000', minWithdraw: '2000', maxWithdraw: '100000', eta: 'Within 7 business days' },
   { id: 'upi', label: 'UPI', kinds: ['deposit'], enabled: true, minDeposit: '200', maxDeposit: '20000', minWithdraw: '0', maxWithdraw: '0', eta: 'Within hours' },
-  { id: 'binance', label: 'Binance Pay', kinds: ['deposit', 'withdraw'], enabled: true, minDeposit: '200', maxDeposit: '100000', minWithdraw: '50', maxWithdraw: '100000', eta: 'Same day' },
-  { id: 'crypto_usdt', label: 'Crypto (USDT)', kinds: ['deposit', 'withdraw'], enabled: true, minDeposit: '200', maxDeposit: '100000', minWithdraw: '50', maxWithdraw: '100000', eta: 'Same day' },
+  { id: 'binance', label: 'Binance Pay', kinds: ['deposit', 'withdraw'], enabled: true, minDeposit: '200', maxDeposit: '100000', minWithdraw: '2000', maxWithdraw: '100000', eta: '4-6 business days' },
+  { id: 'crypto_usdt', label: 'Crypto (USDT)', kinds: ['deposit', 'withdraw'], enabled: true, minDeposit: '200', maxDeposit: '100000', minWithdraw: '2000', maxWithdraw: '100000', eta: 'Same day' },
   { id: 'card', label: 'Card', kinds: ['deposit'], enabled: true, minDeposit: '200', maxDeposit: '5000', minWithdraw: '0', maxWithdraw: '0', eta: 'Instant' },
 ] as const;
 export type PaymentMethodId = (typeof PAYMENT_METHODS)[number]['id'];
@@ -203,10 +203,13 @@ export const withdrawRequestSchema = z.object({
   amount: moneySchema,
   method: z.enum(PAYMENT_METHOD_IDS),
   /** where to send the money: IBAN / account number or wallet address + network */
-  destination: z.object({
-    label: z.string().trim().min(2).max(80),
-    details: z.string().trim().min(4).max(200),
-  }),
+  /** optional: where to send the money. The broker arranges the bank/RTGS transfer from the client's verified details. */
+  destination: z
+    .object({
+      label: z.string().trim().min(2).max(80),
+      details: z.string().trim().min(4).max(200),
+    })
+    .optional(),
   reason: z.string().trim().max(200).optional(),
 });
 export type WithdrawRequestInput = z.infer<typeof withdrawRequestSchema>;
@@ -223,7 +226,14 @@ export const depositChannelsSchema = z.object({
   crypto_usdt: z.object({ enabled: z.boolean(), address: z.string().trim().max(120).default(''), network: z.string().trim().max(40).default('TRC20'), note }),
   card: z.object({ enabled: z.boolean(), note }),
   /** cashier page texts */
-  cashier: z.object({ enabled: z.boolean().default(true), footer: z.string().trim().max(1200).default('') }),
+  cashier: z.object({
+    enabled: z.boolean().default(true),
+    footer: z.string().trim().max(1200).default(''),
+    /** admin-set USD -> local-currency price shown on the deposit cashier (no live feed) */
+    rates: z
+      .object({ INR: z.coerce.number().positive().max(1000000).default(86), PKR: z.coerce.number().positive().max(1000000).default(278), AED: z.coerce.number().positive().max(1000000).default(3.67), EUR: z.coerce.number().positive().max(1000000).default(0.92), GBP: z.coerce.number().positive().max(1000000).default(0.79) })
+      .default({ INR: 86, PKR: 278, AED: 3.67, EUR: 0.92, GBP: 0.79 }),
+  }),
 });
 export type DepositChannels = z.infer<typeof depositChannelsSchema>;
 
@@ -245,7 +255,7 @@ export const DEFAULT_DEPOSIT_CHANNELS: DepositChannels = {
   binance: { enabled: true, payId: '123456789', email: 'pay@zerventa.com', qrLink: '', note: 'Binance app → Pay → Send → enter the Pay ID (or scan). Send USDT. Zero fee inside Binance.' },
   crypto_usdt: { enabled: true, address: 'TXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX', network: 'TRC20', note: 'Send USDT on the TRC20 network only. Transfers on another network cannot be recovered.' },
   card: { enabled: true, note: 'After you submit, our team emails you a secure card payment link within business hours.' },
-  cashier: { enabled: true, footer: 'Company Information: [COMPANY LEGAL NAME] with brand name [BRAND] is authorised and regulated by [REGULATOR] with licence number [LICENCE]. Trading CFDs involves significant risk of loss and is not suitable for all investors.' },
+  cashier: { enabled: true, footer: 'Company Information: [COMPANY LEGAL NAME] with brand name [BRAND] is authorised and regulated by [REGULATOR] with licence number [LICENCE]. Trading CFDs involves significant risk of loss and is not suitable for all investors.', rates: { INR: 86, PKR: 278, AED: 3.67, EUR: 0.92, GBP: 0.79 } },
 };
 
 // ---------- back-office controls

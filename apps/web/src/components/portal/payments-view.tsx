@@ -264,8 +264,6 @@ function WithdrawForm({ accounts, methods, onCreated, onHistory }: { accounts: A
   const [accountId, setAccountId] = useState<string | null>(live[0]?.id ?? null);
   const [method, setMethod] = useState<string | null>(usable[0]?.id ?? null);
   const [amount, setAmount] = useState('');
-  const [label, setLabel] = useState('');
-  const [details, setDetails] = useState('');
   const [reason, setReason] = useState('');
   const [fieldErr, setFieldErr] = useState<Record<string, string>>({});
   const [error, setError] = useState<FriendlyError | null>(null);
@@ -276,7 +274,6 @@ function WithdrawForm({ accounts, methods, onCreated, onHistory }: { accounts: A
   const m = methods.find((x) => x.id === method);
   const account = accounts.find((a) => a.id === accountId);
   const Icon = methodIcon(method ?? '');
-  const crypto = method === 'crypto_usdt';
 
   // the server is the authority on what can leave; it tells us on a refused attempt
   useEffect(() => setAvailable(null), [accountId]);
@@ -284,14 +281,12 @@ function WithdrawForm({ accounts, methods, onCreated, onHistory }: { accounts: A
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    const parsed = withdrawRequestSchema.safeParse({ accountId: accountId ?? '', amount, method: method ?? '', destination: { label, details }, reason: reason.trim() || undefined });
+    const parsed = withdrawRequestSchema.safeParse({ accountId: accountId ?? '', amount, method: method ?? '', reason: reason.trim() || undefined });
     if (!parsed.success) {
       const errs: Record<string, string> = {};
       for (const i of parsed.error.issues) errs[i.path.join('.')] ??= i.message;
       if (errs.accountId) errs.accountId = 'Choose a live account';
       if (errs.method) errs.method = 'Choose a method';
-      if (errs['destination.label']) errs['destination.label'] = 'Give this destination a short name (2-80 characters)';
-      if (errs['destination.details']) errs['destination.details'] = crypto ? 'Enter the wallet address and network' : 'Enter the IBAN or account number (at least 4 characters)';
       setFieldErr(errs);
       return;
     }
@@ -368,23 +363,6 @@ function WithdrawForm({ accounts, methods, onCreated, onHistory }: { accounts: A
             <Input label="Reason (optional)" name="reason" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Taking profit" maxLength={200} />
           </div>
         </section>
-        <section>
-          <StepTitle n={4}>Destination</StepTitle>
-          <div className="grid gap-4 sm:grid-cols-[200px_1fr]">
-            <Input label="Label" name="dest-label" value={label} onChange={(e) => setLabel(e.target.value)} placeholder={crypto ? 'USDT TRC20' : 'My bank'} maxLength={80} error={fieldErr['destination.label']} />
-            <Input
-              label={crypto ? 'Wallet address and network' : 'IBAN / account number'}
-              name="dest-details"
-              value={details}
-              onChange={(e) => setDetails(e.target.value)}
-              placeholder={crypto ? 'T… wallet address (TRC20)' : 'AE07 0331 2345 6789 0123 456'}
-              maxLength={200}
-              className="font-mono"
-              error={fieldErr['destination.details']}
-              hint="Must be in your own name. Third-party payouts are declined."
-            />
-          </div>
-        </section>
       </div>
 
       <aside className="min-w-0 lg:sticky lg:top-24 lg:self-start">
@@ -399,7 +377,6 @@ function WithdrawForm({ accounts, methods, onCreated, onHistory }: { accounts: A
           <div className="mt-5 space-y-2.5 border-t border-white/[0.06] pt-4">
             <SummaryRow label="From account">{account ? <span className="tabular font-mono">{fmtLogin(account.loginCode)}</span> : '—'}</SummaryRow>
             <SummaryRow label="Method">{m?.label ?? '—'}</SummaryRow>
-            <SummaryRow label="To">{label || '—'}</SummaryRow>
             <SummaryRow label="Processing">{m?.eta ?? '—'}</SummaryRow>
           </div>
           <div className="mt-5">

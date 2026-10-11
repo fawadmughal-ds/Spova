@@ -96,21 +96,11 @@ export class PaymentsService {
     return input;
   }
 
-  /** USD -> other currencies (free public rates, cached one hour) for the cashier's "charged by" line. */
+  /** USD -> local-currency price, set by the admin on the deposit channels (no live feed). */
   async fxRates(): Promise<Record<string, number>> {
-    const cached = await this.redis.client.get(FX_KEY);
-    if (cached) return JSON.parse(cached) as Record<string, number>;
-    try {
-      const res = await fetch(FX_URL, { signal: AbortSignal.timeout(8000) });
-      const body = (await res.json()) as { result?: string; rates?: Record<string, number> };
-      if (body.result !== 'success' || !body.rates) throw new Error('bad fx payload');
-      const rates = { USD: 1, USDT: 1, INR: body.rates.INR, PKR: body.rates.PKR, EUR: body.rates.EUR, GBP: body.rates.GBP, AED: body.rates.AED };
-      await this.redis.client.set(FX_KEY, JSON.stringify(rates), 'EX', 3600);
-      return rates;
-    } catch (e) {
-      this.log.warn({ err: (e as Error).message }, 'fx rates unavailable');
-      return { USD: 1, USDT: 1 };
-    }
+    const cfg = await this.channels();
+    const r = cfg.cashier.rates;
+    return { USD: 1, USDT: 1, INR: r.INR, PKR: r.PKR, AED: r.AED, EUR: r.EUR, GBP: r.GBP };
   }
 
   async cashierInfo(): Promise<CashierInfoDto> {
@@ -143,7 +133,7 @@ export class PaymentsService {
   }
 
   private async guardUser(userId: string) {
-    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { status: true, email: true, kycPoi: true, kycPor: true } });
+    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { status: true, email: true, kycPoi: true, kycPor: true, profile: { select: { notifEmail: true } } } });
     if (user.status !== 'active') throw ApiError.forbidden('account_frozen', 'Your account is restricted. Contact support.');
     if (!(await this.redis.allow(`payments:${userId}`, 20, 3600))) throw ApiError.tooMany('Too many requests. Try again later.');
     return user;
@@ -250,10 +240,11 @@ export class PaymentsService {
     }
 
     const row = await this.prisma.paymentRequest.create({
-      data: { userId, accountId: acc.id, kind: 'withdraw', amount: amount.toFixed(2), currency: acc.currency, method: input.method, destination: input.destination, reference: input.reason ?? null },
+      data: { userId, accountId: acc.id, kind: 'withdraw', amount: amount.toFixed(2), currency: acc.currency, method: input.method, destination: input.destination ?? undefined, reference: input.reason ?? null },
       include: { account: { select: { loginCode: true } } },
     });
     this.afterNew(row, user.email);
+    if (user.profile?.notifEmail) void this.mail.withdrawReceived(user.email, money(row.amount), row.currency, row.account.loginCode).catch((e) => this.log.warn(e.message));
     return paymentToDto(row);
   }
 

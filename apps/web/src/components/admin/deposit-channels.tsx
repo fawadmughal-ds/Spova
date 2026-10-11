@@ -123,6 +123,27 @@ export function DepositChannelsEditor({ className }: { className?: string }) {
               <Textarea className="mt-3" label="Footer text" name="cashier-footer" rows={3} value={cfg.cashier.footer} onChange={(e) => patch('cashier', { footer: e.target.value })} />
             </div>
           )}
+          {cfg && (
+            <div className="mt-5 rounded-2xl border border-white/[0.1] bg-white/[0.02] p-4">
+              <div className="text-sm font-semibold text-white">USD conversion rates</div>
+              <p className="mt-1 text-xs text-ink-400">The price of 1 USD in each currency, shown on the deposit cashier. Set your own rate here; there is no live feed.</p>
+              <div className="mt-3 grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
+                {(['INR', 'PKR', 'AED', 'EUR', 'GBP'] as const).map((ccy) => (
+                  <Input
+                    key={ccy}
+                    label={`1 USD = ? ${ccy}`}
+                    name={`rate-${ccy}`}
+                    type="number"
+                    inputMode="decimal"
+                    step="0.01"
+                    min="0"
+                    value={String(cfg.cashier.rates[ccy])}
+                    onChange={(e) => patch('cashier', { rates: { ...cfg.cashier.rates, [ccy]: Number(e.target.value) } })}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
           {errors && <p className="mt-3 text-xs text-down">{errors}</p>}
           <div className="mt-5 flex justify-end">
             <Button onClick={() => void save()} loading={busy} disabled={!cfg}>

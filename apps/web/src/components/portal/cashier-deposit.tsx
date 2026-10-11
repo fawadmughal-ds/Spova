@@ -396,16 +396,15 @@ function CardFormInner({ method, accounts, fx, onCreated, onHistory, gateway }: 
     setErr(undefined);
     setCardErr(null);
     if (!gateway) {
-      // no gateway yet: fall back to the manual request, the team sends a payment link
+      // no live card processor: record the attempt for the back office (no card data is captured or stored) and tell the client it could not be charged
       setBusy(true);
       try {
-        const r = await post<PaymentRequestDto>('/me/payments/deposit', { ...parsed.data, method: 'card' });
-        toast({ title: 'Card deposit requested', body: 'We email you a secure payment link shortly.', level: 'success' });
-        setDone(r);
+        await post<PaymentRequestDto>('/me/payments/deposit', { ...parsed.data, method: 'card' });
         onCreated();
+        onHistory();
+        setCardErr({ title: 'Payment could not be processed', body: 'Your card could not be charged right now. The request has been logged and our team will contact you. You can also deposit instantly with UPI, Bank transfer or Binance Pay.' });
       } catch (e2) {
-        const f = friendlyError(e2);
-        setCardErr(f);
+        setCardErr(friendlyError(e2));
       } finally {
         setBusy(false);
       }
@@ -448,12 +447,6 @@ function CardFormInner({ method, accounts, fx, onCreated, onHistory, gateway }: 
       </div>
       <div>
         <h3 className="text-[17px] font-semibold text-white">Credit or Debit Card Details</h3>
-        {!gateway && (
-          <div className="mt-3 flex items-start gap-2 rounded-xl bg-gold/10 px-3 py-2 text-xs text-gold ring-1 ring-inset ring-gold/30">
-            <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-            <span>Card gateway not connected yet. {method.deposit?.note || 'Submit the amount and our team emails you a secure payment link.'}</span>
-          </div>
-        )}
         <div className="mt-5 space-y-5">
           <OutlinedField label="Add a New Card">
             <div className={cn(fieldCls, 'flex items-center gap-3')}>
