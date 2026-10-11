@@ -62,6 +62,51 @@ const SYMBOLS: Sym[] = [
   { id: 'LTCUSD', name: 'Litecoin vs US Dollar', assetClass: 'crypto', digits: 2, contractSize: 1, leverageMax: 5, feedSource: 'binance', feedSymbol: 'ltcusdt', spreadMarkup: 0.08, swapLong: -0.05, swapShort: -0.05, maxLot: 500, sortOrder: 62 },
   { id: 'XRPUSD', name: 'Ripple vs US Dollar', assetClass: 'crypto', digits: 4, contractSize: 1000, leverageMax: 5, feedSource: 'binance', feedSymbol: 'xrpusdt', spreadMarkup: 0.0006, swapLong: -0.05, swapShort: -0.05, maxLot: 500, sortOrder: 63 },
   { id: 'SOLUSD', name: 'Solana vs US Dollar', assetClass: 'crypto', digits: 2, contractSize: 1, leverageMax: 5, feedSource: 'binance', feedSymbol: 'solusdt', spreadMarkup: 0.05, swapLong: -0.05, swapShort: -0.05, maxLot: 500, sortOrder: 64 },
+  // --- additional catalogue ---
+  // forex crosses
+  { id: 'AUDJPY', name: 'Australian Dollar vs Japanese Yen', assetClass: 'forex', digits: 3, contractSize: 100000, leverageMax: 400, feedSource: 'synthetic', feedSymbol: 'AUD/JPY', spreadMarkup: 0.012, swapLong: 3.1, swapShort: -8.4, sortOrder: 9 },
+  { id: 'EURCHF', name: 'Euro vs Swiss Franc', assetClass: 'forex', digits: 5, contractSize: 100000, leverageMax: 400, feedSource: 'synthetic', feedSymbol: 'EUR/CHF', spreadMarkup: 0.00012, swapLong: 2.4, swapShort: -6.1, sortOrder: 10 },
+  { id: 'GBPCHF', name: 'British Pound vs Swiss Franc', assetClass: 'forex', digits: 5, contractSize: 100000, leverageMax: 400, feedSource: 'synthetic', feedSymbol: 'GBP/CHF', spreadMarkup: 0.00018, swapLong: 3.9, swapShort: -9.2, sortOrder: 11 },
+  { id: 'CADJPY', name: 'Canadian Dollar vs Japanese Yen', assetClass: 'forex', digits: 3, contractSize: 100000, leverageMax: 400, feedSource: 'synthetic', feedSymbol: 'CAD/JPY', spreadMarkup: 0.012, swapLong: 2.8, swapShort: -7.6, sortOrder: 12 },
+  { id: 'NZDJPY', name: 'New Zealand Dollar vs Japanese Yen', assetClass: 'forex', digits: 3, contractSize: 100000, leverageMax: 400, feedSource: 'synthetic', feedSymbol: 'NZD/JPY', spreadMarkup: 0.013, swapLong: 2.6, swapShort: -7.1, sortOrder: 13 },
+  { id: 'EURAUD', name: 'Euro vs Australian Dollar', assetClass: 'forex', digits: 5, contractSize: 100000, leverageMax: 400, feedSource: 'synthetic', feedSymbol: 'EUR/AUD', spreadMarkup: 0.00016, swapLong: -5.2, swapShort: 1.4, sortOrder: 14 },
+  { id: 'GBPAUD', name: 'British Pound vs Australian Dollar', assetClass: 'forex', digits: 5, contractSize: 100000, leverageMax: 400, feedSource: 'synthetic', feedSymbol: 'GBP/AUD', spreadMarkup: 0.0002, swapLong: -4.1, swapShort: 0.9, sortOrder: 15 },
+  { id: 'AUDNZD', name: 'Australian Dollar vs New Zealand Dollar', assetClass: 'forex', digits: 5, contractSize: 100000, leverageMax: 400, feedSource: 'synthetic', feedSymbol: 'AUD/NZD', spreadMarkup: 0.00018, swapLong: -1.2, swapShort: -1.1, sortOrder: 16 },
+  { id: 'EURCAD', name: 'Euro vs Canadian Dollar', assetClass: 'forex', digits: 5, contractSize: 100000, leverageMax: 400, feedSource: 'synthetic', feedSymbol: 'EUR/CAD', spreadMarkup: 0.00015, swapLong: -4.6, swapShort: 0.8, sortOrder: 17 },
+  { id: 'CHFJPY', name: 'Swiss Franc vs Japanese Yen', assetClass: 'forex', digits: 3, contractSize: 100000, leverageMax: 400, feedSource: 'synthetic', feedSymbol: 'CHF/JPY', spreadMarkup: 0.014, swapLong: 1.1, swapShort: -4.9, sortOrder: 18 },
+  // metals
+  { id: 'XPTUSD', name: 'Platinum vs US Dollar', assetClass: 'metal', digits: 2, contractSize: 100, leverageMax: 100, feedSource: 'synthetic', feedSymbol: 'XPT/USD', spreadMarkup: 0.6, swapLong: -12.1, swapShort: 5.4, sortOrder: 22 },
+  { id: 'XPDUSD', name: 'Palladium vs US Dollar', assetClass: 'metal', digits: 2, contractSize: 100, leverageMax: 100, feedSource: 'synthetic', feedSymbol: 'XPD/USD', spreadMarkup: 1.2, swapLong: -14.8, swapShort: 6.1, sortOrder: 23 },
+  // commodities
+  { id: 'COPPER', name: 'Copper', assetClass: 'commodity', digits: 4, contractSize: 25000, leverageMax: 50, feedSource: 'synthetic', feedSymbol: 'COPPER/USD', spreadMarkup: 0.0015, swapLong: -2.1, swapShort: -1.4, sortOrder: 33 },
+  { id: 'WHEAT', name: 'Wheat', assetClass: 'commodity', digits: 2, contractSize: 50, leverageMax: 20, feedSource: 'synthetic', feedSymbol: 'WHEAT/USD', spreadMarkup: 0.25, swapLong: -1.8, swapShort: -1.2, sortOrder: 34 },
+  { id: 'CORN', name: 'Corn', assetClass: 'commodity', digits: 2, contractSize: 50, leverageMax: 20, feedSource: 'synthetic', feedSymbol: 'CORN/USD', spreadMarkup: 0.25, swapLong: -1.6, swapShort: -1.1, sortOrder: 35 },
+  { id: 'COFFEE', name: 'Coffee', assetClass: 'commodity', digits: 2, contractSize: 100, leverageMax: 20, feedSource: 'synthetic', feedSymbol: 'COFFEE/USD', spreadMarkup: 0.3, swapLong: -2.4, swapShort: -1.6, sortOrder: 36 },
+  // indices
+  { id: 'JP225', name: 'Japan 225', assetClass: 'index', digits: 1, contractSize: 1, leverageMax: 200, feedSource: 'synthetic', feedSymbol: 'JP225', spreadMarkup: 8, swapLong: -2.1, swapShort: -1.1, sortOrder: 44 },
+  { id: 'AUS200', name: 'Australia 200', assetClass: 'index', digits: 1, contractSize: 1, leverageMax: 200, feedSource: 'synthetic', feedSymbol: 'AUS200', spreadMarkup: 2, swapLong: -1.8, swapShort: -0.9, sortOrder: 45 },
+  { id: 'HK50', name: 'Hong Kong 50', assetClass: 'index', digits: 1, contractSize: 1, leverageMax: 200, feedSource: 'synthetic', feedSymbol: 'HK50', spreadMarkup: 6, swapLong: -2.4, swapShort: -1.2, sortOrder: 46 },
+  { id: 'FRA40', name: 'France 40', assetClass: 'index', digits: 1, contractSize: 1, leverageMax: 200, feedSource: 'synthetic', feedSymbol: 'FRA40', spreadMarkup: 2, swapLong: -1.9, swapShort: -1.0, sortOrder: 47 },
+  { id: 'EU50', name: 'Euro Stoxx 50', assetClass: 'index', digits: 1, contractSize: 1, leverageMax: 200, feedSource: 'synthetic', feedSymbol: 'EU50', spreadMarkup: 2, swapLong: -1.9, swapShort: -1.0, sortOrder: 48 },
+  { id: 'US2000', name: 'US Russell 2000', assetClass: 'index', digits: 1, contractSize: 1, leverageMax: 200, feedSource: 'synthetic', feedSymbol: 'US2000', spreadMarkup: 1.5, swapLong: -2.0, swapShort: -1.1, sortOrder: 49 },
+  // shares
+  { id: 'MSFT', name: 'Microsoft Corp.', assetClass: 'stock', digits: 2, contractSize: 1, leverageMax: 5, feedSource: 'synthetic', feedSymbol: 'MSFT', spreadMarkup: 0.05, swapLong: -0.03, swapShort: -0.02, maxLot: 1000, sortOrder: 54 },
+  { id: 'GOOGL', name: 'Alphabet Inc.', assetClass: 'stock', digits: 2, contractSize: 1, leverageMax: 5, feedSource: 'synthetic', feedSymbol: 'GOOGL', spreadMarkup: 0.05, swapLong: -0.03, swapShort: -0.02, maxLot: 1000, sortOrder: 55 },
+  { id: 'META', name: 'Meta Platforms Inc.', assetClass: 'stock', digits: 2, contractSize: 1, leverageMax: 5, feedSource: 'synthetic', feedSymbol: 'META', spreadMarkup: 0.06, swapLong: -0.03, swapShort: -0.02, maxLot: 1000, sortOrder: 56 },
+  { id: 'NFLX', name: 'Netflix Inc.', assetClass: 'stock', digits: 2, contractSize: 1, leverageMax: 5, feedSource: 'synthetic', feedSymbol: 'NFLX', spreadMarkup: 0.08, swapLong: -0.04, swapShort: -0.02, maxLot: 1000, sortOrder: 57 },
+  { id: 'AMD', name: 'Advanced Micro Devices', assetClass: 'stock', digits: 2, contractSize: 1, leverageMax: 5, feedSource: 'synthetic', feedSymbol: 'AMD', spreadMarkup: 0.05, swapLong: -0.03, swapShort: -0.02, maxLot: 1000, sortOrder: 58 },
+  { id: 'INTC', name: 'Intel Corp.', assetClass: 'stock', digits: 2, contractSize: 1, leverageMax: 5, feedSource: 'synthetic', feedSymbol: 'INTC', spreadMarkup: 0.03, swapLong: -0.02, swapShort: -0.02, maxLot: 1000, sortOrder: 59 },
+  { id: 'JPM', name: 'JPMorgan Chase & Co.', assetClass: 'stock', digits: 2, contractSize: 1, leverageMax: 5, feedSource: 'synthetic', feedSymbol: 'JPM', spreadMarkup: 0.05, swapLong: -0.03, swapShort: -0.02, maxLot: 1000, sortOrder: 66 },
+  { id: 'DIS', name: 'Walt Disney Co.', assetClass: 'stock', digits: 2, contractSize: 1, leverageMax: 5, feedSource: 'synthetic', feedSymbol: 'DIS', spreadMarkup: 0.04, swapLong: -0.03, swapShort: -0.02, maxLot: 1000, sortOrder: 67 },
+  { id: 'BABA', name: 'Alibaba Group', assetClass: 'stock', digits: 2, contractSize: 1, leverageMax: 5, feedSource: 'synthetic', feedSymbol: 'BABA', spreadMarkup: 0.05, swapLong: -0.03, swapShort: -0.02, maxLot: 1000, sortOrder: 68 },
+  // crypto (binance has live prices for these)
+  { id: 'BNBUSD', name: 'BNB vs US Dollar', assetClass: 'crypto', digits: 2, contractSize: 1, leverageMax: 5, feedSource: 'binance', feedSymbol: 'bnbusdt', spreadMarkup: 0.3, swapLong: -0.05, swapShort: -0.05, maxLot: 200, sortOrder: 70 },
+  { id: 'ADAUSD', name: 'Cardano vs US Dollar', assetClass: 'crypto', digits: 4, contractSize: 1000, leverageMax: 5, feedSource: 'binance', feedSymbol: 'adausdt', spreadMarkup: 0.0005, swapLong: -0.05, swapShort: -0.05, maxLot: 500, sortOrder: 71 },
+  { id: 'DOGUSD', name: 'Dogecoin vs US Dollar', assetClass: 'crypto', digits: 5, contractSize: 10000, leverageMax: 5, feedSource: 'binance', feedSymbol: 'dogeusdt', spreadMarkup: 0.00004, swapLong: -0.05, swapShort: -0.05, maxLot: 500, sortOrder: 72 },
+  { id: 'DOTUSD', name: 'Polkadot vs US Dollar', assetClass: 'crypto', digits: 3, contractSize: 100, leverageMax: 5, feedSource: 'binance', feedSymbol: 'dotusdt', spreadMarkup: 0.004, swapLong: -0.05, swapShort: -0.05, maxLot: 500, sortOrder: 73 },
+  { id: 'AVAUSD', name: 'Avalanche vs US Dollar', assetClass: 'crypto', digits: 2, contractSize: 10, leverageMax: 5, feedSource: 'binance', feedSymbol: 'avaxusdt', spreadMarkup: 0.03, swapLong: -0.05, swapShort: -0.05, maxLot: 500, sortOrder: 74 },
+  { id: 'LNKUSD', name: 'Chainlink vs US Dollar', assetClass: 'crypto', digits: 3, contractSize: 100, leverageMax: 5, feedSource: 'binance', feedSymbol: 'linkusdt', spreadMarkup: 0.01, swapLong: -0.05, swapShort: -0.05, maxLot: 500, sortOrder: 75 },
+  { id: 'TRXUSD', name: 'TRON vs US Dollar', assetClass: 'crypto', digits: 5, contractSize: 10000, leverageMax: 5, feedSource: 'binance', feedSymbol: 'trxusdt', spreadMarkup: 0.00005, swapLong: -0.05, swapShort: -0.05, maxLot: 500, sortOrder: 76 },
 ];
 
 const RISK = [

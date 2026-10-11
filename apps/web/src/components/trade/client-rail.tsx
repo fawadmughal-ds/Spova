@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useLayoutEffect, useState, type CSSProperties, type ReactNode, type RefObject } from 'react';
-import { Check, ChevronRight, CircleDollarSign, CircleHelp, CircleUser, CreditCard, FileText, IdCard, LayoutDashboard, LogOut, Wallet } from 'lucide-react';
+import { Check, ChevronDown, CircleDollarSign, CircleHelp, CircleUser, CreditCard, FileText, IdCard, LayoutDashboard, LogOut, Wallet } from 'lucide-react';
 import { TierTag } from '@/components/trade/tier-tag';
 import type { AccountDto, MeDto } from '@spova/shared';
 import { cn, initials } from '@/lib/utils';
@@ -113,13 +113,14 @@ function AccountPill({ accounts, account, onSelect, onOpenAccounts }: { accounts
     <div ref={ref} className="relative">
       <button type="button" onClick={() => setOpen((v) => !v)} aria-haspopup="menu" aria-expanded={open} title="Switch account" className="trail-pill">
         {account ? (
-          <span className="rounded px-1.5 py-px text-[10px] font-bold uppercase leading-4 tracking-wide" style={account.type === 'live' ? { background: '#2563eb', color: '#fff' } : { background: 'rgba(21,128,61,0.18)', color: '#22c55e' }}>
-            {account.type}
-          </span>
+          <>
+            <TierTag tier={account.tier} demo={account.type === 'demo'} />
+            <span className="font-mono text-[11px] font-semibold text-white/90">{account.loginCode}</span>
+          </>
         ) : (
-          <span className="text-[11px] text-[#55617a]">…</span>
-        )}{' '}
-        <ChevronRight strokeWidth={3} />
+          <span className="text-[11px] text-white/70">…</span>
+        )}
+        <ChevronDown strokeWidth={2.5} className="opacity-80" />
       </button>
       {open && (
         <div role="menu" className="trail-menu w-64" style={anchor}>

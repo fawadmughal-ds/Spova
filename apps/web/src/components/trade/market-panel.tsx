@@ -5,7 +5,7 @@ import { Building2, Calendar, ChartColumn, Check, ChevronDown, Flame, Info, Layo
 import { dec, effectiveLeverage, notional, quoteCurrency, requiredMarginUsd, toUsd, validateLots, type AccountDto, type CandleDto, type OrderSide, type PlaceOrderResult } from '@spova/shared';
 import { get, post } from '@/lib/api';
 import { cn } from '@/lib/utils';
-import { marketByCls } from '@/lib/markets';
+import { marketByCls, MARKET_LIST } from '@/lib/markets';
 import { useToast } from '@/components/toast';
 import { Skeleton, Spinner } from '@/components/ui';
 import { dailyChange, fmtCountdown, fmtLots, fmtNum, fmtPrice, spreadPoints, type SymbolSpec } from './format';
@@ -232,6 +232,7 @@ export interface MarketPanelProps {
 export function MarketPanel({ symbols, selected, onSelect, account, onPlaced, onAdvanced, sessions, className, quickTrade = true }: MarketPanelProps) {
   const [tab, setTab] = useState<ListTab>('fav');
   const [query, setQuery] = useState('');
+  const [catOpen, setCatOpen] = useState<Set<string>>(() => new Set(['forex', 'crypto']));
   const t = useT();
   const favs = useFavourites();
   const bookVersion = useBookVersion();
@@ -265,6 +266,14 @@ export function MarketPanel({ symbols, selected, onSelect, account, onPlaced, on
     // movers re-sort on every tick batch (bookVersion)
   }, [symbols, tab, query, favs.ids, selected, tab === 'movers' ? bookVersion : 0]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const groups = useMemo(() => {
+    if (!symbols) return [] as { meta: (typeof MARKET_LIST)[number]; items: SymbolSpec[] }[];
+    const q = query.trim().toUpperCase();
+    const filtered = q ? symbols.filter((s) => s.id.includes(q) || s.name.toUpperCase().includes(q)) : symbols;
+    return MARKET_LIST.map((meta) => ({ meta, items: filtered.filter((s) => s.assetClass === meta.cls) })).filter((g) => g.items.length > 0);
+  }, [symbols, query]);
+  const toggleCat = (cls: string) => setCatOpen((prev) => { const n = new Set(prev); n.has(cls) ? n.delete(cls) : n.add(cls); return n; });
+
   const pick = useCallback((id: string) => onSelect(id), [onSelect]);
 
   return (
@@ -291,11 +300,13 @@ export function MarketPanel({ symbols, selected, onSelect, account, onPlaced, on
           )}
         </div>
       )}
-      <div className="grid h-[33px] shrink-0 grid-cols-[26px_minmax(0,1fr)_auto_minmax(72px,auto)] items-center gap-x-3 border-b border-[var(--t-line)] px-3 text-[12px] text-[var(--t-muted)]">
-        <span className="col-span-2">{t('symbol')}</span>
-        <span className="text-right">{t('price')}</span>
-        <span className="text-right">{t('daily')}</span>
-      </div>
+      {tab !== 'search' && (
+        <div className="grid h-[33px] shrink-0 grid-cols-[26px_minmax(0,1fr)_auto_minmax(72px,auto)] items-center gap-x-3 border-b border-[var(--t-line)] px-3 text-[12px] text-[var(--t-muted)]">
+          <span className="col-span-2">{t('symbol')}</span>
+          <span className="text-right">{t('price')}</span>
+          <span className="text-right">{t('daily')}</span>
+        </div>
+      )}
       <div className="min-h-0 flex-1 overflow-y-auto">
         {symbols === null &&
           Array.from({ length: 12 }, (_, i) => (
@@ -304,18 +315,49 @@ export function MarketPanel({ symbols, selected, onSelect, account, onPlaced, on
               <Skeleton className="w-20" />
             </div>
           ))}
-        {symbols && list.length === 0 && (tab === 'search' ? <EmptyState title={`No instrument matches “${query}”`} /> : tab === 'fav' ? <EmptyState icon={<Star />} title="No favourites yet">Open the search tab and star the instruments you trade most.</EmptyState> : <EmptyState title="Waiting for daily data" />)}
-        <ul>
-          {list.map((s) => (
-            <Row key={s.id} s={s} selected={s.id === selected} onSelect={pick} sessions={sessions.get(s.id)}>
-              {quickTrade && (
-                <div className="hidden lg:block">
-                  <QuickTrade spec={s} account={account} onPlaced={onPlaced} onAdvanced={(side, lots) => onAdvanced(s, side, lots)} />
+        {tab === 'search' ? (
+          <>
+            {symbols && groups.length === 0 && <EmptyState title={`No instrument matches “${query}”`} />}
+            {groups.map((g) => {
+              const Icon = g.meta.icon;
+              const open = catOpen.has(g.meta.cls) || query.trim().length > 0;
+              return (
+                <div key={g.meta.cls} className="border-b border-[var(--t-line)]">
+                  <button type="button" onClick={() => toggleCat(g.meta.cls)} className="flex h-[38px] w-full items-center gap-2.5 px-3 text-[13px] font-semibold text-white hover:bg-white/[0.03]">
+                    <span className="flex h-6 w-6 items-center justify-center rounded-md" style={{ background: `rgb(${g.meta.rgb} / 0.14)`, color: `rgb(${g.meta.rgb})` }}>
+                      <Icon className="h-3.5 w-3.5" />
+                    </span>
+                    <span className="flex-1 text-left">{g.meta.label}</span>
+                    <span className="rounded bg-white/[0.07] px-1.5 py-px text-[11px] font-semibold text-[var(--t-muted)]">{g.items.length}</span>
+                    <ChevronDown className={cn('h-4 w-4 text-[var(--t-muted)] transition-transform', open && 'rotate-180')} />
+                  </button>
+                  {open && (
+                    <ul>
+                      {g.items.map((s) => (
+                        <Row key={s.id} s={s} selected={s.id === selected} onSelect={pick} sessions={sessions.get(s.id)} />
+                      ))}
+                    </ul>
+                  )}
                 </div>
-              )}
-            </Row>
-          ))}
-        </ul>
+              );
+            })}
+          </>
+        ) : (
+          <>
+            {symbols && list.length === 0 && (tab === 'fav' ? <EmptyState icon={<Star />} title="No favourites yet">Open the search tab and star the instruments you trade most.</EmptyState> : <EmptyState title="Waiting for daily data" />)}
+            <ul>
+              {list.map((s) => (
+                <Row key={s.id} s={s} selected={s.id === selected} onSelect={pick} sessions={sessions.get(s.id)}>
+                  {quickTrade && (
+                    <div className="hidden lg:block">
+                      <QuickTrade spec={s} account={account} onPlaced={onPlaced} onAdvanced={(side, lots) => onAdvanced(s, side, lots)} />
+                    </div>
+                  )}
+                </Row>
+              ))}
+            </ul>
+          </>
+        )}
       </div>
     </section>
   );
