@@ -224,7 +224,7 @@ export class AdminService {
   async updateAccount(
     actor: Actor,
     accountId: string,
-    patch: { leverage?: number; tier?: 'classic' | 'silver' | 'gold' | 'platinum' | 'vip'; status?: 'enabled' | 'disabled' | 'readonly'; tradingBlocked?: boolean },
+    patch: { leverage?: number; tier?: 'classic' | 'silver' | 'gold' | 'platinum' | 'vip'; status?: 'enabled' | 'disabled' | 'readonly'; tradingBlocked?: boolean; swapFree?: boolean },
   ) {
     const before = await this.prisma.tradingAccount.findUnique({ where: { id: accountId } });
     if (!before) throw ApiError.notFound('account_not_found', 'Account not found');
@@ -245,8 +245,8 @@ export class AdminService {
           action: 'account.update',
           targetType: 'account',
           targetId: accountId,
-          before: { leverage: before.leverage, tier: before.tier, status: before.status, tradingBlocked: before.tradingBlocked },
-          after: { leverage: a.leverage, tier: a.tier, status: a.status, tradingBlocked: a.tradingBlocked },
+          before: { leverage: before.leverage, tier: before.tier, status: before.status, tradingBlocked: before.tradingBlocked, swapFree: before.swapFree },
+          after: { leverage: a.leverage, tier: a.tier, status: a.status, tradingBlocked: a.tradingBlocked, swapFree: a.swapFree },
           ip: actor.ip,
         },
       });

@@ -140,6 +140,7 @@ export class AccountsService {
       marginLevel: s.marginLevel,
       status: acc.status,
       tradingBlocked: acc.tradingBlocked,
+      swapFree: acc.swapFree,
       createdAt: acc.createdAt.toISOString(),
     };
   }

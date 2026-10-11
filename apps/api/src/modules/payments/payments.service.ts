@@ -239,8 +239,8 @@ export class PaymentsService {
     const method = methodOf(input.method);
     if (!method || !method.enabled || !(method.kinds as readonly string[]).includes('withdraw')) throw ApiError.badRequest('method_unavailable', 'This withdrawal method is not available');
     const amount = D(input.amount);
-    if (amount.lt(method.minWithdraw)) throw ApiError.badRequest('amount_min', `Minimum withdrawal by ${method.label} is ${method.minWithdraw} USD`);
-    if (amount.gt(method.maxWithdraw)) throw ApiError.badRequest('amount_max', `Maximum withdrawal by ${method.label} is ${method.maxWithdraw} USD`);
+    if (D(method.minWithdraw).gt(0) && amount.lt(method.minWithdraw)) throw ApiError.badRequest('amount_min', `Minimum withdrawal by ${method.label} is ${method.minWithdraw} USD`);
+    if (D(method.maxWithdraw).gt(0) && amount.gt(method.maxWithdraw)) throw ApiError.badRequest('amount_max', `Maximum withdrawal by ${method.label} is ${method.maxWithdraw} USD`);
 
     // v1: no hold. Pending withdrawals count against what can be requested, and the amount is re-checked at approval.
     const snap = await this.accounts.snapshot(acc);

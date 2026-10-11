@@ -15,6 +15,7 @@ export function AccountSettingsPanel({ account, onChanged }: { account: AccountD
   const [tier, setTier] = useState<string>(account.tier);
   const [status, setStatus] = useState<string>(account.status);
   const [blocked, setBlocked] = useState(account.tradingBlocked);
+  const [swapFree, setSwapFree] = useState(account.swapFree);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -22,6 +23,7 @@ export function AccountSettingsPanel({ account, onChanged }: { account: AccountD
     setTier(account.tier);
     setStatus(account.status);
     setBlocked(account.tradingBlocked);
+    setSwapFree(account.swapFree);
   }, [account]);
 
   const save = async () => {
@@ -32,6 +34,7 @@ export function AccountSettingsPanel({ account, onChanged }: { account: AccountD
         tier,
         status,
         tradingBlocked: blocked,
+        swapFree,
       });
       onChanged(a);
       toast({ title: 'Account updated', level: 'success' });
@@ -70,6 +73,13 @@ export function AccountSettingsPanel({ account, onChanged }: { account: AccountD
             <span className="block text-xs text-ink-500">Client cannot open or close positions</span>
           </span>
           <input type="checkbox" className="h-5 w-5 accent-down" checked={blocked} onChange={(e) => setBlocked(e.target.checked)} />
+        </label>
+        <label className="flex items-center justify-between rounded-xl border border-white/10 px-3 py-2.5 text-sm">
+          <span>
+            Swap-free
+            <span className="block text-xs text-ink-500">No overnight swap charges on this account</span>
+          </span>
+          <input type="checkbox" className="h-5 w-5 accent-brand-500" checked={swapFree} onChange={(e) => setSwapFree(e.target.checked)} />
         </label>
         <Input label="Login code" value={account.loginCode} readOnly disabled />
         <Button className="w-full" variant="secondary" onClick={() => void save()} loading={saving}>

@@ -329,7 +329,7 @@ function WithdrawForm({ accounts, methods, onCreated, onHistory }: { accounts: A
       <div className="card min-w-0 space-y-7 p-5 sm:p-6">
         <section>
           <StepTitle n={1}>Withdraw from</StepTitle>
-          <AccountPicker name="withdraw-account" accounts={live} value={accountId} onChange={setAccountId} showMargin />
+          <AccountPicker name="withdraw-account" accounts={live} value={accountId} onChange={setAccountId} />
           {fieldErr.accountId && <p className="animate-pop-in mt-1.5 text-xs text-down">{fieldErr.accountId}</p>}
         </section>
         <section>
@@ -344,19 +344,9 @@ function WithdrawForm({ accounts, methods, onCreated, onHistory }: { accounts: A
               value={amount}
               onChange={setAmount}
               error={fieldErr.amount}
-              presets={['100', '250', '500', '1000']}
               hint={
                 <>
-                  {available !== null ? (
-                    <>
-                      Available now: <span className="tabular font-mono text-ink-200">{fmtMoney(available)} USD</span>.{' '}
-                    </>
-                  ) : account ? (
-                    <>
-                      Balance <span className="tabular font-mono text-ink-200">{fmtMoney(account.balance)}</span> · free margin <span className="tabular font-mono text-ink-200">{fmtMoney(account.freeMargin)}</span> USD.{' '}
-                    </>
-                  ) : null}
-                  {m && <>Min {fmtMoney(m.minWithdraw)} · Max {fmtMoney(m.maxWithdraw)}.</>}
+                  Available balance for withdrawal: <span className="tabular font-mono text-ink-200">{fmtMoney(available ?? account?.balance ?? '0')} USD</span>. You can withdraw any amount up to this.
                 </>
               }
             />

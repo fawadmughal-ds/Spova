@@ -149,6 +149,7 @@ describe('phase 2: kyc -> live account -> payments -> tickets', () => {
     assert.equal(second.data.code, 'live_limit');
     const methods = await client.json('GET', '/me/payments/methods');
     assert.ok(methods.data.find((m: any) => m.id === 'bank' && m.enabled));
+    assert.ok(!methods.data.find((m: any) => m.id === 'rtgs')?.kinds.includes('withdraw'), 'RTGS is deposit-only');
 
     assert.equal((await client.json('POST', '/me/payments/deposit', { accountId: liveAccountId, amount: '100', method: 'bank' })).data.code, 'amount_min');
     const cardReq = await client.json('POST', '/me/payments/deposit', { accountId: liveAccountId, amount: '500', method: 'card' });
@@ -172,7 +173,7 @@ describe('phase 2: kyc -> live account -> payments -> tickets', () => {
     const wd = await client.json('POST', '/me/payments/withdraw', { accountId: liveAccountId, amount: '2000', method: 'bank' });
     assert.equal(wd.status, 422);
     assert.equal(wd.data.code, 'insufficient_funds');
-    assert.equal((await client.json('POST', '/me/payments/withdraw', { accountId: liveAccountId, amount: '100', method: 'bank' })).data.code, 'amount_min', 'minimum withdrawal is enforced');
+    assert.equal((await client.json('POST', '/me/payments/withdraw', { accountId: liveAccountId, amount: '100', method: 'bank' })).data.code, 'insufficient_funds', 'no minimum withdrawal; only the balance limits it');
 
     const list = await client.json('GET', '/me/payments?status=pending');
     assert.equal(list.data.total, 1, 'the cancelled card request is not pending');
@@ -492,6 +493,12 @@ describe('phase 2: kyc -> live account -> payments -> tickets', () => {
     const removed = await admin.json('POST', `/admin/accounts/${liveAccountId}/remove-credit`, { amount: '3000', reason: 'Promo ended' });
     assert.ok([200, 201].includes(removed.status), JSON.stringify(removed.data));
     assert.equal(removed.data.account.credit, '0.00');
+
+    // admin swap-free toggle
+    const sf = await admin.json('PATCH', `/admin/accounts/${liveAccountId}`, { swapFree: true });
+    assert.equal(sf.status, 200, JSON.stringify(sf.data));
+    assert.equal(sf.data.swapFree, true);
+    assert.equal((await admin.json('PATCH', `/admin/accounts/${liveAccountId}`, { swapFree: false })).data.swapFree, false);
   });
 
   it('notification emails toggle from the back office, and a client can be sent a deposit email', async () => {

@@ -52,7 +52,7 @@ export function MethodCards({ methods, kind, value, onChange }: { methods: Payme
             </span>
             {m.enabled && (
               <span className="tabular font-mono text-[10px] uppercase tracking-[0.1em] text-ink-500">
-                {Number(max) > 0 ? `${fmtMoney(min)} – ${fmtMoney(max)} USD` : `${fmtMoney(min)}+ USD`}
+                {Number(max) > 0 ? `${fmtMoney(min)} – ${fmtMoney(max)} USD` : Number(min) > 0 ? `${fmtMoney(min)}+ USD` : 'Any amount'}
               </span>
             )}
           </button>

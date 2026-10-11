@@ -254,6 +254,7 @@ model TradingAccount {
   credit         Decimal       @default(0) @db.Decimal(18, 2)
   status         AccountStatus @default(enabled)
   tradingBlocked Boolean       @default(false) @map("trading_blocked")
+  swapFree       Boolean       @default(false) @map("swap_free")
   marginCallAt   DateTime?     @map("margin_call_at") @db.Timestamptz
   createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz
   updatedAt      DateTime      @updatedAt @map("updated_at") @db.Timestamptz

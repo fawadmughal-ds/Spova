@@ -74,6 +74,8 @@ export interface AccountDto {
   marginLevel: string | null;
   status: AccountStatus;
   tradingBlocked: boolean;
+  /** overnight swap charges waived for this account (admin-controlled) */
+  swapFree: boolean;
   createdAt: string;
 }
 

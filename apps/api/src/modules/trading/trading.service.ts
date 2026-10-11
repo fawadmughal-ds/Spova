@@ -413,12 +413,17 @@ export class TradingService {
     const key = `swap:done:${date}`;
     if (!(await this.redis.client.set(key, '1', 'EX', 7 * 86400, 'NX'))) return { applied: 0, skipped: true };
     const day = new Date(`${date}T00:00:00Z`);
-    const [positions, specs] = await Promise.all([this.prisma.position.findMany({ where: { status: 'open' } }), this.quotes.specs()]);
+    const [positions, specs, freeAccts] = await Promise.all([
+      this.prisma.position.findMany({ where: { status: 'open' } }),
+      this.quotes.specs(),
+      this.prisma.tradingAccount.findMany({ where: { swapFree: true }, select: { id: true } }).then((rows) => new Set(rows.map((r) => r.id))),
+    ]);
     const touched = new Set<string>();
     let applied = 0;
     for (const p of positions) {
       const spec = specs.get(p.symbolId) ?? (await this.prisma.symbol.findUnique({ where: { id: p.symbolId }, include: { sessions: true } }));
       if (!spec) continue;
+      if (freeAccts.has(p.accountId)) continue; // admin made this account swap-free
       const swap = swapFor(p.lots.toString(), p.side, spec.swapLong.toString(), spec.swapShort.toString(), day).toDecimalPlaces(2);
       if (swap.isZero()) continue;
       await this.prisma.$transaction(async (tx) => {
