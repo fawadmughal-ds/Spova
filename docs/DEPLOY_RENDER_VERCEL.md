@@ -50,6 +50,11 @@ and answers `/health`; its real work runs in the background.
 - **Emails** print to the API log (`MAIL_PROVIDER=console`). Set `MAIL_PROVIDER=resend` + `RESEND_API_KEY`
   for real mail.
 
+## Blueprint sync overwrites environment values
+Every env var listed in `render.yaml` is re-applied when Render syncs the Blueprint (each push). Edit those
+values in `render.yaml`, not only in the dashboard, or the next deploy puts the old value back. `WEB_ORIGIN`,
+`APP_DOMAIN`, `COOKIE_*`, `BRAND_NAME` and `SEED_ADMIN_EMAIL` are set to the zerventa.com values in the file.
+
 ## The API must share your domain (required, not optional)
 The web app's route guard reads the login cookie on the **web** domain, so the API must set cookies on the same
 site. Put the API on a subdomain of your domain:

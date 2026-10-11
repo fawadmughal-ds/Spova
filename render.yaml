@@ -22,14 +22,18 @@ services:
           type: keyvalue
           name: spova-redis
           property: connectionString
+      # The web app lives on www.zerventa.com (Vercel) and this API on api.zerventa.com (custom domain on this service).
+      # These values are re-applied on every Blueprint sync, so they must be the real ones, not placeholders.
       - key: WEB_ORIGIN
-        value: https://CHANGE-ME.vercel.app
+        value: https://www.zerventa.com,https://zerventa.com
+      - key: APP_DOMAIN
+        value: zerventa.com
       - key: COOKIE_SAMESITE
-        value: none
+        value: lax
       - key: COOKIE_SECURE
         value: "true"
       - key: COOKIE_DOMAIN
-        value: ""
+        value: .zerventa.com
       - key: JWT_ACCESS_SECRET
         generateValue: true
       - key: JWT_REFRESH_SECRET
