@@ -42,7 +42,7 @@ const FIELDS: Record<Key, { name: string; label: string; placeholder?: string }[
 export function DepositChannelsEditor({ className }: { className?: string }) {
   const toast = useToast();
   const [cfg, setCfg] = useState<DepositChannels | null>(null);
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true);
   const [busy, setBusy] = useState(false);
   const [errors, setErrors] = useState<string | null>(null);
 
@@ -82,8 +82,8 @@ export function DepositChannelsEditor({ className }: { className?: string }) {
           <Landmark className="h-5 w-5" />
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block text-base font-semibold text-white">Deposit channels</span>
-          <span className="block text-xs text-ink-400">Bank account, UPI ID, Binance Pay ID and USDT wallet that clients pay into. {cfg ? `${(Object.keys(TITLES) as Key[]).filter((k) => cfg[k].enabled).map((k) => TITLES[k]).join(', ')} enabled.` : ''}</span>
+          <span className="block text-base font-semibold text-white">Deposit channels &amp; USD rates</span>
+          <span className="block text-xs text-ink-400">Where clients pay in, and the price of 1 USD in INR shown on the cashier. {cfg ? `${(Object.keys(TITLES) as Key[]).filter((k) => cfg[k].enabled).map((k) => TITLES[k]).join(', ')} enabled.` : ''}</span>
         </span>
         <ChevronDown className={cn('h-5 w-5 text-ink-400 transition-transform', open && 'rotate-180')} />
       </button>
