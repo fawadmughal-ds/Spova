@@ -38,7 +38,7 @@ function AccountChip({ accounts, account, onSelect }: { accounts: AccountDto[]; 
       buttonClassName="flex h-9 items-center gap-2 rounded-md px-2 text-[14px] font-semibold text-white transition-colors hover:bg-white/[0.06]"
       button={(open) => (
         <>
-          <TierTag tier={account.tier} demo={account.type === 'demo'} />
+          <TierTag tier={account.tier} />
           <span>{account.loginCode}</span>
           <ChevronDown className={cn('h-3.5 w-3.5 text-[var(--t-muted)] transition-transform', open && 'rotate-180')} />
         </>

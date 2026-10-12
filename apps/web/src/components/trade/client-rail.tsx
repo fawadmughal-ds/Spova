@@ -113,14 +113,13 @@ function AccountPill({ accounts, account, onSelect, onOpenAccounts }: { accounts
     <div ref={ref} className="relative">
       <button type="button" onClick={() => setOpen((v) => !v)} aria-haspopup="menu" aria-expanded={open} title="Switch account" className="trail-pill">
         {account ? (
-          <>
-            <TierTag tier={account.tier} demo={account.type === 'demo'} />
-            <span className="font-mono text-[11px] font-semibold text-white/90">{account.loginCode}</span>
-          </>
+          <span className="rounded px-1.5 py-px text-[10px] font-bold uppercase leading-4 tracking-wide" style={account.type === 'live' ? { background: 'rgba(255,255,255,0.22)', color: '#fff' } : { background: 'rgba(34,197,94,0.25)', color: '#dcffe6' }}>
+            {account.type}
+          </span>
         ) : (
-          <span className="text-[11px] text-white/70">…</span>
+          <span className="text-[11px] text-white/80">…</span>
         )}
-        <ChevronDown strokeWidth={2.5} className="opacity-80" />
+        <ChevronDown strokeWidth={2.5} className="opacity-90" />
       </button>
       {open && (
         <div role="menu" className="trail-menu w-64" style={anchor}>

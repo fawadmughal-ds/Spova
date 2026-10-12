@@ -57,11 +57,11 @@ const SYMBOLS: Sym[] = [
   { id: 'AMZN', name: 'Amazon.com Inc.', assetClass: 'stock', digits: 2, contractSize: 1, leverageMax: 5, feedSource: 'synthetic', feedSymbol: 'AMZN', spreadMarkup: 0.06, swapLong: -0.03, swapShort: -0.02, maxLot: 1000, sortOrder: 52 },
   { id: 'NVDA', name: 'NVIDIA Corp.', assetClass: 'stock', digits: 2, contractSize: 1, leverageMax: 5, feedSource: 'synthetic', feedSymbol: 'NVDA', spreadMarkup: 0.06, swapLong: -0.03, swapShort: -0.02, maxLot: 1000, sortOrder: 53 },
   // crypto (Binance bookTicker, free)
-  { id: 'BTCUSD', name: 'Bitcoin vs US Dollar', assetClass: 'crypto', digits: 2, contractSize: 1, leverageMax: 5, feedSource: 'binance', feedSymbol: 'btcusdt', spreadMarkup: 8, swapLong: -0.05, swapShort: -0.05, maxLot: 20, featured: true, sortOrder: 60 },
-  { id: 'ETHUSD', name: 'Ethereum vs US Dollar', assetClass: 'crypto', digits: 2, contractSize: 1, leverageMax: 5, feedSource: 'binance', feedSymbol: 'ethusdt', spreadMarkup: 0.6, swapLong: -0.05, swapShort: -0.05, maxLot: 200, featured: true, sortOrder: 61 },
-  { id: 'LTCUSD', name: 'Litecoin vs US Dollar', assetClass: 'crypto', digits: 2, contractSize: 1, leverageMax: 5, feedSource: 'binance', feedSymbol: 'ltcusdt', spreadMarkup: 0.08, swapLong: -0.05, swapShort: -0.05, maxLot: 500, sortOrder: 62 },
-  { id: 'XRPUSD', name: 'Ripple vs US Dollar', assetClass: 'crypto', digits: 4, contractSize: 1000, leverageMax: 5, feedSource: 'binance', feedSymbol: 'xrpusdt', spreadMarkup: 0.0006, swapLong: -0.05, swapShort: -0.05, maxLot: 500, sortOrder: 63 },
-  { id: 'SOLUSD', name: 'Solana vs US Dollar', assetClass: 'crypto', digits: 2, contractSize: 1, leverageMax: 5, feedSource: 'binance', feedSymbol: 'solusdt', spreadMarkup: 0.05, swapLong: -0.05, swapShort: -0.05, maxLot: 500, sortOrder: 64 },
+  { id: 'BTCUSD', name: 'Bitcoin vs US Dollar', assetClass: 'crypto', digits: 2, contractSize: 1, leverageMax: 5, feedSource: 'synthetic', feedSymbol: 'BTC/USD', spreadMarkup: 8, swapLong: -0.05, swapShort: -0.05, maxLot: 20, featured: true, sortOrder: 60 },
+  { id: 'ETHUSD', name: 'Ethereum vs US Dollar', assetClass: 'crypto', digits: 2, contractSize: 1, leverageMax: 5, feedSource: 'synthetic', feedSymbol: 'ETH/USD', spreadMarkup: 0.6, swapLong: -0.05, swapShort: -0.05, maxLot: 200, featured: true, sortOrder: 61 },
+  { id: 'LTCUSD', name: 'Litecoin vs US Dollar', assetClass: 'crypto', digits: 2, contractSize: 1, leverageMax: 5, feedSource: 'synthetic', feedSymbol: 'LTC/USD', spreadMarkup: 0.08, swapLong: -0.05, swapShort: -0.05, maxLot: 500, sortOrder: 62 },
+  { id: 'XRPUSD', name: 'Ripple vs US Dollar', assetClass: 'crypto', digits: 4, contractSize: 1000, leverageMax: 5, feedSource: 'synthetic', feedSymbol: 'XRP/USD', spreadMarkup: 0.0006, swapLong: -0.05, swapShort: -0.05, maxLot: 500, sortOrder: 63 },
+  { id: 'SOLUSD', name: 'Solana vs US Dollar', assetClass: 'crypto', digits: 2, contractSize: 1, leverageMax: 5, feedSource: 'synthetic', feedSymbol: 'SOL/USD', spreadMarkup: 0.05, swapLong: -0.05, swapShort: -0.05, maxLot: 500, sortOrder: 64 },
   // --- additional catalogue ---
   // forex crosses
   { id: 'AUDJPY', name: 'Australian Dollar vs Japanese Yen', assetClass: 'forex', digits: 3, contractSize: 100000, leverageMax: 400, feedSource: 'synthetic', feedSymbol: 'AUD/JPY', spreadMarkup: 0.012, swapLong: 3.1, swapShort: -8.4, sortOrder: 9 },
@@ -100,13 +100,13 @@ const SYMBOLS: Sym[] = [
   { id: 'DIS', name: 'Walt Disney Co.', assetClass: 'stock', digits: 2, contractSize: 1, leverageMax: 5, feedSource: 'synthetic', feedSymbol: 'DIS', spreadMarkup: 0.04, swapLong: -0.03, swapShort: -0.02, maxLot: 1000, sortOrder: 67 },
   { id: 'BABA', name: 'Alibaba Group', assetClass: 'stock', digits: 2, contractSize: 1, leverageMax: 5, feedSource: 'synthetic', feedSymbol: 'BABA', spreadMarkup: 0.05, swapLong: -0.03, swapShort: -0.02, maxLot: 1000, sortOrder: 68 },
   // crypto (binance has live prices for these)
-  { id: 'BNBUSD', name: 'BNB vs US Dollar', assetClass: 'crypto', digits: 2, contractSize: 1, leverageMax: 5, feedSource: 'binance', feedSymbol: 'bnbusdt', spreadMarkup: 0.3, swapLong: -0.05, swapShort: -0.05, maxLot: 200, sortOrder: 70 },
-  { id: 'ADAUSD', name: 'Cardano vs US Dollar', assetClass: 'crypto', digits: 4, contractSize: 1000, leverageMax: 5, feedSource: 'binance', feedSymbol: 'adausdt', spreadMarkup: 0.0005, swapLong: -0.05, swapShort: -0.05, maxLot: 500, sortOrder: 71 },
-  { id: 'DOGUSD', name: 'Dogecoin vs US Dollar', assetClass: 'crypto', digits: 5, contractSize: 10000, leverageMax: 5, feedSource: 'binance', feedSymbol: 'dogeusdt', spreadMarkup: 0.00004, swapLong: -0.05, swapShort: -0.05, maxLot: 500, sortOrder: 72 },
-  { id: 'DOTUSD', name: 'Polkadot vs US Dollar', assetClass: 'crypto', digits: 3, contractSize: 100, leverageMax: 5, feedSource: 'binance', feedSymbol: 'dotusdt', spreadMarkup: 0.004, swapLong: -0.05, swapShort: -0.05, maxLot: 500, sortOrder: 73 },
-  { id: 'AVAUSD', name: 'Avalanche vs US Dollar', assetClass: 'crypto', digits: 2, contractSize: 10, leverageMax: 5, feedSource: 'binance', feedSymbol: 'avaxusdt', spreadMarkup: 0.03, swapLong: -0.05, swapShort: -0.05, maxLot: 500, sortOrder: 74 },
-  { id: 'LNKUSD', name: 'Chainlink vs US Dollar', assetClass: 'crypto', digits: 3, contractSize: 100, leverageMax: 5, feedSource: 'binance', feedSymbol: 'linkusdt', spreadMarkup: 0.01, swapLong: -0.05, swapShort: -0.05, maxLot: 500, sortOrder: 75 },
-  { id: 'TRXUSD', name: 'TRON vs US Dollar', assetClass: 'crypto', digits: 5, contractSize: 10000, leverageMax: 5, feedSource: 'binance', feedSymbol: 'trxusdt', spreadMarkup: 0.00005, swapLong: -0.05, swapShort: -0.05, maxLot: 500, sortOrder: 76 },
+  { id: 'BNBUSD', name: 'BNB vs US Dollar', assetClass: 'crypto', digits: 2, contractSize: 1, leverageMax: 5, feedSource: 'synthetic', feedSymbol: 'BNB/USD', spreadMarkup: 0.3, swapLong: -0.05, swapShort: -0.05, maxLot: 200, sortOrder: 70 },
+  { id: 'ADAUSD', name: 'Cardano vs US Dollar', assetClass: 'crypto', digits: 4, contractSize: 1000, leverageMax: 5, feedSource: 'synthetic', feedSymbol: 'ADA/USD', spreadMarkup: 0.0005, swapLong: -0.05, swapShort: -0.05, maxLot: 500, sortOrder: 71 },
+  { id: 'DOGUSD', name: 'Dogecoin vs US Dollar', assetClass: 'crypto', digits: 5, contractSize: 10000, leverageMax: 5, feedSource: 'synthetic', feedSymbol: 'DOG/USD', spreadMarkup: 0.00004, swapLong: -0.05, swapShort: -0.05, maxLot: 500, sortOrder: 72 },
+  { id: 'DOTUSD', name: 'Polkadot vs US Dollar', assetClass: 'crypto', digits: 3, contractSize: 100, leverageMax: 5, feedSource: 'synthetic', feedSymbol: 'DOT/USD', spreadMarkup: 0.004, swapLong: -0.05, swapShort: -0.05, maxLot: 500, sortOrder: 73 },
+  { id: 'AVAUSD', name: 'Avalanche vs US Dollar', assetClass: 'crypto', digits: 2, contractSize: 10, leverageMax: 5, feedSource: 'synthetic', feedSymbol: 'AVA/USD', spreadMarkup: 0.03, swapLong: -0.05, swapShort: -0.05, maxLot: 500, sortOrder: 74 },
+  { id: 'LNKUSD', name: 'Chainlink vs US Dollar', assetClass: 'crypto', digits: 3, contractSize: 100, leverageMax: 5, feedSource: 'synthetic', feedSymbol: 'LNK/USD', spreadMarkup: 0.01, swapLong: -0.05, swapShort: -0.05, maxLot: 500, sortOrder: 75 },
+  { id: 'TRXUSD', name: 'TRON vs US Dollar', assetClass: 'crypto', digits: 5, contractSize: 10000, leverageMax: 5, feedSource: 'synthetic', feedSymbol: 'TRX/USD', spreadMarkup: 0.00005, swapLong: -0.05, swapShort: -0.05, maxLot: 500, sortOrder: 76 },
 ];
 
 const RISK = [
@@ -162,7 +162,7 @@ export async function runSeed(prisma: PrismaClient, opts: { demoClient?: boolean
         sortOrder: s.sortOrder ?? 100,
         sessions: { create: sessionsFor(s) },
       },
-      update: { name: s.name, leverageMax: s.leverageMax, featured: s.featured ?? false, sortOrder: s.sortOrder ?? 100 },
+      update: { name: s.name, leverageMax: s.leverageMax, featured: s.featured ?? false, sortOrder: s.sortOrder ?? 100, feedSource: s.feedSource, feedSymbol: s.feedSymbol },
     });
   }
   console.log(`symbols: ${SYMBOLS.length}`);
