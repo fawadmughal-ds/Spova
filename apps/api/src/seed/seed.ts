@@ -117,10 +117,15 @@ const RISK = [
   { tier: 'vip', minDeposit: 100000, defaultLeverage: 100, maxLeverage: 400, spreadDiscountPct: 40 },
 ] as const;
 
-/** FX sessions: Sun 22:00 -> Fri 22:00 UTC. Crypto 24/7 (no rows = always open). Stocks/indices: Mon-Fri 13:30-20:00 UTC. */
+/**
+ * Crypto: 24/7 (no rows = always open).
+ * Stocks: the US cash session, Mon-Fri 13:30-20:00 UTC (single-stock CFDs follow the exchange).
+ * FX, metals, commodities AND indices: near 24/5, Sun 22:00 -> Fri 22:00 UTC. Index CFDs trade almost
+ * around the clock on weekdays, so a Tokyo / Hong Kong / Frankfurt index is not stuck to US hours.
+ */
 function sessionsFor(s: Sym): { weekday: number; openTime: string; closeTime: string }[] {
   if (s.assetClass === 'crypto') return [];
-  if (s.assetClass === 'stock' || s.assetClass === 'index') {
+  if (s.assetClass === 'stock') {
     return [1, 2, 3, 4, 5].map((weekday) => ({ weekday, openTime: '13:30', closeTime: '20:00' }));
   }
   return [
@@ -160,10 +165,17 @@ export async function runSeed(prisma: PrismaClient, opts: { demoClient?: boolean
         feedSymbol: s.feedSymbol,
         featured: s.featured ?? false,
         sortOrder: s.sortOrder ?? 100,
-        sessions: { create: sessionsFor(s) },
       },
       update: { name: s.name, leverageMax: s.leverageMax, featured: s.featured ?? false, sortOrder: s.sortOrder ?? 100, feedSource: s.feedSource, feedSymbol: s.feedSymbol },
     });
+
+    // Sessions are synced every seed so trading hours in code always win (e.g. re-seeding existing
+    // symbols to widen index hours). Delete + recreate keeps it idempotent.
+    await prisma.symbolSession.deleteMany({ where: { symbolId: s.id } });
+    const rows = sessionsFor(s);
+    if (rows.length) {
+      await prisma.symbolSession.createMany({ data: rows.map((r) => ({ symbolId: s.id, ...r })) });
+    }
   }
   console.log(`symbols: ${SYMBOLS.length}`);
 
