@@ -526,7 +526,7 @@ function Terminal() {
         {mtab === 'more' && (
           <section className="t-panel min-h-0 flex-1 lg:hidden" aria-label="More">
             <div className="t-bar !pl-4 text-[14px] font-semibold text-white">{t('more')}</div>
-            <ul className="p-2">
+            <ul className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2">
               <li>
                 <button type="button" onClick={() => settingsStore.patch({ theme: settings.theme === 'dark' ? 'light' : 'dark' })} className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-white/[0.04]">
                   <span className="flex h-9 w-9 items-center justify-center rounded-md bg-[var(--t-raised)] text-[var(--t-text-2)] [&>svg]:h-4 [&>svg]:w-4">{settings.theme === 'dark' ? <Sun /> : <Moon />}</span>

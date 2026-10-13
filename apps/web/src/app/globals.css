@@ -1060,6 +1060,13 @@ body:has(.terminal[data-theme='light']) {
 .terminal[data-theme='light'] .t-quick:disabled {
   opacity: 0.4;
 }
+/* smooth momentum scrolling inside the pinned terminal; contain keeps an inner list from rubber-banding the whole app on mobile */
+.terminal [class*='overflow-auto'],
+.terminal [class*='overflow-y-auto'],
+.terminal [class*='overflow-x-auto'] {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
 .terminal ::-webkit-scrollbar {
   width: 8px;
   height: 8px;

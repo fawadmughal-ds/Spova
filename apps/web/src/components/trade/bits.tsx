@@ -122,9 +122,9 @@ export function SymbolTile({ spec, id, size = 26, className }: { spec?: SymbolSp
   const cls = spec?.assetClass;
   const letterTile: CSSProperties = cls === 'crypto' || cls === 'stock' ? { background: '#0f1115', color: '#fff', boxShadow: 'inset 0 0 0 1px var(--t-raised-2)' } : cls === 'metal' ? { background: '#e0a526', color: '#1c2128' } : cls === 'commodity' ? { background: '#1c2128', color: '#fff', boxShadow: 'inset 0 0 0 1px var(--t-raised-2)' } : { background: '#f3f5f8', color: '#1c2128' };
 
-  // crypto & share logos from public CDNs, with a letter fallback
-  if (CRYPTO_ICON[sym]) return <LogoImg src={`https://assets.coincap.io/assets/icons/${CRYPTO_ICON[sym]}@2x.png`} sym={sym} size={size} tile={letterTile} />;
-  if (SHARE_DOMAIN[sym]) return <LogoImg src={`https://logo.clearbit.com/${SHARE_DOMAIN[sym]}`} sym={sym} size={size} tile={letterTile} chip />;
+  // crypto & share logos are self-hosted under /brand/sym (reliable on mobile; no third-party CDN), letter fallback on miss
+  if (CRYPTO_ICON[sym]) return <LogoImg src={`/brand/sym/${sym}.png`} sym={sym} size={size} tile={letterTile} />;
+  if (SHARE_DOMAIN[sym]) return <LogoImg src={`/brand/sym/${sym}.png`} sym={sym} size={size} tile={letterTile} chip />;
 
   // indices: a single flag "coin"
   if (INDEX_FLAG[sym])
