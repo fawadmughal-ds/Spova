@@ -160,7 +160,9 @@ export function KLineChart({ spec, className, footer }: { spec: SymbolSpec; clas
     if (!chart) return;
     let alive = true;
     setLoading(true);
-    get<CandleDto[]>(`/market/candles/${spec.id}?tf=${tf}&limit=500`)
+    // fewer bars on phones keeps the canvas light and scrolling smooth
+    const limit = typeof window !== 'undefined' && window.innerWidth < 1024 ? 220 : 500;
+    get<CandleDto[]>(`/market/candles/${spec.id}?tf=${tf}&limit=${limit}`)
       .then((rows) => {
         if (!alive) return;
         barsRef.current = rows.map(toBar);

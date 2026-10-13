@@ -476,7 +476,8 @@ function Terminal() {
             </button>
 
             <div className={cn('min-h-0 min-w-0 flex-1 flex-col', show(mtab === 'chart' || mtab === 'portfolio'), 'lg:flex')}>
-              {spec ? (
+              {spec && (desktop || mtab === 'chart') ? (
+                // on mobile the chart only mounts when its tab is open, so the Trade tab stays fast and responsive
                 <KLineChart
                   spec={spec}
                   className={cn('min-h-0 flex-1', show(mtab === 'chart'), 'lg:flex')}
@@ -486,7 +487,7 @@ function Terminal() {
                     </div>
                   }
                 />
-              ) : (
+              ) : spec ? null : (
                 <div className={cn('t-panel min-h-0 flex-1 items-center justify-center', show(mtab === 'chart'), 'lg:flex')}>
                   {symbolsError ? (
                     <div className="flex flex-col items-center gap-2 text-center">
