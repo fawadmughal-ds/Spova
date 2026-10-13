@@ -123,6 +123,7 @@ export function KLineChart({ spec, positions, className, footer }: { spec: Symbo
   const [active, setActive] = useState<Record<string, string>>({}); // indicator key -> paneId
   const [loading, setLoading] = useState(true);
   const [fs, setFs] = useState(false);
+  const [ready, setReady] = useState(false);
 
   // init chart once
   useEffect(() => {
@@ -135,11 +136,13 @@ export function KLineChart({ spec, positions, className, footer }: { spec: Symbo
       const chart = kc.init(holder.current, { styles: stylesFor(dark) as never }) as unknown as KChart;
       chartRef.current = chart;
       chart.setPriceVolumePrecision(spec.digits ?? 2, 0);
+      setReady(true);
       ro = new ResizeObserver(() => chart.resize());
       ro.observe(holder.current);
     })();
     return () => {
       disposed = true;
+      setReady(false);
       ro?.disconnect();
       if (holder.current && kcRef.current) kcRef.current.dispose(holder.current);
       chartRef.current = null;
@@ -155,10 +158,10 @@ export function KLineChart({ spec, positions, className, footer }: { spec: Symbo
     chartRef.current?.setPriceVolumePrecision(spec.digits ?? 2, 0);
   }, [spec.digits]);
 
-  // load history on symbol / timeframe change
+  // load history on symbol / timeframe change (waits for the chart to finish its async init -> `ready`)
   useEffect(() => {
     const chart = chartRef.current;
-    if (!chart) return;
+    if (!chart || !ready) return;
     let alive = true;
     setLoading(true);
     // fewer bars on phones keeps the canvas light and scrolling smooth
@@ -174,7 +177,7 @@ export function KLineChart({ spec, positions, className, footer }: { spec: Symbo
     return () => {
       alive = false;
     };
-  }, [spec.id, tf]);
+  }, [spec.id, tf, ready]);
 
   // live last-candle updates from quote ticks
   useEffect(() => {

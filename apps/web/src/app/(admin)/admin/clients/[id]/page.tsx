@@ -157,18 +157,30 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
 
       {/* trading / money summary */}
       <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {(
+        {(() => {
+          const sumN = (f: (a: AccountDto) => string | null) => u.accounts.reduce((s, a) => s + Number(f(a) ?? 0), 0);
+          const totEquity = sumN((a) => a.equity);
+          const totUsed = sumN((a) => a.usedMargin);
+          const totFree = sumN((a) => a.freeMargin);
+          const totFloat = u.accounts.reduce((s, a) => s + (Number(a.equity) - Number(a.balance) - Number(a.credit)), 0);
+          const liveAcc = u.accounts.find((a) => a.type === 'live') ?? u.accounts[0];
+          return (
           [
             ['Open trades', String(u.stats.openTrades), u.stats.openTrades > 0],
             ['Closed trades', String(u.stats.closedTrades), false],
             ['Volume (lots)', u.stats.totalVolumeLots, false],
             ['Realized P/L', fmtMoney(u.stats.realizedPnl), false],
+            ['Equity', fmtMoney(totEquity.toFixed(2)), false],
+            ['In market (margin)', fmtMoney(totUsed.toFixed(2)), totUsed > 0],
+            ['Available to withdraw', fmtMoney(totFree.toFixed(2)), false],
+            ['Floating P/L', `${totFloat >= 0 ? '+' : ''}${totFloat.toFixed(2)}`, totFloat !== 0],
+            ['Margin level', liveAcc?.marginLevel ? `${Number(liveAcc.marginLevel).toFixed(0)}%` : '—', false],
             ['Deposits', fmtMoney(u.stats.depositsApproved), false],
             ['Withdrawals', fmtMoney(u.stats.withdrawalsApproved), false],
             ['Pending payments', String(u.stats.pendingPayments), u.stats.pendingPayments > 0],
             ['Open tickets', String(u.stats.openTickets), u.stats.openTickets > 0],
           ] as [string, string, boolean][]
-        ).map(([label, value, hot]) => (
+          ); })().map(([label, value, hot]) => (
           <div key={label} className="rounded-xl border border-white/5 bg-white/[0.02] px-4 py-3">
             <div className="text-[11px] uppercase tracking-wider text-ink-500">{label}</div>
             <div className={cn('mt-1 text-lg font-semibold tabular', hot ? 'text-brand-300' : 'text-white')}>{value}</div>
