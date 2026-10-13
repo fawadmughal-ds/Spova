@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 import { Logo, Wordmark } from '@/components/logo';
 import { AnimatedNumber } from '@/components/motion';
 import { fmtNum, type SymbolSpec } from './format';
-import { useFloatingTotal } from './pnl';
+import { useFloatingTotal, useLiveAccount } from './pnl';
 import { Dropdown, ToggleRow } from './bits';
 import { PROFIT_FIGURES, settingsStore, toggleProfitFigure, useProfitFigures, useSettings, type ProfitFigure } from './settings';
 import { useT, type StringKey } from './i18n';
@@ -116,6 +116,7 @@ function FigureValue({ value, suffix, className }: { value: number | null; suffi
 function ProfitBlock({ account, positions, symbols, compact }: { account: AccountDto | undefined; positions: PositionDto[]; symbols: Map<string, SymbolSpec>; compact?: boolean }) {
   const t = useT();
   const total = useFloatingTotal(positions, symbols);
+  const live = useLiveAccount(account, positions, symbols);
   const { shown } = useProfitFigures();
   const tone = total === null ? '' : total > 0 ? 't-pnl-up' : total < 0 ? 't-pnl-down' : 'text-white';
   const pinned = PROFIT_FIGURES.filter((f) => shown.includes(f.key));
@@ -130,7 +131,7 @@ function ProfitBlock({ account, positions, symbols, compact }: { account: Accoun
       </span>
       {!compact &&
         pinned.map((f) => {
-          const v = figureValue(account, f.key);
+          const v = figureValue(live, f.key);
           return (
             <span key={f.key} className="flex flex-col items-start border-l border-[var(--t-raised-2)] pl-3 leading-none">
               <span className="text-[11px] font-medium text-[var(--t-muted)]">{f.label}</span>
@@ -149,7 +150,7 @@ function ProfitBlock({ account, positions, symbols, compact }: { account: Accoun
           <div className="w-60 py-2">
             {account ? (
               PROFIT_FIGURES.map((f) => {
-                const v = figureValue(account, f.key);
+                const v = figureValue(live, f.key);
                 const on = shown.includes(f.key);
                 return (
                   <label key={f.key} className="flex h-12 cursor-pointer items-center gap-3 px-4 text-[13px] hover:bg-white/[0.04]">

@@ -51,8 +51,7 @@ export class AuthService {
           riskAcceptedAt: now,
           lastLoginAt: now,
           lastLoginIp: meta.ip,
-          // every client gets 15 days to upload the four document groups (see KycDeadlineService)
-          kycDeadlineAt: new Date(now.getTime() + 15 * 86_400_000),
+          // sign-up opens a DEMO account; the 15-day document window starts when the client opens a LIVE account
           profile: {
             create: {
               firstName: input.firstName,
@@ -65,9 +64,9 @@ export class AuthService {
         },
         include: { profile: true },
       });
-      // sign-up opens a LIVE account straight away (the reference broker does the same); demo accounts are optional extras
-      const live = await this.accounts.createInTx(tx, user.id, 'live');
-      return { user, demo: live };
+      // sign-up opens a DEMO account (reference flow); the client opens a live account later with a 15-day KYC window
+      const demo = await this.accounts.createInTx(tx, user.id, 'demo');
+      return { user, demo };
     });
 
     void this.mail.welcome(user.email, input.firstName, demo.loginCode).catch((e) => this.log.warn(e.message));

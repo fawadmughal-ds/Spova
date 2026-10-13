@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Search } from 'lucide-react';
 import type { AdminUserRowDto, Paginated } from '@spova/shared';
 import { get } from '@/lib/api';
-import { fmtDate, fmtMoney } from '@/lib/utils';
+import { fmtAgo, fmtDate, fmtMoney } from '@/lib/utils';
 import { PageHeader } from '@/components/app-shell';
 import { Badge, Button, Card, Empty, Input, Select, Spinner } from '@/components/ui';
 
@@ -82,7 +82,7 @@ export default function ClientsPage() {
                           <span
                             className="inline-block h-2 w-2 shrink-0 rounded-full"
                             style={{ background: u.online ? '#22c55e' : '#52607a', boxShadow: u.online ? '0 0 0 3px rgba(34,197,94,0.18)' : 'none' }}
-                            title={u.online ? 'Online now' : u.lastSeenAt ? `Last seen ${fmtDate(u.lastSeenAt)}` : 'Offline'}
+                            title={u.online ? 'Online now' : u.lastSeenAt ? `Last seen ${fmtAgo(u.lastSeenAt)}` : 'Offline'}
                           />
                           <span className="font-medium text-white">{u.firstName || u.lastName ? `${u.firstName ?? ''} ${u.lastName ?? ''}` : '—'}</span>
                         </div>

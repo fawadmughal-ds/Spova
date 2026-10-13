@@ -67,17 +67,17 @@ export class AccountsService {
       const platform = await this.settings.getCached<PlatformSettings>('platform', DEFAULT_PLATFORM_SETTINGS);
       if (!platform.liveAccountsOpen) throw ApiError.forbidden('live_accounts_closed', 'Live account opening is paused at the moment');
     }
-    if (type === 'live' && env.KYC_REQUIRED_FOR_LIVE) {
-      const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
-      if (!user.kycPoi || !user.kycPor) {
-        throw ApiError.forbidden('kyc_required', 'Complete identity and address verification before opening a live account');
-      }
-    }
     const count = await this.prisma.tradingAccount.count({ where: { userId, type } });
     if (type === 'demo' && count >= 3) throw ApiError.conflict('demo_limit', 'Maximum 3 demo accounts');
     if (type === 'live' && count >= 1) throw ApiError.conflict('live_limit', 'You already have a live account');
 
-    return this.prisma.$transaction((tx) => this.createInTx(tx, userId, type));
+    const account = await this.prisma.$transaction((tx) => this.createInTx(tx, userId, type));
+    // opening a live account starts the 15-day window to upload documents (trading pauses after that if missing)
+    if (type === 'live') {
+      const u = await this.prisma.user.findUnique({ where: { id: userId }, select: { kycDeadlineAt: true } });
+      if (!u?.kycDeadlineAt) await this.prisma.user.update({ where: { id: userId }, data: { kycDeadlineAt: new Date(Date.now() + 15 * 86_400_000), kycReminderSentAt: null } });
+    }
+    return account;
   }
 
   listForUser(userId: string) {

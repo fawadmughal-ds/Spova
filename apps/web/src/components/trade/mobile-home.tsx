@@ -8,14 +8,15 @@ import { Logo } from '@/components/logo';
 import { AnimatedNumber } from '@/components/motion';
 import { Dropdown } from './bits';
 import { fmtNum, type SymbolSpec } from './format';
-import { useFloatingTotal } from './pnl';
+import { useFloatingTotal, useLiveAccount } from './pnl';
 import { useT } from './i18n';
 
 /**
  * Phone layout pieces of the terminal "Trade" tab (reference: the MatchTrader mobile client area):
  * white header with the account pill, equity and a deposit button; a promo banner; the Profit / Equity strip.
  */
-export function MobileHeader({ accounts, account, onSelectAccount, onDeposit, onMenu, bell, className }: { accounts: AccountDto[]; account: AccountDto | undefined; onSelectAccount: (id: string) => void; onDeposit: () => void; onMenu: () => void; bell?: ReactNode; className?: string }) {
+export function MobileHeader({ accounts, account, positions, symbols, onSelectAccount, onDeposit, onMenu, bell, className }: { accounts: AccountDto[]; account: AccountDto | undefined; positions: PositionDto[]; symbols: Map<string, SymbolSpec>; onSelectAccount: (id: string) => void; onDeposit: () => void; onMenu: () => void; bell?: ReactNode; className?: string }) {
+  const liveHeader = useLiveAccount(account, positions, symbols);
   const t = useT();
   return (
     <header className={cn('light-scope flex h-[64px] shrink-0 items-center gap-3 bg-paper px-4 text-white shadow-[0_1px_0_#e3e8ef]', className)}>
@@ -56,7 +57,7 @@ export function MobileHeader({ accounts, account, onSelectAccount, onDeposit, on
         )}
       </Dropdown>
       <div className="min-w-0 flex-1 text-center leading-tight">
-        <div className="truncate text-[20px] font-bold tracking-tight text-white">{account ? `$${fmtNum(account.equity)}` : '—'}</div>
+        <div className="truncate text-[20px] font-bold tracking-tight text-white">{liveHeader ? `$${fmtNum(liveHeader.equity)}` : '—'}</div>
         <div className="text-[13px] text-ink-400">Equity</div>
       </div>
       <button type="button" onClick={onDeposit} aria-label={t('deposit')} className="flex h-10 w-10 items-center justify-center text-up">
@@ -93,6 +94,7 @@ export function DepositBanner({ onClick, className }: { onClick: () => void; cla
 export function MobileStats({ account, positions, symbols, onSearch, className }: { account: AccountDto | undefined; positions: PositionDto[]; symbols: Map<string, SymbolSpec>; onSearch?: () => void; className?: string }) {
   const t = useT();
   const total = useFloatingTotal(positions, symbols);
+  const live = useLiveAccount(account, positions, symbols);
   const [open, setOpen] = useState(false);
   const cur = account?.currency ?? 'USD';
   const tone = total === null ? 'text-[var(--t-text)]' : total > 0 ? 't-pnl-up' : total < 0 ? 't-pnl-down' : 'text-[var(--t-text)]';
@@ -110,7 +112,7 @@ export function MobileStats({ account, positions, symbols, onSearch, className }
           <span className="ml-1 text-[11px] font-medium text-[var(--t-muted)]">{cur}</span>
         </Cell>
         <Cell label="Equity">
-          <span className="t-pnl-up">{account ? fmtNum(account.equity) : '—'}</span>
+          <span className="t-pnl-up">{live ? fmtNum(live.equity) : '—'}</span>
           <span className="ml-1 text-[11px] font-medium text-[var(--t-muted)]">{cur}</span>
         </Cell>
         <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} aria-label="More figures" className="flex h-12 w-12 shrink-0 items-center justify-center text-[var(--t-text-2)]">
@@ -132,8 +134,8 @@ export function MobileStats({ account, positions, symbols, onSearch, className }
               ['Balance', fmtNum(account.balance)],
               ...(Number(account.credit) > 0 ? [['Credit', fmtNum(account.credit)]] : []),
               ['Used margin', fmtNum(account.usedMargin)],
-              ['Free margin', fmtNum(account.freeMargin)],
-              ['Margin level', account.marginLevel === null || account.marginLevel === undefined ? '—' : `${fmtNum(account.marginLevel)}%`],
+              ['Free margin', fmtNum((live ?? account).freeMargin)],
+              ['Margin level', (live ?? account).marginLevel === null || (live ?? account).marginLevel === undefined ? '—' : `${fmtNum((live ?? account).marginLevel)}%`],
               ['Leverage', `1:${account.leverage}`],
             ] as [string, string][]
           ).map(([k, v]) => (

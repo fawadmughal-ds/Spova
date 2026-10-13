@@ -113,7 +113,7 @@ function AccountPill({ accounts, account, onSelect, onOpenAccounts }: { accounts
     <div ref={ref} className="relative">
       <button type="button" onClick={() => setOpen((v) => !v)} aria-haspopup="menu" aria-expanded={open} title="Switch account" className="trail-pill">
         {account ? (
-          <span className="rounded px-1.5 py-px text-[10px] font-bold uppercase leading-4 tracking-wide" style={account.type === 'live' ? { background: 'rgba(255,255,255,0.22)', color: '#fff' } : { background: 'rgba(34,197,94,0.25)', color: '#dcffe6' }}>
+          <span className="text-[11px] font-bold uppercase leading-4 tracking-wide text-white">
             {account.type}
           </span>
         ) : (

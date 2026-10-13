@@ -6,7 +6,7 @@ import { Lock, Unlock, Mail } from 'lucide-react';
 import type { AccountDto, AdminUserDetailDto } from '@spova/shared';
 import { get, patch, post, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
-import { cn, fmtDate, fmtMoney } from '@/lib/utils';
+import { cn, fmtAgo, fmtDate, fmtMoney } from '@/lib/utils';
 import { PageHeader } from '@/components/app-shell';
 import { LedgerTable } from '@/components/ledger-table';
 import { useToast } from '@/components/toast';
@@ -82,6 +82,11 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
         sub={
           <span className="flex flex-wrap items-center gap-2">
             <span>{u.email}</span>
+            {u.online ? (
+              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-400"><span className="inline-block h-2 w-2 rounded-full bg-emerald-400" style={{ boxShadow: '0 0 0 3px rgba(16,185,129,0.18)' }} /> Online</span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 text-xs text-ink-400"><span className="inline-block h-2 w-2 rounded-full bg-[#52607a]" /> last seen {fmtAgo(u.lastSeenAt)}</span>
+            )}
             <Badge tone={statusTone[u.status]}>{u.status}</Badge>
             <Badge tone={u.kyc.poi ? 'success' : 'neutral'}>POI</Badge>
             <Badge tone={u.kyc.por ? 'success' : 'neutral'}>POR</Badge>

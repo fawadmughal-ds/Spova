@@ -1,6 +1,7 @@
 'use client';
 
-import { floatingPnl, quoteCurrency, toUsd, type PositionDto } from '@spova/shared';
+import { useMemo } from 'react';
+import { dec, floatingPnl, quoteCurrency, toUsd, type AccountDto, type PositionDto } from '@spova/shared';
 import type { SymbolSpec } from './format';
 import { quoteStore, useBookVersion, type LiveQuote } from './quote-store';
 
@@ -40,3 +41,19 @@ export const conversionPairs = (spec: SymbolSpec | undefined): [string | null, s
   const ccy = quoteCurrency(spec.id, spec.assetClass);
   return ccy === 'USD' ? [null, null] : [`${ccy}USD`, `USD${ccy}`];
 };
+
+/**
+ * Account with equity / free margin / margin level recomputed LIVE from the floating P/L, so they track
+ * price ticks instead of waiting for the next server snapshot (fixes "equity stuck while profit moves").
+ */
+export function useLiveAccount(account: AccountDto | undefined, positions: PositionDto[], symbols: Map<string, SymbolSpec>): AccountDto | undefined {
+  const total = useFloatingTotal(positions, symbols);
+  return useMemo(() => {
+    if (!account || total === null) return account;
+    const equity = dec(account.balance).plus(account.credit || 0).plus(total);
+    const used = dec(account.usedMargin || 0);
+    const freeMargin = equity.minus(used);
+    const marginLevel = used.gt(0) ? equity.div(used).times(100) : null;
+    return { ...account, equity: equity.toFixed(2), freeMargin: freeMargin.toFixed(2), marginLevel: marginLevel ? marginLevel.toFixed(2) : account.marginLevel };
+  }, [account, total]);
+}

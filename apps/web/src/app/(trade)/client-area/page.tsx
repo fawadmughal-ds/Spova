@@ -435,7 +435,7 @@ function Terminal() {
       <div className="hidden lg:block">
         <TopBar accounts={all} account={account} onSelectAccount={selectAccount} connected={connected} view={view} onView={setView} onDashboard={() => setPanel('dashboard')} positions={openPositions} symbols={symbolMap} notices={notices} email={me?.email} onLogout={() => void logout()} />
       </div>
-      <MobileHeader className="lg:hidden" accounts={all} account={account} onSelectAccount={selectAccount} onDeposit={() => setPanel('deposit')} onMenu={() => setMtab('more')} bell={<BellMenu notices={notices} />} />
+      <MobileHeader className="lg:hidden" accounts={all} account={account} positions={openPositions} symbols={symbolMap} onSelectAccount={selectAccount} onDeposit={() => setPanel('deposit')} onMenu={() => setMtab('more')} bell={<BellMenu notices={notices} />} />
       <PlatformStrip />
       <KycDeadlineBanner onDocuments={() => setPanel('documents')} />
       {account?.tradingBlocked && !me?.kyc.frozen && <TradingBlockedBanner />}

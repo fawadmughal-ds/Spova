@@ -50,12 +50,12 @@ describe('phase 2: kyc -> live account -> payments -> tickets', () => {
     clientId = a.me.id;
     await register(other, 'other');
     await adminLogin(admin);
-    // sign-up opens a live account; a demo account is an optional extra the client opens
+    // sign-up opens a DEMO account; opening a LIVE account starts the 15-day KYC window
     const accounts = await client.json('GET', '/me/accounts');
-    liveAccountId = accounts.data.live[0].id;
-    const demo = await client.json('POST', '/me/accounts', { type: 'demo' });
-    assert.ok([200, 201].includes(demo.status), JSON.stringify(demo.data));
-    demoAccountId = demo.data.id;
+    demoAccountId = accounts.data.demo[0].id;
+    const live = await client.json('POST', '/me/accounts', { type: 'live' });
+    assert.ok([200, 201].includes(live.status), JSON.stringify(live.data));
+    liveAccountId = live.data.id;
   });
 
   // ---------------------------------------------------------------- KYC
@@ -93,14 +93,14 @@ describe('phase 2: kyc -> live account -> payments -> tickets', () => {
     assert.equal((await other.raw('GET', `/me/kyc/documents/${poiDocId}/file`)).status, 404);
   });
 
-  it('sign-up opened a live account; a second one needs verification; demo accounts take no real money', async () => {
+  it('opening a live account started the 15-day window; a second live account is blocked; demo takes no real money', async () => {
     const me = await client.json('GET', '/auth/me');
-    assert.equal(typeof me.data.kyc.deadlineAt, 'string', '15-day document deadline is set');
+    assert.equal(typeof me.data.kyc.deadlineAt, 'string', '15-day document deadline is set after opening live');
     assert.ok(me.data.kyc.daysLeft >= 14 && me.data.kyc.daysLeft <= 15, `daysLeft=${me.data.kyc.daysLeft}`);
     assert.equal(me.data.kyc.frozen, false);
-    const live = await client.json('POST', '/me/accounts', { type: 'live' });
-    assert.equal(live.status, 403);
-    assert.equal(live.data.code, 'kyc_required');
+    const live2 = await client.json('POST', '/me/accounts', { type: 'live' });
+    assert.equal(live2.status, 409);
+    assert.equal(live2.data.code, 'live_limit');
     const dep = await client.json('POST', '/me/payments/deposit', { accountId: demoAccountId, amount: '500', method: 'bank' });
     assert.equal(dep.status, 422);
     assert.equal(dep.data.code, 'demo_account');
