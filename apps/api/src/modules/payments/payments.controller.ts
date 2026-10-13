@@ -15,8 +15,7 @@ import {
   type DepositChannels,
   type DepositRequestInput,
   type PaymentDecisionInput,
-  type WithdrawRequestInput,
-} from '@spova/shared';
+  type WithdrawRequestInput, sendDepositDetailsSchema, type SendDepositDetailsInput } from '@spova/shared';
 import { PaymentsService } from './payments.service';
 import { StripeService } from './stripe.service';
 import { ClientIp, CurrentUser, Public, Roles } from '../../common/auth/decorators';
@@ -140,5 +139,10 @@ export class PaymentsAdminController {
   @Patch(':id')
   decide(@CurrentUser() actor: AuthUser, @ClientIp() ip: string, @Param('id') id: string, @Body(new ZodPipe(paymentDecisionSchema)) body: PaymentDecisionInput) {
     return this.payments.decide({ id: actor.id, ip }, id, body);
+  }
+
+  @Post(':id/send-details')
+  sendDetails(@CurrentUser() actor: AuthUser, @ClientIp() ip: string, @Param('id') id: string, @Body(new ZodPipe(sendDepositDetailsSchema)) body: SendDepositDetailsInput) {
+    return this.payments.sendDepositDetails({ id: actor.id, ip }, id, body);
   }
 }

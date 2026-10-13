@@ -107,9 +107,26 @@ export interface AccountMath {
 }
 
 /** equity = balance + credit + sum(floating); used = sum(margin_used); level = equity / used x 100 */
-export function accountMath(balance: Decimal.Value, credit: Decimal.Value, positions: { marginUsed: Decimal.Value; floatingUsd: Decimal }[]): AccountMath {
+/**
+ * Hedged used margin (MT4-style): opposite positions on the same symbol offset, so per symbol the required
+ * margin is the LARGER of the total buy-side vs total sell-side margin, not the sum of both.
+ */
+export function hedgedUsedMargin(positions: { symbol: string; side: 'buy' | 'sell'; marginUsed: Decimal.Value }[]): Decimal {
+  const bySymbol = new Map<string, { buy: Decimal; sell: Decimal }>();
+  for (const p of positions) {
+    const e = bySymbol.get(p.symbol) ?? { buy: dec(0), sell: dec(0) };
+    if (p.side === 'buy') e.buy = e.buy.plus(p.marginUsed);
+    else e.sell = e.sell.plus(p.marginUsed);
+    bySymbol.set(p.symbol, e);
+  }
+  let used = dec(0);
+  for (const e of bySymbol.values()) used = used.plus(Decimal.max(e.buy, e.sell));
+  return used;
+}
+
+export function accountMath(balance: Decimal.Value, credit: Decimal.Value, positions: { symbol: string; side: 'buy' | 'sell'; marginUsed: Decimal.Value; floatingUsd: Decimal }[]): AccountMath {
   const floating = positions.reduce((a, p) => a.plus(p.floatingUsd), dec(0));
-  const usedMargin = positions.reduce((a, p) => a.plus(p.marginUsed), dec(0));
+  const usedMargin = hedgedUsedMargin(positions);
   const equity = dec(balance).plus(credit).plus(floating);
   return { equity, usedMargin, freeMargin: equity.minus(usedMargin), marginLevel: usedMargin.gt(0) ? equity.div(usedMargin).times(100) : null };
 }

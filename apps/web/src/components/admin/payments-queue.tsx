@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { ArrowDownToLine, ArrowUpFromLine, Landmark, Paperclip } from 'lucide-react';
 import { PAYMENT_METHODS, WS_EVENTS, paymentDecisionSchema, type AdminPaymentRowDto, type Paginated, type PaymentKind, type PaymentRequestDto, type PaymentStatus } from '@spova/shared';
-import { fileUrl, get, patch, ApiError } from '@/lib/api';
+import { fileUrl, get, patch, post, ApiError } from '@/lib/api';
 import { useUserEvent } from '@/lib/ws';
 import { cn, fmtMoney } from '@/lib/utils';
 import { AnimatedNumber } from '@/components/motion';
@@ -45,6 +45,7 @@ export function PaymentsQueue({ userId, compact, onChanged }: { userId?: string;
   const items = q.data?.items ?? [];
 
   const [confirm, setConfirm] = useState<{ id: string; status: Decision } | null>(null);
+  const [sendFor, setSendFor] = useState<AdminPaymentRowDto | null>(null);
   const [note, setNote] = useState('');
   const [noteErr, setNoteErr] = useState<string | undefined>();
   const [err, setErr] = useState<string | null>(null);
@@ -181,6 +182,7 @@ export function PaymentsQueue({ userId, compact, onChanged }: { userId?: string;
   };
 
   return (
+    <>
     <Card className={cn(compact && 'p-4')}>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 max-w-full flex-wrap items-center gap-3">
@@ -332,6 +334,11 @@ export function PaymentsQueue({ userId, compact, onChanged }: { userId?: string;
                       <td className="whitespace-nowrap py-2.5 pr-2 text-right">
                         {p.status === 'pending' && (
                           <div className="flex justify-end gap-1.5">
+                            {p.kind === 'deposit' && (p.method === 'rtgs' || p.method === 'bank') && (
+                              <Button size="sm" variant="ghost" disabled={busy} onClick={() => setSendFor(p)} className="text-brand-300 hover:bg-brand-400/10">
+                                Send details
+                              </Button>
+                            )}
                             <Button size="sm" variant="secondary" disabled={busy} onClick={() => openConfirm(p.id, 'approved')} className={cn(active && confirm?.status === 'approved' && 'ring-brand-400/60')}>
                               Approve
                             </Button>
@@ -359,6 +366,49 @@ export function PaymentsQueue({ userId, compact, onChanged }: { userId?: string;
       {activeRow && <div className="mt-3 lg:hidden">{renderConfirm(activeRow)}</div>}
       {q.data && <Pager page={q.page} pages={q.pages} total={q.data.total} noun="requests" onPage={q.setPage} />}
     </Card>
+    {sendFor && <SendDetailsModal row={sendFor} onClose={() => setSendFor(null)} onSent={() => { setSendFor(null); toast({ title: 'Bank details sent', body: 'The client has been emailed the pay-to details.', level: 'success' }); }} />}
+    </>
+  );
+}
+
+/** Admin form to email RTGS/bank pay-to details for a specific pending deposit request. */
+function SendDetailsModal({ row, onClose, onSent }: { row: AdminPaymentRowDto; onClose: () => void; onSent: () => void }) {
+  const toast = useToast();
+  const [f, setF] = useState({ bankName: '', accountName: '', accountNumber: '', ifsc: '', note: '' });
+  const [busy, setBusy] = useState(false);
+  const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setF((p) => ({ ...p, [k]: e.target.value }));
+  const valid = f.bankName.trim() && f.accountName.trim() && f.accountNumber.trim();
+  const send = async () => {
+    if (!valid) return;
+    setBusy(true);
+    try {
+      await post(`/admin/payments/${row.id}/send-details`, { bankName: f.bankName.trim(), accountName: f.accountName.trim(), accountNumber: f.accountNumber.trim(), ifsc: f.ifsc.trim() || undefined, note: f.note.trim() || undefined });
+      onSent();
+    } catch {
+      toast({ title: 'Could not send the details', level: 'danger' });
+    } finally {
+      setBusy(false);
+    }
+  };
+  const fld = 'w-full rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white placeholder:text-ink-500 focus:border-brand-400 focus:outline-none';
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
+      <div className="w-full max-w-md rounded-2xl border border-white/10 bg-ink-950 p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="mb-1 text-[11px] uppercase tracking-wider text-ink-500">Send bank details · {fmtMoney(row.amount)} {row.currency}</div>
+        <h3 className="mb-4 text-base font-semibold text-white">{row.user.email}</h3>
+        <div className="grid gap-3">
+          <input className={fld} placeholder="Bank name" value={f.bankName} onChange={set('bankName')} />
+          <input className={fld} placeholder="Account holder name" value={f.accountName} onChange={set('accountName')} />
+          <input className={fld} placeholder="Account number" value={f.accountNumber} onChange={set('accountNumber')} />
+          <input className={fld} placeholder="IFSC / SWIFT (optional)" value={f.ifsc} onChange={set('ifsc')} />
+          <textarea className={fld} rows={2} placeholder="Note (optional)" value={f.note} onChange={set('note')} />
+        </div>
+        <div className="mt-5 flex justify-end gap-2">
+          <Button size="sm" variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button size="sm" loading={busy} disabled={!valid} onClick={() => void send()}>Send email</Button>
+        </div>
+      </div>
+    </div>
   );
 }
 

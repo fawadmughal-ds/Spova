@@ -20,8 +20,7 @@ import {
   type PaymentMethodDto,
   type PaymentRequestDto,
   type WithdrawRequestInput,
-  type WsPaymentStatus,
-} from '@spova/shared';
+  type WsPaymentStatus, type SendDepositDetailsInput } from '@spova/shared';
 import { PrismaService } from '../../infra/prisma.service';
 import { MailService } from '../../infra/mail.service';
 import { ActivityService } from '../../infra/activity.service';
@@ -170,11 +169,7 @@ export class PaymentsService {
     });
     this.afterNew(row, user.email);
     void this.activity.record({ userId, kind: 'deposit_request', title: 'Requested a deposit', detail: `${money(row.amount)} ${row.currency} via ${method.label}`, meta: { amount: money(row.amount), method: input.method, loginCode: row.account.loginCode } });
-    // bank / RTGS: finance confirms and emails the pay-to details, so send them now
-    if (input.method === 'rtgs' && user.profile?.notifEmail) {
-      const ch = depositChannelPublic(input.method, cfg, env.BRAND_NAME);
-      if (ch) void this.mail.depositInstructions(user.email, method.label, money(row.amount), row.currency, row.account.loginCode, ch).catch((e) => this.log.warn(e.message));
-    }
+    // RTGS: the pay-to details are NOT auto-sent; an admin reviews the request and sends the bank details manually
     return paymentToDto(row);
   }
 
@@ -411,6 +406,22 @@ export class PaymentsService {
     if (user?.profile?.notifEmail) void this.mail.paymentResult(user.email, row.kind, money(row.amount), input.status, input.note).catch((e) => this.log.warn(e.message));
     return paymentToDto(row);
   }
+  /** Admin-sent RTGS/bank pay-to details for a specific pending deposit request. */
+  async sendDepositDetails(actor: Actor, id: string, input: SendDepositDetailsInput) {
+    const req = await this.prisma.paymentRequest.findUnique({ where: { id }, include: { user: { select: { email: true } }, account: { select: { loginCode: true } } } });
+    if (!req) throw ApiError.notFound('payment_not_found', 'Request not found');
+    if (req.kind !== 'deposit') throw ApiError.badRequest('not_a_deposit', 'Bank details apply to deposit requests only');
+    const fields = [
+      { label: 'Bank name', value: input.bankName },
+      { label: 'Account name', value: input.accountName },
+      { label: 'Account number', value: input.accountNumber },
+      ...(input.ifsc ? [{ label: 'IFSC / SWIFT', value: input.ifsc }] : []),
+    ];
+    await this.mail.depositInstructions(req.user.email, 'RTGS', money(req.amount), req.currency, req.account.loginCode, { title: 'Bank transfer details', fields, note: input.note });
+    await this.prisma.adminAudit.create({ data: { actorId: actor.id, action: 'payment.send_details', targetType: 'payment_request', targetId: id, after: { bankName: input.bankName, accountNumber: input.accountNumber }, ip: actor.ip } });
+    return { sent: true };
+  }
+
 }
 
 const Decimal_min = (a: ReturnType<typeof D>, b: ReturnType<typeof D>) => (a.lt(b) ? a : b);

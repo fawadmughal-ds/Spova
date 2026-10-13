@@ -6,7 +6,7 @@ import {
   GitFork, Magnet, Trash2, Search, X, LineChart as LineIcon, CandlestickChart,
   BarChart3, AreaChart, ZoomIn, ZoomOut, Maximize2, Minimize2, FunctionSquare, ChevronDown,
 } from 'lucide-react';
-import { TF_NAME, TIMEFRAMES, WS_EVENTS, bucketStart, type CandleDto, type Timeframe, type WsCandle } from '@spova/shared';
+import { TF_NAME, TIMEFRAMES, WS_EVENTS, bucketStart, type CandleDto, type PositionDto, type Timeframe, type WsCandle } from '@spova/shared';
 import { get } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { Spinner } from '@/components/ui';
@@ -105,13 +105,14 @@ function stylesFor(dark: boolean) {
   };
 }
 
-export function KLineChart({ spec, className, footer }: { spec: SymbolSpec; className?: string; footer?: ReactNode }) {
+export function KLineChart({ spec, positions, className, footer }: { spec: SymbolSpec; positions?: PositionDto[]; className?: string; footer?: ReactNode }) {
   const { theme } = useSettings();
   const dark = theme !== 'light';
   const holder = useRef<HTMLDivElement>(null);
   const chartRef = useRef<KChart | null>(null);
   const kcRef = useRef<typeof import('klinecharts') | null>(null);
   const barsRef = useRef<KBar[]>([]);
+  const posOverlays = useRef<string[]>([]);
   const { socket } = useSocket();
 
   const [tf, setTf] = useState<Timeframe>('h1');
@@ -213,6 +214,24 @@ export function KLineChart({ spec, className, footer }: { spec: SymbolSpec; clas
       socket.off(WS_EVENTS.CANDLE, onCandle);
     };
   }, [socket, spec.id, tf]);
+
+  // open-position entry lines (+ TP/SL) for this symbol, drawn as locked horizontal lines on the chart
+  const mine = (positions ?? []).filter((p) => p.symbol === spec.id);
+  const mineKey = mine.map((p) => `${p.id}:${p.openPrice}:${p.sl ?? ''}:${p.tp ?? ''}`).join('|');
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    for (const id of posOverlays.current) chart.removeOverlay(id);
+    posOverlays.current = [];
+    for (const p of mine) {
+      const color = p.side === 'buy' ? '#16c784' : '#ea3943';
+      const entry = chart.createOverlay({ name: 'priceLine', id: `pos-${p.id}`, points: [{ value: Number(p.openPrice) }], lock: true, styles: { line: { color, style: 'solid', size: 1 }, text: { color } } } as unknown as string);
+      if (typeof entry === 'string') posOverlays.current.push(entry);
+      if (p.tp) { const o = chart.createOverlay({ name: 'priceLine', id: `tp-${p.id}`, points: [{ value: Number(p.tp) }], lock: true, styles: { line: { color: '#16c784', style: 'dashed', size: 1 }, text: { color: '#16c784' } } } as unknown as string); if (typeof o === 'string') posOverlays.current.push(o); }
+      if (p.sl) { const o = chart.createOverlay({ name: 'priceLine', id: `sl-${p.id}`, points: [{ value: Number(p.sl) }], lock: true, styles: { line: { color: '#ea3943', style: 'dashed', size: 1 }, text: { color: '#ea3943' } } } as unknown as string); if (typeof o === 'string') posOverlays.current.push(o); }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [spec.id, mineKey, loading]);
 
   const pickTool = (t: (typeof TOOLS)[number]) => {
     setTool(t.key);

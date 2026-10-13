@@ -2,7 +2,7 @@
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { Building2, Calendar, ChartColumn, Check, ChevronDown, Flame, Info, LayoutGrid, Minus, Moon, Plus, Search, Star, X } from 'lucide-react';
-import { dec, effectiveLeverage, notional, quoteCurrency, requiredMarginUsd, toUsd, validateLots, type AccountDto, type CandleDto, type OrderSide, type PlaceOrderResult } from '@spova/shared';
+import { dec, effectiveLeverage, notional, quoteCurrency, requiredMarginUsd, toUsd, validateLots, type AccountDto, type CandleDto, type OrderSide, type PlaceOrderResult, type PositionDto } from '@spova/shared';
 import { get, post } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { marketByCls, MARKET_LIST } from '@/lib/markets';
@@ -10,6 +10,7 @@ import { useToast } from '@/components/toast';
 import { Skeleton, Spinner } from '@/components/ui';
 import { dailyChange, fmtCountdown, fmtLots, fmtNum, fmtPrice, spreadPoints, type SymbolSpec } from './format';
 import { quoteStore, useBookVersion, useQuote } from './quote-store';
+import { livePnl } from './pnl';
 import { EmptyState, SplitBar, SymbolTile } from './bits';
 import { useSentiment } from './explore-view';
 import { useT } from './i18n';
@@ -179,7 +180,7 @@ export function QuickTrade({ spec, account, onPlaced, onAdvanced }: { spec: Symb
   );
 }
 
-const Row = memo(function Row({ s, selected, onSelect, sessions, children }: { s: SymbolSpec; selected: boolean; onSelect: (id: string) => void; sessions: SessionRow[] | undefined; children?: ReactNode }) {
+const Row = memo(function Row({ s, selected, onSelect, sessions, pnl, children }: { s: SymbolSpec; selected: boolean; onSelect: (id: string) => void; sessions: SessionRow[] | undefined; pnl?: number | null; children?: ReactNode }) {
   const q = useQuote(s.id);
   const hasPrice = !!q && !!q.bid && !!q.ask;
   const closed = q?.open === false || (q?.open === undefined && !s.isOpen);
@@ -194,6 +195,11 @@ const Row = memo(function Row({ s, selected, onSelect, sessions, children }: { s
         <span className="min-w-0 leading-tight">
           <span className="flex items-center gap-1.5">
             <span className="truncate text-[14px] font-semibold text-white">{s.id}</span>
+            {pnl !== null && pnl !== undefined ? (
+              <span className={cn('shrink-0 rounded px-1 py-px text-[10px] font-bold tabular', pnl >= 0 ? 'bg-[rgb(22_199_132_/_0.16)] text-[var(--t-up)]' : 'bg-[rgb(234_57_67_/_0.16)] text-[var(--t-down)]')}>
+                {pnl >= 0 ? '+' : '-'}{Math.abs(pnl) >= 1000 ? (Math.abs(pnl) / 1000).toFixed(1).replace(/\.0$/, '') + 'k' : Math.abs(pnl).toFixed(2)}
+              </span>
+            ) : null}
           </span>
           {closed ? (
             <span className="flex items-center gap-1 text-[11px] text-[var(--t-muted)]">
@@ -226,10 +232,23 @@ export interface MarketPanelProps {
   className?: string;
   /** mobile: hide the quick-trade block (the chart tab pins its own strip) */
   quickTrade?: boolean;
+  /** open positions to show a floating-P/L badge on their symbol row */
+  positions?: PositionDto[];
 }
 
 /** Favorites / Top Movers / search list with the expanded one-click row. */
-export function MarketPanel({ symbols, selected, onSelect, account, onPlaced, onAdvanced, sessions, className, quickTrade = true }: MarketPanelProps) {
+export function MarketPanel({ symbols, selected, onSelect, account, onPlaced, onAdvanced, sessions, className, quickTrade = true, positions }: MarketPanelProps) {
+  const pnlBook = useBookVersion();
+  const specById = useMemo(() => new Map((symbols ?? []).map((x) => [x.id, x])), [symbols]);
+  const pnlBySymbol = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const pos of positions ?? []) {
+      const r = livePnl(pos, specById.get(pos.symbol), quoteStore.get(pos.symbol));
+      if (r.pnl !== null) m.set(pos.symbol, (m.get(pos.symbol) ?? 0) + r.pnl);
+    }
+    return m;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [positions, specById, pnlBook]);
   const [tab, setTab] = useState<ListTab>('fav');
   const [query, setQuery] = useState('');
   const [catOpen, setCatOpen] = useState<Set<string>>(() => new Set(['forex', 'crypto']));
@@ -334,7 +353,7 @@ export function MarketPanel({ symbols, selected, onSelect, account, onPlaced, on
                   {open && (
                     <ul>
                       {g.items.map((s) => (
-                        <Row key={s.id} s={s} selected={s.id === selected} onSelect={pick} sessions={sessions.get(s.id)} />
+                        <Row key={s.id} s={s} selected={s.id === selected} onSelect={pick} sessions={sessions.get(s.id)} pnl={pnlBySymbol.get(s.id) ?? null} />
                       ))}
                     </ul>
                   )}
@@ -347,7 +366,7 @@ export function MarketPanel({ symbols, selected, onSelect, account, onPlaced, on
             {symbols && list.length === 0 && (tab === 'fav' ? <EmptyState icon={<Star />} title="No favourites yet">Open the search tab and star the instruments you trade most.</EmptyState> : <EmptyState title="Waiting for daily data" />)}
             <ul>
               {list.map((s) => (
-                <Row key={s.id} s={s} selected={s.id === selected} onSelect={pick} sessions={sessions.get(s.id)}>
+                <Row key={s.id} s={s} selected={s.id === selected} onSelect={pick} sessions={sessions.get(s.id)} pnl={pnlBySymbol.get(s.id) ?? null}>
                   {quickTrade && (
                     <div className="hidden lg:block">
                       <QuickTrade spec={s} account={account} onPlaced={onPlaced} onAdvanced={(side, lots) => onAdvanced(s, side, lots)} />

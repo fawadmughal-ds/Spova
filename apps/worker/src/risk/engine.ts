@@ -189,7 +189,7 @@ export class RiskEngine {
       const m = accountMath(
         a.balance,
         a.credit,
-        positions.map((p) => ({ marginUsed: p.marginUsed, floatingUsd: this.floating.get(p.id) ?? dec(0) })),
+        positions.map((p) => ({ symbol: p.symbol, side: p.side as 'buy' | 'sell', marginUsed: p.marginUsed, floatingUsd: this.floating.get(p.id) ?? dec(0) })),
       );
       const snap: WsAccountSnapshot = {
         accountId: id,

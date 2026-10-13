@@ -108,7 +108,7 @@ export class AccountsService {
         const raw = floatingPnl({ side: p.side, openPrice: p.openPrice.toString(), lots: p.lots.toString(), contractSize: spec.contractSize.toString(), bid: q.bid, ask: q.ask });
         floatingUsd = toUsd(raw, quoteCurrency(spec.id, spec.assetClass), book) ?? dec(0);
       }
-      return { marginUsed: p.marginUsed.toString(), floatingUsd };
+      return { symbol: p.symbolId, side: p.side as 'buy' | 'sell', marginUsed: p.marginUsed.toString(), floatingUsd };
     });
     const m = accountMath(acc.balance.toString(), acc.credit.toString(), rows);
     return {

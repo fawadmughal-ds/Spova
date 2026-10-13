@@ -373,6 +373,15 @@ export const paymentDecisionSchema = z
   .refine((v) => v.status === 'approved' || (v.note && v.note.length >= 3), { path: ['note'], message: 'Give the client a reason for the decline' });
 export type PaymentDecisionInput = z.infer<typeof paymentDecisionSchema>;
 
+export const sendDepositDetailsSchema = z.object({
+  bankName: z.string().trim().min(1).max(120),
+  accountName: z.string().trim().min(1).max(120),
+  accountNumber: z.string().trim().min(1).max(60),
+  ifsc: z.string().trim().max(40).optional(),
+  note: z.string().trim().max(400).optional(),
+});
+export type SendDepositDetailsInput = z.infer<typeof sendDepositDetailsSchema>;
+
 export const createTicketSchema = z.object({
   subject: z.string().trim().min(3).max(120),
   message: z.string().trim().min(5).max(4000),

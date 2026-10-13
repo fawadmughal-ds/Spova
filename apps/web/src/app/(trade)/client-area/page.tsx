@@ -461,7 +461,7 @@ function Terminal() {
                   </div>
                 )}
               </div>
-              <MarketPanel symbols={symbolsError ? [] : symbols} selected={selected} onSelect={pick} account={account} onPlaced={onPlaced} onAdvanced={(s, side, lots) => setTicket({ spec: s, side, lots })} sessions={sessions} className="min-h-0 flex-1" />
+              <MarketPanel symbols={symbolsError ? [] : symbols} selected={selected} onSelect={pick} account={account} onPlaced={onPlaced} onAdvanced={(s, side, lots) => setTicket({ spec: s, side, lots })} sessions={sessions} positions={openPositions} className="min-h-0 flex-1" />
               {/* handle: swap the space between the instrument list and the info panel */}
               <div onPointerDown={onInfoDragStart} onPointerMove={onInfoDrag} onPointerUp={onInfoDragEnd} onPointerCancel={onInfoDragEnd} role="separator" aria-orientation="horizontal" aria-label="Resize the information panel" className="absolute left-1/2 z-10 hidden h-[16px] w-[52px] -translate-x-1/2 cursor-row-resize touch-none select-none items-center justify-center lg:flex" style={{ bottom: infoHeight + 1 }}>
                 <span title={settings.infoCollapsed ? 'Expand' : 'Collapse'} className="flex h-[14px] w-[38px] items-center justify-center rounded-full bg-[var(--t-raised)] text-[var(--t-muted)] hover:text-white">
@@ -480,6 +480,7 @@ function Terminal() {
                 // on mobile the chart only mounts when its tab is open, so the Trade tab stays fast and responsive
                 <KLineChart
                   spec={spec}
+                  positions={openPositions}
                   className={cn('min-h-0 flex-1', show(mtab === 'chart'), 'lg:flex')}
                   footer={
                     <div className="shrink-0 border-t border-[var(--t-line)] lg:hidden">

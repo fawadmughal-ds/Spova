@@ -5,6 +5,7 @@ import {
   type PlatformSettings,
   WS_EVENTS,
   accountMath,
+  hedgedUsedMargin,
   closePriceFor,
   dec,
   effectiveLeverage,
@@ -170,8 +171,12 @@ export class TradingService {
     if (!margin) throw ApiError.unprocessable('no_conversion', `No USD rate to value ${spec.id} right now`);
 
     const snap = await this.accounts.snapshot(acc);
-    if (dec(snap.freeMargin).lt(margin)) {
-      throw ApiError.unprocessable('insufficient_margin', 'Not enough free margin for this order', { required: money(margin), freeMargin: snap.freeMargin });
+    // hedged margin: an order that offsets existing exposure on the same symbol only needs the EXTRA margin
+    const openPos = await this.prisma.position.findMany({ where: { accountId, status: 'open' }, select: { symbolId: true, side: true, marginUsed: true } });
+    const current = openPos.map((pp) => ({ symbol: pp.symbolId, side: pp.side as 'buy' | 'sell', marginUsed: pp.marginUsed.toString() }));
+    const addMargin = hedgedUsedMargin([...current, { symbol: spec.id, side: input.side, marginUsed: margin.toString() }]).minus(hedgedUsedMargin(current));
+    if (dec(snap.freeMargin).lt(addMargin)) {
+      throw ApiError.unprocessable('insufficient_margin', 'Not enough free margin for this order', { required: money(addMargin), freeMargin: snap.freeMargin });
     }
 
     if (input.type !== 'market') {
@@ -397,7 +402,7 @@ export class TradingService {
       ]);
       if (positions.length === 0) break;
       const rows = positions.map((p) => ({ p, marginUsed: p.marginUsed.toString(), floatingUsd: dec(this.live(p, book, specs)?.floatingUsd ?? 0) }));
-      const m = accountMath(fresh.balance.toString(), fresh.credit.toString(), rows);
+      const m = accountMath(fresh.balance.toString(), fresh.credit.toString(), rows.map((r) => ({ symbol: r.p.symbolId, side: r.p.side as 'buy' | 'sell', marginUsed: r.marginUsed, floatingUsd: r.floatingUsd })));
       if (!m.marginLevel || m.marginLevel.gt(risk.stopOut)) break;
       const worst = worstPosition(rows)!;
       const q = book[worst.p.symbolId];
