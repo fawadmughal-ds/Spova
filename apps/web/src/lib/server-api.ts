@@ -2,10 +2,14 @@ import 'server-only';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
-/** Server-side fetch for public endpoints (marketing pages). Cached briefly; never throws. */
+/**
+ * Server-side fetch for public endpoints (marketing pages). Cached briefly; never throws.
+ * A short timeout keeps a slow or unreachable API from stalling static generation (the page
+ * build budget) or a page render; on timeout we fall back to the default instead of hanging.
+ */
 export async function publicGet<T>(path: string, fallback: T, revalidate = 60): Promise<T> {
   try {
-    const res = await fetch(`${API_URL}/v1${path}`, { next: { revalidate } });
+    const res = await fetch(`${API_URL}/v1${path}`, { next: { revalidate }, signal: AbortSignal.timeout(8000) });
     if (!res.ok) return fallback;
     return (await res.json()) as T;
   } catch {
