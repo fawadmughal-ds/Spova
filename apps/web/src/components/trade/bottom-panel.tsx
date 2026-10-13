@@ -2,14 +2,15 @@
 
 import { memo, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { Check, ClipboardList, Download, FileText, Filter, History, Inbox, Info, Layers, Pencil, Wallet, X } from 'lucide-react';
-import { dec, validateLots, validateSlTp, type AccountDto, type ClosePositionResult, type LedgerEntryDto, type OrderDto, type Paginated, type PositionDto } from '@spova/shared';
+import { dec, quoteCurrency, validateLots, validateSlTp, type AccountDto, type ClosePositionResult, type LedgerEntryDto, type OrderDto, type Paginated, type PositionDto } from '@spova/shared';
 import { del, get, patch, post } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/components/toast';
 import { Spinner } from '@/components/ui';
 import { useT } from './i18n';
 import { fmtDateTimeParts, fmtLots, fmtNum, fmtPrice, fmtSignedNum, type SymbolSpec } from './format';
-import { useBookVersion, useQuote, type LiveQuote } from './quote-store';
+import { quoteStore, useBookVersion, useQuote, type LiveQuote } from './quote-store';
+import { SlTpField, quoteToUsdRate } from './sltp-field';
 import { conversionPairs, livePnl } from './pnl';
 import { CountBadge, Dropdown, EmptyState, SymbolTile } from './bits';
 import { tradeError } from './errors';
@@ -76,6 +77,8 @@ function EditRow({ p, spec, q, account, data, onDone }: { p: PositionDto; spec: 
   const [err, setErr] = useState<{ title: string; body?: string } | null>(null);
   const digits = spec?.digits ?? 2;
   const ref = q && q.bid && q.ask ? (p.side === 'buy' ? q.bid : q.ask) : p.currentPrice;
+  const bookVersion = useBookVersion();
+  const qToUsd = useMemo(() => quoteToUsdRate(quoteCurrency(p.symbol, spec?.assetClass ?? 'forex'), quoteStore.book() as Record<string, { bid: string; ask: string }>), [p.symbol, spec?.assetClass, bookVersion]); // eslint-disable-line react-hooks/exhaustive-deps
   const fmtErr = (sl && !PRICE_RE.test(sl)) || (tp && !PRICE_RE.test(tp)) ? 'Enter valid prices' : null;
   const sideErr = !fmtErr && ref ? validateSlTp(p.side, ref, sl || null, tp || null) : null;
   const v = fmtErr ?? sideErr;
@@ -107,14 +110,8 @@ function EditRow({ p, spec, q, account, data, onDone }: { p: PositionDto; spec: 
           className={sub}
         >
           <span className="text-[12px] font-semibold text-white">Edit {p.symbol}</span>
-          <label className="flex items-center gap-1.5 text-[12px] text-[var(--t-muted)]">
-            <span className="font-semibold text-[var(--t-tp)]">TP</span>
-            <input value={tp} onChange={(e) => setTp(e.target.value.replace(/[^\d.]/g, ''))} placeholder="none" inputMode="decimal" className={mini} aria-label="Take profit" />
-          </label>
-          <label className="flex items-center gap-1.5 text-[12px] text-[var(--t-muted)]">
-            <span className="font-semibold text-[var(--t-sl)]">SL</span>
-            <input value={sl} onChange={(e) => setSl(e.target.value.replace(/[^\d.]/g, ''))} placeholder="none" inputMode="decimal" autoFocus className={mini} aria-label="Stop loss" />
-          </label>
+          <div className="w-44"><SlTpField kind="sl" side={p.side} refPrice={p.openPrice} digits={digits} lots={p.lots} contractSize={Number(spec?.contractSize ?? 1)} quoteToUsd={qToUsd} value={sl} onChange={setSl} label="Stop loss" error={v && v.toLowerCase().includes('stop') ? v : null} /></div>
+          <div className="w-44"><SlTpField kind="tp" side={p.side} refPrice={p.openPrice} digits={digits} lots={p.lots} contractSize={Number(spec?.contractSize ?? 1)} quoteToUsd={qToUsd} value={tp} onChange={setTp} label="Take profit" error={v && v.toLowerCase().includes('take') ? v : null} /></div>
           <span className="text-[12px] text-[var(--t-muted)]">now {fmtPrice(ref, digits)}</span>
           <button type="submit" disabled={!!v || busy || unchanged} className="t-btn t-btn-blue !h-8">
             {busy ? <Spinner className="h-3" tone="current" /> : <Check className="h-3.5 w-3.5" strokeWidth={3} />} Save

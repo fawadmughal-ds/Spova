@@ -11,6 +11,7 @@ import { Spinner } from '@/components/ui';
 import { fmtNum, fmtPrice, pipSize, spreadPoints, type SymbolSpec } from './format';
 import { quoteStore, useBookVersion, useQuote } from './quote-store';
 import { tradeError } from './errors';
+import { SlTpField, quoteToUsdRate } from '@/components/trade/sltp-field';
 
 const PRICE_RE = /^\d{1,12}(\.\d{1,6})?$/;
 const TYPES: { value: OrderType; label: string }[] = [
@@ -120,6 +121,7 @@ export function OrderTicket({ spec, account, onPlaced, onBeforePlace, className,
 
   const leverage = effectiveLeverage(account.leverage, spec.leverageMax);
   const quoteCcy = quoteCurrency(spec.id, spec.assetClass);
+  const qToUsd = useMemo(() => quoteToUsdRate(quoteCcy, quoteStore.book() as Record<string, { bid: string; ask: string }>), [quoteCcy, bookVersion]); // eslint-disable-line react-hooks/exhaustive-deps
   // bookVersion keys the recompute on every tick
   const margin = useMemo(() => (refPrice && !lotsErr ? requiredMarginUsd({ lots, contractSize: spec.contractSize, price: refPrice, leverage, quoteCcy, book: quoteStore.book() }) : null), [refPrice, lots, lotsErr, spec.contractSize, leverage, quoteCcy, bookVersion]);
   const free = dec(account.freeMargin);
@@ -143,20 +145,6 @@ export function OrderTicket({ spec, account, onPlaced, onBeforePlace, className,
     if (next.lt(spec.minLot)) next = dec(spec.minLot);
     if (next.gt(spec.maxLot)) next = dec(spec.maxLot);
     setLots(next.toFixed(lotDecimals));
-  };
-  /** Step a protective price by one pip; from empty, start half a percent away on the right side. */
-  const stepPx = (kind: 'sl' | 'tp', value: string, dir: 1 | -1) => {
-    const set = kind === 'sl' ? setSl : setTp;
-    if (value && PRICE_RE.test(value)) {
-      const next = dec(value).plus(dec(pip).times(dir));
-      set(next.gt(0) ? next.toFixed(spec.digits) : value);
-      return;
-    }
-    if (!refPrice) return;
-    const r = dec(refPrice);
-    const off = r.times(0.005);
-    const below = (kind === 'sl') === (side === 'buy');
-    set((below ? r.minus(off) : r.plus(off)).toFixed(spec.digits));
   };
 
   const submit = async (e?: FormEvent) => {
@@ -281,8 +269,8 @@ export function OrderTicket({ spec, account, onPlaced, onBeforePlace, className,
         )}
 
         <div className="grid grid-cols-2 gap-2">
-          <Stepper id="ticket-sl" label="Stop loss" value={sl} onChange={setSl} onStep={(d) => stepPx('sl', sl, d)} placeholder="Not set" error={slErr} clearable />
-          <Stepper id="ticket-tp" label="Take profit" value={tp} onChange={setTp} onStep={(d) => stepPx('tp', tp, d)} placeholder="Not set" error={tpErr} clearable />
+          <SlTpField kind="sl" side={side} refPrice={refPrice} digits={spec.digits} lots={lots} contractSize={Number(spec.contractSize)} quoteToUsd={qToUsd} value={sl} onChange={setSl} error={slErr} label="Stop loss" />
+          <SlTpField kind="tp" side={side} refPrice={refPrice} digits={spec.digits} lots={lots} contractSize={Number(spec.contractSize)} quoteToUsd={qToUsd} value={tp} onChange={setTp} error={tpErr} label="Take profit" />
         </div>
 
         <dl className="space-y-1 rounded-lg bg-[var(--t-raised)] px-3 py-2 text-[12px]">
