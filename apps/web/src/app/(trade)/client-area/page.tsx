@@ -481,6 +481,7 @@ function Terminal() {
                 <KLineChart
                   spec={spec}
                   positions={openPositions}
+                  orders={data.orders ?? []}
                   className={cn('min-h-0 flex-1', show(mtab === 'chart'), 'lg:flex')}
                   footer={
                     <div className="shrink-0 border-t border-[var(--t-line)] lg:hidden">

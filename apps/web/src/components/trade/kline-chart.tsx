@@ -6,7 +6,7 @@ import {
   GitFork, Magnet, Trash2, Search, X, LineChart as LineIcon, CandlestickChart,
   BarChart3, AreaChart, ZoomIn, ZoomOut, Maximize2, Minimize2, FunctionSquare, ChevronDown,
 } from 'lucide-react';
-import { TF_NAME, TIMEFRAMES, WS_EVENTS, bucketStart, type CandleDto, type PositionDto, type Timeframe, type WsCandle } from '@spova/shared';
+import { TF_NAME, TIMEFRAMES, WS_EVENTS, bucketStart, type CandleDto, type OrderDto, type PositionDto, type Timeframe, type WsCandle } from '@spova/shared';
 import { get } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { Spinner } from '@/components/ui';
@@ -26,6 +26,7 @@ type KChart = {
   setStyles: (s: unknown) => void;
   setPriceVolumePrecision: (p: number, v: number) => void;
   resize: () => void;
+  setPaneOptions: (o: unknown) => void;
   zoomAtCoordinate: (scale: number) => void;
   getDataList: () => KBar[];
 };
@@ -105,7 +106,7 @@ function stylesFor(dark: boolean) {
   };
 }
 
-export function KLineChart({ spec, positions, className, footer }: { spec: SymbolSpec; positions?: PositionDto[]; className?: string; footer?: ReactNode }) {
+export function KLineChart({ spec, positions, orders, className, footer }: { spec: SymbolSpec; positions?: PositionDto[]; orders?: OrderDto[]; className?: string; footer?: ReactNode }) {
   const { theme } = useSettings();
   const dark = theme !== 'light';
   const holder = useRef<HTMLDivElement>(null);
@@ -136,6 +137,7 @@ export function KLineChart({ spec, positions, className, footer }: { spec: Symbo
       const chart = kc.init(holder.current, { styles: stylesFor(dark) as never }) as unknown as KChart;
       chartRef.current = chart;
       chart.setPriceVolumePrecision(spec.digits ?? 2, 0);
+      try { chart.setPaneOptions({ id: 'candle_pane', gap: { top: 0.22, bottom: 0.1 } }); } catch { /* older api */ }
       setReady(true);
       ro = new ResizeObserver(() => chart.resize());
       ro.observe(holder.current);
@@ -220,7 +222,8 @@ export function KLineChart({ spec, positions, className, footer }: { spec: Symbo
 
   // open-position entry lines (+ TP/SL) for this symbol, drawn as locked horizontal lines on the chart
   const mine = (positions ?? []).filter((p) => p.symbol === spec.id);
-  const mineKey = mine.map((p) => `${p.id}:${p.openPrice}:${p.sl ?? ''}:${p.tp ?? ''}`).join('|');
+  const myOrders = (orders ?? []).filter((o) => o.symbol === spec.id && o.price);
+  const mineKey = mine.map((p) => `${p.id}:${p.openPrice}:${p.sl ?? ''}:${p.tp ?? ''}`).join('|') + '#' + myOrders.map((o) => `${o.id}:${o.price}:${o.side}`).join('|');
   useEffect(() => {
     const chart = chartRef.current;
     if (!chart) return;
@@ -232,6 +235,11 @@ export function KLineChart({ spec, positions, className, footer }: { spec: Symbo
       if (typeof entry === 'string') posOverlays.current.push(entry);
       if (p.tp) { const o = chart.createOverlay({ name: 'priceLine', id: `tp-${p.id}`, points: [{ value: Number(p.tp) }], lock: true, styles: { line: { color: '#16c784', style: 'dashed', size: 1 }, text: { color: '#16c784' } } } as unknown as string); if (typeof o === 'string') posOverlays.current.push(o); }
       if (p.sl) { const o = chart.createOverlay({ name: 'priceLine', id: `sl-${p.id}`, points: [{ value: Number(p.sl) }], lock: true, styles: { line: { color: '#ea3943', style: 'dashed', size: 1 }, text: { color: '#ea3943' } } } as unknown as string); if (typeof o === 'string') posOverlays.current.push(o); }
+    }
+    for (const o of myOrders) {
+      const color = o.side === 'buy' ? '#2563eb' : '#f59e0b';
+      const ov = chart.createOverlay({ name: 'priceLine', id: `ord-${o.id}`, points: [{ value: Number(o.price) }], lock: true, styles: { line: { color, style: 'dashed', size: 1 }, text: { color } } } as unknown as string);
+      if (typeof ov === 'string') posOverlays.current.push(ov);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [spec.id, mineKey, loading]);

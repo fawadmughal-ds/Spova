@@ -10,6 +10,7 @@ import { useAuth } from '@/lib/auth-context';
 import { Wordmark } from '@/components/logo';
 import { PlatformStrip } from '@/components/platform-notice';
 import { KycDeadlineBanner } from '@/components/kyc-deadline-banner';
+import { NotificationBell } from '@/components/admin/notification-bell';
 
 export interface NavItem {
   href: string;
@@ -261,9 +262,12 @@ export function AppShell({ nav, children, variant }: { nav: NavItem[]; children:
                 </Link>
               </>
             ) : (
-              <Link href="/client-area" className={buttonClass('outline', 'sm', 'group h-9 rounded-full px-4')}>
-                Client view <ArrowUpRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
-              </Link>
+              <>
+                <NotificationBell />
+                <Link href="/client-area" className={buttonClass('outline', 'sm', 'group h-9 rounded-full px-4')}>
+                  Client view <ArrowUpRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+                </Link>
+              </>
             )}
           </div>
         </header>
