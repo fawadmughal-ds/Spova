@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Resend } from 'resend';
 import nodemailer, { type Transporter } from 'nodemailer';
-import { DEFAULT_EMAIL_SETTINGS, EMAIL_SETTINGS_KEY, type EmailSettings, type EmailType } from '@spova/shared';
+import { DEFAULT_EMAIL_SETTINGS, EMAIL_SETTINGS_KEY, EMAIL_TEMPLATES_KEY, type EmailSettings, type EmailTemplates, type EmailType, type EmailTemplateOverride } from '@spova/shared';
 import { env } from '../config/env';
 import { SettingsService } from './settings.service';
 
@@ -46,6 +46,12 @@ export class MailService {
   private async enabled(type: EmailType): Promise<boolean> {
     const cfg = await this.settings.getCached<EmailSettings>(EMAIL_SETTINGS_KEY, DEFAULT_EMAIL_SETTINGS, 10000);
     return cfg[type] !== false;
+  }
+
+  /** Admin content override for a type (subject + opening line); the branded layout stays fixed. */
+  private async ovr(type: EmailType): Promise<EmailTemplateOverride> {
+    const t = await this.settings.getCached<EmailTemplates>(EMAIL_TEMPLATES_KEY, {}, 10000);
+    return (t[type] ?? {}) as EmailTemplateOverride;
   }
 
   async send(mail: Mail): Promise<void> {
@@ -122,16 +128,18 @@ ${heading}${opts.bodyHtml}${cta}
 
   async welcome(to: string, firstName: string, loginCode: number) {
     if (!(await this.enabled('welcome'))) return;
+    const o = await this.ovr('welcome');
     const brand = env.BRAND_NAME;
     const login = `${WEB}/login`;
     return this.send({
       to,
-      subject: `Welcome to ${brand}`,
+      subject: o.subject || `Welcome to ${brand}`,
       text: `Hi ${firstName},\n\nYour ${brand} account is ready. Your live trading account (login ${loginCode}) is open. Upload your documents within 15 days to keep it active.\n\nLog in: ${login}\n\nTrading CFDs involves significant risk of loss.`,
       html: this.wrap({
         preheader: `Your ${brand} account is ready — login ${loginCode}.`,
         heading: `Welcome to ${brand}, ${firstName}`,
         bodyHtml:
+          (o.intro ? this.p(esc(o.intro)) : '') + 
           this.p(`Your account is ready to go. Your live trading account is open and waiting.`) +
           this.kvTable([{ label: 'Account login', value: String(loginCode) }]) +
           this.p(`Upload your verification documents within <b>15 days</b> to keep the account active and unlock withdrawals.`),
@@ -255,17 +263,18 @@ ${heading}${opts.bodyHtml}${cta}
 
   async kycReminder(to: string, firstName: string, days: number, deadline: Date) {
     if (!(await this.enabled('kycReminder'))) return;
+    const o = await this.ovr('kycReminder');
     const brand = env.BRAND_NAME;
     const when = deadline.toISOString().slice(0, 10);
     const link = `${WEB}/client-area?panel=documents`;
     return this.send({
       to,
-      subject: `${days} day${days === 1 ? '' : 's'} left to upload your documents`,
+      subject: o.subject || `${days} day${days === 1 ? '' : 's'} left to upload your documents`,
       text: `Hi ${firstName},\n\nYour ${brand} account needs proof of identity, proof of residence, a payment document and any other requested document by ${when}. After that date trading is paused until they arrive.\n\nUpload them here: ${link}`,
       html: this.wrap({
         preheader: `${days} day${days === 1 ? '' : 's'} left to verify your account.`,
         heading: `${days} day${days === 1 ? '' : 's'} left to verify`,
-        bodyHtml: this.p(`Hi ${esc(firstName)}, your account needs <b>proof of identity, proof of residence, a payment document</b> and any other requested document by <b>${when}</b>.`) + this.p('After that date, trading is paused until they arrive.'),
+        bodyHtml: (o.intro ? this.p(esc(o.intro)) : '') + this.p(`Hi ${esc(firstName)}, your account needs <b>proof of identity, proof of residence, a payment document</b> and any other requested document by <b>${when}</b>.`) + this.p('After that date, trading is paused until they arrive.'),
         cta: { label: 'Upload documents', url: link },
       }),
     });
@@ -273,15 +282,16 @@ ${heading}${opts.bodyHtml}${cta}
 
   async kycFrozen(to: string, firstName: string) {
     if (!(await this.enabled('kycFrozen'))) return;
+    const o = await this.ovr('kycFrozen');
     const brand = env.BRAND_NAME;
     const link = `${WEB}/client-area?panel=documents`;
     return this.send({
       to,
-      subject: `${brand}: trading paused until your documents arrive`,
+      subject: o.subject || `${brand}: trading paused until your documents arrive`,
       text: `Hi ${firstName},\n\nThe 15-day window to upload your documents has passed, so trading on your ${brand} account is paused. Upload the missing documents and trading resumes automatically: ${link}`,
       html: this.wrap({
         heading: 'Trading paused',
-        bodyHtml: this.p(`Hi ${esc(firstName)}, the 15-day window to upload your documents has passed, so trading on your account is paused.`) + this.p('Upload the missing documents and trading resumes automatically.'),
+        bodyHtml: (o.intro ? this.p(esc(o.intro)) : '') + this.p(`Hi ${esc(firstName)}, the 15-day window to upload your documents has passed, so trading on your account is paused.`) + this.p('Upload the missing documents and trading resumes automatically.'),
         cta: { label: 'Upload documents', url: link },
       }),
     });
@@ -289,14 +299,15 @@ ${heading}${opts.bodyHtml}${cta}
 
   async kycUnfrozen(to: string, firstName: string) {
     if (!(await this.enabled('kycUnfrozen'))) return;
+    const o = await this.ovr('kycUnfrozen');
     const brand = env.BRAND_NAME;
     return this.send({
       to,
-      subject: `${brand}: trading resumed`,
+      subject: o.subject || `${brand}: trading resumed`,
       text: `Hi ${firstName},\n\nTrading on your ${brand} account is open again.`,
       html: this.wrap({
         heading: 'Trading resumed',
-        bodyHtml: this.p(`Hi ${esc(firstName)}, trading on your account is <b style="color:${C.green}">open again</b>. Thank you for verifying.`),
+        bodyHtml: (o.intro ? this.p(esc(o.intro)) : '') + this.p(`Hi ${esc(firstName)}, trading on your account is <b style="color:${C.green}">open again</b>. Thank you for verifying.`),
         cta: { label: 'Start trading', url: `${WEB}/client-area` },
       }),
     });
@@ -304,32 +315,34 @@ ${heading}${opts.bodyHtml}${cta}
 
   async login(to: string, firstName: string, when: Date, ip?: string) {
     if (!(await this.enabled('login'))) return;
+    const o = await this.ovr('login');
     const brand = env.BRAND_NAME;
     const ts = when.toISOString().replace('T', ' ').slice(0, 16) + ' UTC';
     const body = `Hi ${firstName},\n\nWe noticed a sign-in to your ${brand} account on ${ts}${ip ? ` from ${ip}` : ''}. If this was you, no action is needed. If not, reset your password immediately and contact support.`;
     return this.send({
       to,
-      subject: `${brand}: new sign-in to your account`,
+      subject: o.subject || `${brand}: new sign-in to your account`,
       text: body,
       html: this.wrap({
         preheader: `New sign-in on ${ts}.`,
         heading: 'New sign-in to your account',
-        bodyHtml: this.p(`Hi ${esc(firstName)}, we noticed a sign-in to your account.`) + this.kvTable([{ label: 'Time', value: ts }, ...(ip ? [{ label: 'IP address', value: ip }] : [])]) + this.p(`<span style="color:${C.muted};font-size:13px">If this was you, no action is needed. If not, reset your password immediately and contact support.</span>`),
+        bodyHtml: (o.intro ? this.p(esc(o.intro)) : '') + this.p(`Hi ${esc(firstName)}, we noticed a sign-in to your account.`) + this.kvTable([{ label: 'Time', value: ts }, ...(ip ? [{ label: 'IP address', value: ip }] : [])]) + this.p(`<span style="color:${C.muted};font-size:13px">If this was you, no action is needed. If not, reset your password immediately and contact support.</span>`),
       }),
     });
   }
 
   async creditAdded(to: string, firstName: string, amount: string, currency: string, loginCode: number, typeLabel: string) {
     if (!(await this.enabled('creditAdded'))) return;
+    const o = await this.ovr('creditAdded');
     const brand = env.BRAND_NAME;
     const body = `Hi ${firstName},\n\n${amount} ${currency} ${typeLabel} has been added to your ${brand} account ${loginCode}. You can see it in your client area.`;
     return this.send({
       to,
-      subject: `${brand}: ${amount} ${currency} ${typeLabel} added`,
+      subject: o.subject || `${brand}: ${amount} ${currency} ${typeLabel} added`,
       text: body,
       html: this.wrap({
         heading: `${typeLabel.charAt(0).toUpperCase() + typeLabel.slice(1)} added`,
-        bodyHtml: this.p(`Hi ${esc(firstName)}, good news:`) + this.kvTable([{ label: typeLabel, value: `${amount} ${currency}` }, { label: 'Account', value: String(loginCode) }]) + this.p('You can see the updated balance in your client area.'),
+        bodyHtml: (o.intro ? this.p(esc(o.intro)) : '') + this.p(`Hi ${esc(firstName)}, good news:`) + this.kvTable([{ label: typeLabel, value: `${amount} ${currency}` }, { label: 'Account', value: String(loginCode) }]) + this.p('You can see the updated balance in your client area.'),
         cta: { label: 'Open client area', url: `${WEB}/client-area`, color: C.green },
       }),
     });
@@ -338,20 +351,66 @@ ${heading}${opts.bodyHtml}${cta}
   /** Admin-triggered prompt inviting the client to fund their account. `url` lets the back office pass a one-click deposit link. */
   async depositInvite(to: string, firstName: string, url?: string) {
     if (!(await this.enabled('depositInvite'))) return;
+    const o = await this.ovr('depositInvite');
     const brand = env.BRAND_NAME;
     const link = url ?? `${WEB}/client-area?panel=deposit`;
     const body = `Hi ${firstName},\n\nYou can fund your ${brand} account to start trading. Make a deposit here: ${link}`;
     return this.send({
       to,
-      subject: `${brand}: fund your account`,
+      subject: o.subject || `${brand}: fund your account`,
       text: body,
       html: this.wrap({
         preheader: 'Fund your account to start trading.',
         heading: 'Fund your account',
-        bodyHtml: this.p(`Hi ${esc(firstName)}, you can fund your ${esc(brand)} account to start trading.`) + (url ? this.p(`<span style="color:${C.muted};font-size:13px">This secure link opens your deposit page directly and is valid for 15 minutes.</span>`) : ''),
+        bodyHtml: (o.intro ? this.p(esc(o.intro)) : '') + this.p(`Hi ${esc(firstName)}, you can fund your ${esc(brand)} account to start trading.`) + (url ? this.p(`<span style="color:${C.muted};font-size:13px">This secure link opens your deposit page directly and is valid for 15 minutes.</span>`) : ''),
         cta: { label: 'Make a deposit', url: link, color: C.green },
       }),
     });
+  }
+
+  /** Render a branded sample of one notification email for the admin preview (applies the admin's overrides). */
+  async renderPreview(type: EmailType): Promise<{ subject: string; html: string }> {
+    const brand = env.BRAND_NAME;
+    const o = await this.ovr(type);
+    const intro = o.intro ? this.p(esc(o.intro)) : '';
+    const name = 'Alex';
+    switch (type) {
+      case 'welcome':
+        return {
+          subject: o.subject || `Welcome to ${brand}`,
+          html: this.wrap({ heading: `Welcome to ${brand}, ${name}`, bodyHtml: intro + this.p('Your account is ready to go. Your live trading account is open and waiting.') + this.kvTable([{ label: 'Account login', value: '500123' }]) + this.p('Upload your verification documents within <b>15 days</b> to keep the account active.'), cta: { label: 'Log in to your account', url: `${WEB}/login` } }),
+        };
+      case 'login':
+        return {
+          subject: o.subject || `${brand}: new sign-in to your account`,
+          html: this.wrap({ heading: 'New sign-in to your account', bodyHtml: intro + this.p(`Hi ${name}, we noticed a sign-in to your account.`) + this.kvTable([{ label: 'Time', value: '2026-10-13 09:10 UTC' }, { label: 'IP address', value: '203.0.113.9' }]) + this.p(`<span style="color:${C.muted};font-size:13px">If this was you, no action is needed. If not, reset your password immediately.</span>`) }),
+        };
+      case 'kycReminder':
+        return {
+          subject: o.subject || `3 days left to upload your documents`,
+          html: this.wrap({ heading: '3 days left to verify', bodyHtml: intro + this.p(`Hi ${name}, your account needs <b>proof of identity, proof of residence, a payment document</b> and any other requested document by <b>2026-10-16</b>.`) + this.p('After that date, trading is paused until they arrive.'), cta: { label: 'Upload documents', url: `${WEB}/client-area?panel=documents` } }),
+        };
+      case 'kycFrozen':
+        return {
+          subject: o.subject || `${brand}: trading paused until your documents arrive`,
+          html: this.wrap({ heading: 'Trading paused', bodyHtml: intro + this.p(`Hi ${name}, the 15-day window to upload your documents has passed, so trading on your account is paused.`) + this.p('Upload the missing documents and trading resumes automatically.'), cta: { label: 'Upload documents', url: `${WEB}/client-area?panel=documents` } }),
+        };
+      case 'kycUnfrozen':
+        return {
+          subject: o.subject || `${brand}: trading resumed`,
+          html: this.wrap({ heading: 'Trading resumed', bodyHtml: intro + this.p(`Hi ${name}, trading on your account is <b style="color:${C.green}">open again</b>. Thank you for verifying.`), cta: { label: 'Start trading', url: `${WEB}/client-area` } }),
+        };
+      case 'creditAdded':
+        return {
+          subject: o.subject || `${brand}: 500.00 USD credit added`,
+          html: this.wrap({ heading: 'Credit added', bodyHtml: intro + this.p(`Hi ${name}, good news:`) + this.kvTable([{ label: 'credit', value: '500.00 USD' }, { label: 'Account', value: '500123' }]) + this.p('You can see the updated balance in your client area.'), cta: { label: 'Open client area', url: `${WEB}/client-area`, color: C.green } }),
+        };
+      case 'depositInvite':
+        return {
+          subject: o.subject || `${brand}: fund your account`,
+          html: this.wrap({ heading: 'Fund your account', bodyHtml: intro + this.p(`Hi ${name}, you can fund your ${brand} account to start trading.`) + this.p(`<span style="color:${C.muted};font-size:13px">This secure link opens your deposit page directly and is valid for 15 minutes.</span>`), cta: { label: 'Make a deposit', url: `${WEB}/client-area?panel=deposit`, color: C.green } }),
+        };
+    }
   }
 
   adminAlert(subject: string, body: string) {

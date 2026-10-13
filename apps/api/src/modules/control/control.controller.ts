@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Param, Patch, Post, Put } from '@nestjs/common';
 import { z } from 'zod';
+import { ApiError } from '../../common/errors';
 import {
   TIERS,
   adminSymbolPatchSchema,
@@ -14,7 +15,7 @@ import {
   type RiskConfigInput,
   type StaffCreateInput,
   type StaffPatchInput,
-  type Tier, emailSettingsSchema, type EmailSettings } from '@spova/shared';
+  type Tier, emailSettingsSchema, type EmailSettings, emailTemplatesSchema, type EmailTemplates, EMAIL_TYPES, type EmailType } from '@spova/shared';
 import { ControlService } from './control.service';
 import { ClientIp, CurrentUser, Public, Roles } from '../../common/auth/decorators';
 import type { AuthUser } from '../../common/auth/auth.types';
@@ -65,6 +66,22 @@ export class ControlController {
   @Put('email-settings')
   setEmailSettings(@CurrentUser() actor: AuthUser, @ClientIp() ip: string, @Body(new ZodPipe(emailSettingsSchema)) body: EmailSettings) {
     return this.control.setEmailSettings({ ...actor, ip }, body);
+  }
+
+  @Get('email-templates')
+  emailTemplates() {
+    return this.control.emailTemplates();
+  }
+
+  @Put('email-templates')
+  setEmailTemplates(@CurrentUser() actor: AuthUser, @ClientIp() ip: string, @Body(new ZodPipe(emailTemplatesSchema)) body: EmailTemplates) {
+    return this.control.setEmailTemplates({ ...actor, ip }, body);
+  }
+
+  @Get('email-preview/:type')
+  emailPreview(@Param('type') type: string) {
+    if (!(EMAIL_TYPES as readonly string[]).includes(type)) throw ApiError.badRequest('bad_type', 'Unknown email type');
+    return this.control.emailPreview(type as EmailType);
   }
 
   @Get('staff')

@@ -15,7 +15,7 @@ import {
   type StaffCreateInput,
   type StaffDto,
   type StaffPatchInput,
-  type Tier, DEFAULT_EMAIL_SETTINGS, EMAIL_SETTINGS_KEY, emailSettingsSchema, type EmailSettings } from '@spova/shared';
+  type Tier, DEFAULT_EMAIL_SETTINGS, EMAIL_SETTINGS_KEY, emailSettingsSchema, type EmailSettings, EMAIL_TEMPLATES_KEY, emailTemplatesSchema, type EmailTemplates, type EmailType } from '@spova/shared';
 import { PrismaService } from '../../infra/prisma.service';
 import { RedisService } from '../../infra/redis.service';
 import { SettingsService } from '../../infra/settings.service';
@@ -173,6 +173,23 @@ export class ControlService {
     await this.settings.set(EMAIL_SETTINGS_KEY, input, actor.id);
     await this.audit(actor, 'email_settings.update', 'app_setting', null, before, input);
     return input;
+  }
+
+  async emailTemplates(): Promise<EmailTemplates> {
+    const stored = await this.settings.get<EmailTemplates>(EMAIL_TEMPLATES_KEY, {});
+    const parsed = emailTemplatesSchema.safeParse(stored ?? {});
+    return parsed.success ? parsed.data : {};
+  }
+
+  async setEmailTemplates(actor: Actor, input: EmailTemplates) {
+    const before = await this.emailTemplates();
+    await this.settings.set(EMAIL_TEMPLATES_KEY, input, actor.id);
+    await this.audit(actor, 'email_templates.update', 'app_setting', null, before, input);
+    return input;
+  }
+
+  emailPreview(type: EmailType) {
+    return this.mail.renderPreview(type);
   }
 
   // ---------------------------------------------------------------- staff

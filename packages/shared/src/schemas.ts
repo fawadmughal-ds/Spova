@@ -256,6 +256,24 @@ export type EmailSettings = z.infer<typeof emailSettingsSchema>;
 export const DEFAULT_EMAIL_SETTINGS: EmailSettings = { welcome: true, login: true, kycReminder: true, kycFrozen: true, kycUnfrozen: true, creditAdded: true, depositInvite: true };
 export const EMAIL_SETTINGS_KEY = 'email_settings';
 
+/** Per-type editable content. The branded layout (logo, colours, footer) is fixed; admins set the subject and an opening line. */
+export const emailTemplateOverrideSchema = z.object({
+  subject: z.string().trim().max(160).optional(),
+  intro: z.string().trim().max(600).optional(),
+});
+export type EmailTemplateOverride = z.infer<typeof emailTemplateOverrideSchema>;
+export const emailTemplatesSchema = z.object({
+  welcome: emailTemplateOverrideSchema.optional(),
+  login: emailTemplateOverrideSchema.optional(),
+  kycReminder: emailTemplateOverrideSchema.optional(),
+  kycFrozen: emailTemplateOverrideSchema.optional(),
+  kycUnfrozen: emailTemplateOverrideSchema.optional(),
+  creditAdded: emailTemplateOverrideSchema.optional(),
+  depositInvite: emailTemplateOverrideSchema.optional(),
+});
+export type EmailTemplates = z.infer<typeof emailTemplatesSchema>;
+export const EMAIL_TEMPLATES_KEY = 'email_templates';
+
 export const statementQuerySchema = z
   .object({
     from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'YYYY-MM-DD'),
