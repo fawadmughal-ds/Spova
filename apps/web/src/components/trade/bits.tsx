@@ -82,10 +82,8 @@ export function Dropdown({ button, buttonClassName, children, align = 'left', cl
 
 /** Square tile with the symbol's first letter: white for most markets, black for crypto / shares, gold for metals (like the reference). */
 /** Asset icons. Crypto / share logos are referenced from public CDNs (not redrawn); forex & indices use Unicode flags. */
-const CRYPTO_ICON: Record<string, string> = { BTCUSD: 'btc', ETHUSD: 'eth', LTCUSD: 'ltc', SOLUSD: 'sol', XRPUSD: 'xrp', BCHUSD: 'bch', ADAUSD: 'ada', DOGUSD: 'doge', DOTUSD: 'dot', BNBUSD: 'bnb', AVAUSD: 'avax', LNKUSD: 'link', TRXUSD: 'trx' };
-const SHARE_DOMAIN: Record<string, string> = { AAPL: 'apple.com', AMZN: 'amazon.com', NVDA: 'nvidia.com', TSLA: 'tesla.com', MSFT: 'microsoft.com', GOOGL: 'abc.xyz', META: 'meta.com', NFLX: 'netflix.com', AMD: 'amd.com', INTC: 'intel.com', JPM: 'jpmorganchase.com', DIS: 'thewaltdisneycompany.com', BABA: 'alibabagroup.com' };
-const CCY_FLAG: Record<string, string> = { USD: '🇺🇸', EUR: '🇪🇺', GBP: '🇬🇧', JPY: '🇯🇵', AUD: '🇦🇺', NZD: '🇳🇿', CAD: '🇨🇦', CHF: '🇨🇭', CNY: '🇨🇳' };
-const INDEX_FLAG: Record<string, string> = { DAX: '🇩🇪', DE40: '🇩🇪', FTSE: '🇬🇧', UK100: '🇬🇧', DJI: '🇺🇸', US30: '🇺🇸', NDX: '🇺🇸', US100: '🇺🇸', SPX: '🇺🇸', US500: '🇺🇸', JP225: '🇯🇵', N225: '🇯🇵', AUS200: '🇦🇺', HK50: '🇭🇰', FRA40: '🇫🇷', EU50: '🇪🇺', US2000: '🇺🇸' };
+const CCY_FLAG: Record<string, string> = { USD: '🇺🇸', EUR: '🇪🇺', GBP: '🇬🇧', JPY: '🇯🇵', AUD: '🇦🇺', NZD: '🇳🇿', CAD: '🇨🇦', CHF: '🇨🇭', CNY: '🇨🇳', CNH: '🇨🇳', SEK: '🇸🇪', NOK: '🇳🇴', DKK: '🇩🇰', MXN: '🇲🇽', ZAR: '🇿🇦', TRY: '🇹🇷', SGD: '🇸🇬', HKD: '🇭🇰', PLN: '🇵🇱', INR: '🇮🇳', HUF: '🇭🇺', THB: '🇹🇭', CZK: '🇨🇿' };
+const INDEX_FLAG: Record<string, string> = { DAX: '🇩🇪', DE40: '🇩🇪', FTSE: '🇬🇧', UK100: '🇬🇧', DJI: '🇺🇸', US30: '🇺🇸', NDX: '🇺🇸', US100: '🇺🇸', SPX: '🇺🇸', US500: '🇺🇸', JP225: '🇯🇵', N225: '🇯🇵', AUS200: '🇦🇺', HK50: '🇭🇰', FRA40: '🇫🇷', EU50: '🇪🇺', US2000: '🇺🇸', ES35: '🇪🇸', IT40: '🇮🇹', NL25: '🇳🇱', CH20: '🇨🇭', SE30: '🇸🇪', IN50: '🇮🇳', CN50: '🇨🇳', SG30: '🇸🇬', KR200: '🇰🇷', ZA40: '🇿🇦', BR50: '🇧🇷', MX35: '🇲🇽', JP400: '🇯🇵', VOL: '🇺🇸' };
 const METAL_SYMBOL: Record<string, string> = { XAUUSD: 'Au', XAGUSD: 'Ag', XAUEUR: 'Au', XAGEUR: 'Ag', XPTUSD: 'Pt', XPDUSD: 'Pd' };
 
 /** An <img> logo that falls back to the letter tile if the CDN image fails. */
@@ -122,9 +120,9 @@ export function SymbolTile({ spec, id, size = 26, className }: { spec?: SymbolSp
   const cls = spec?.assetClass;
   const letterTile: CSSProperties = cls === 'crypto' || cls === 'stock' ? { background: '#0f1115', color: '#fff', boxShadow: 'inset 0 0 0 1px var(--t-raised-2)' } : cls === 'metal' ? { background: '#e0a526', color: '#1c2128' } : cls === 'commodity' ? { background: '#1c2128', color: '#fff', boxShadow: 'inset 0 0 0 1px var(--t-raised-2)' } : { background: '#f3f5f8', color: '#1c2128' };
 
-  // crypto & share logos are self-hosted under /brand/sym (reliable on mobile; no third-party CDN), letter fallback on miss
-  if (CRYPTO_ICON[sym]) return <LogoImg src={`/brand/sym/${sym}.png`} sym={sym} size={size} tile={letterTile} />;
-  if (SHARE_DOMAIN[sym]) return <LogoImg src={`/brand/sym/${sym}.png`} sym={sym} size={size} tile={letterTile} chip />;
+  // crypto & share logos are self-hosted under /brand/sym (letter-tile fallback when a logo is missing, like the reference)
+  if (cls === 'crypto') return <LogoImg src={`/brand/sym/${sym}.png`} sym={sym} size={size} tile={letterTile} />;
+  if (cls === 'stock') return <LogoImg src={`/brand/sym/${sym}.png`} sym={sym} size={size} tile={letterTile} chip />;
 
   // indices: a single flag "coin"
   if (INDEX_FLAG[sym])
