@@ -124,6 +124,7 @@ export class FinnhubFeed implements FeedAdapter {
   private idleTimer?: NodeJS.Timeout;
   private openedAt = 0;
   private status: 'up' | 'down' = 'down';
+  private pollStopped = false;
   private readonly opts: Required<FinnhubFeedOptions>;
 
   onStatus: (status: 'up' | 'down') => void = () => {};
@@ -147,11 +148,42 @@ export class FinnhubFeed implements FeedAdapter {
       this.log.warn('finnhub: no symbols mapped, feed idle');
       return;
     }
-    this.open();
+    // REST /quote polling: the free tier blocks the trade websocket beyond a few symbols and only ticks during
+    // US market hours, whereas /quote returns the real last price any time and has no symbol cap (just 60 req/min).
+    this.pollStopped = false;
+    void this.pollLoop();
+  }
+
+  private async pollLoop() {
+    const entries = Object.entries(this.map); // finnhubSymbol -> our id
+    const spacingMs = Math.max(900, Math.floor(60_000 / (entries.length + 5)));
+    this.log.info({ symbols: entries.length, spacingMs }, 'finnhub: REST quote polling started');
+    while (!this.stopped && !this.pollStopped) {
+      for (const [fsym, id] of entries) {
+        if (this.stopped || this.pollStopped) return;
+        try {
+          const r = await fetch(`https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(fsym)}&token=${this.opts.token}`);
+          if (r.ok) {
+            const d = (await r.json()) as { c?: number };
+            if (typeof d.c === 'number' && d.c > 0) {
+              const px = String(d.c);
+              this.onTick({ symbol: id, bid: px, ask: px, ts: Date.now() });
+              if (this.status !== 'up') this.setStatus('up');
+            }
+          } else if (r.status === 429) {
+            await new Promise((res) => setTimeout(res, 5_000));
+          }
+        } catch (e) {
+          this.log.debug({ err: (e as Error).message }, 'finnhub: quote fetch failed');
+        }
+        await new Promise((res) => setTimeout(res, spacingMs));
+      }
+    }
   }
 
   async disconnect() {
     this.stopped = true;
+    this.pollStopped = true;
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
     if (this.idleTimer) clearTimeout(this.idleTimer);
     this.ws?.removeAllListeners();
