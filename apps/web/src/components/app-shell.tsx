@@ -16,6 +16,8 @@ export interface NavItem {
   label: string;
   icon: ComponentType<{ className?: string }>;
   exact?: boolean;
+  /** optional unread count pill (e.g. new activity) */
+  badge?: number;
 }
 
 type Variant = 'client' | 'admin';
@@ -88,7 +90,11 @@ function Rail({ nav, variant, shown = true, onNavigate }: { nav: NavItem[]; vari
                   )}
                 />
                 <span className="flex-1">{n.label}</span>
-                <ChevronRight className={cn('h-3.5 w-3.5 transition-all duration-300', on ? 'text-[rgb(var(--shell)/0.7)]' : '-translate-x-1 text-ink-500 opacity-0 group-hover:translate-x-0 group-hover:opacity-100')} />
+                {n.badge && n.badge > 0 ? (
+                  <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[rgb(var(--shell))] px-1.5 text-[11px] font-semibold text-white">{n.badge > 99 ? '99+' : n.badge}</span>
+                ) : (
+                  <ChevronRight className={cn('h-3.5 w-3.5 transition-all duration-300', on ? 'text-[rgb(var(--shell)/0.7)]' : '-translate-x-1 text-ink-500 opacity-0 group-hover:translate-x-0 group-hover:opacity-100')} />
+                )}
               </Link>
             </li>
           );

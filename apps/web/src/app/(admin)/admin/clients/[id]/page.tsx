@@ -150,6 +150,27 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
         }
       />
 
+      {/* trading / money summary */}
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {(
+          [
+            ['Open trades', String(u.stats.openTrades), u.stats.openTrades > 0],
+            ['Closed trades', String(u.stats.closedTrades), false],
+            ['Volume (lots)', u.stats.totalVolumeLots, false],
+            ['Realized P/L', fmtMoney(u.stats.realizedPnl), false],
+            ['Deposits', fmtMoney(u.stats.depositsApproved), false],
+            ['Withdrawals', fmtMoney(u.stats.withdrawalsApproved), false],
+            ['Pending payments', String(u.stats.pendingPayments), u.stats.pendingPayments > 0],
+            ['Open tickets', String(u.stats.openTickets), u.stats.openTickets > 0],
+          ] as [string, string, boolean][]
+        ).map(([label, value, hot]) => (
+          <div key={label} className="rounded-xl border border-white/5 bg-white/[0.02] px-4 py-3">
+            <div className="text-[11px] uppercase tracking-wider text-ink-500">{label}</div>
+            <div className={cn('mt-1 text-lg font-semibold tabular', hot ? 'text-brand-300' : 'text-white')}>{value}</div>
+          </div>
+        ))}
+      </div>
+
       <div className="grid grid-cols-[minmax(0,1fr)] gap-6 xl:grid-cols-3">
         {/* profile */}
         <Card title="Profile">
@@ -163,6 +184,7 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
               ['ZIP', u.profile?.zip],
               ['Registered', fmtDate(u.createdAt)],
               ['Last login', `${fmtDate(u.lastLoginAt)}${u.lastLoginIp ? ` · ${u.lastLoginIp}` : ''}`],
+              ['Presence', u.online ? 'Online now' : u.lastSeenAt ? `Last seen ${fmtDate(u.lastSeenAt)}` : 'Offline'],
             ].map(([k, v]) => (
               <div key={k as string}>
                 <dt className="text-[11px] uppercase tracking-wider text-ink-500">{k}</dt>

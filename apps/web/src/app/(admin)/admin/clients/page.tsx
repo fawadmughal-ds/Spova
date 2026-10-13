@@ -66,6 +66,7 @@ export default function ClientsPage() {
                   <th className="py-2 pr-4 font-medium">Country</th>
                   <th className="py-2 pr-4 font-medium">Status</th>
                   <th className="py-2 pr-4 font-medium">KYC</th>
+                  <th className="py-2 pr-4 text-right font-medium">Open</th>
                   <th className="py-2 pr-4 text-right font-medium">Accounts</th>
                   <th className="py-2 pr-4 text-right font-medium">Total balance</th>
                   <th className="py-2 pr-4 font-medium">Registered</th>
@@ -77,8 +78,15 @@ export default function ClientsPage() {
                   <tr key={u.id} className="hover:bg-white/[0.03]">
                     <td className="py-2.5 pr-4">
                       <Link href={`/admin/clients/${u.id}`} className="block">
-                        <div className="font-medium text-white">{u.firstName || u.lastName ? `${u.firstName ?? ''} ${u.lastName ?? ''}` : '—'}</div>
-                        <div className="text-xs text-ink-400">{u.email}</div>
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="inline-block h-2 w-2 shrink-0 rounded-full"
+                            style={{ background: u.online ? '#22c55e' : '#52607a', boxShadow: u.online ? '0 0 0 3px rgba(34,197,94,0.18)' : 'none' }}
+                            title={u.online ? 'Online now' : u.lastSeenAt ? `Last seen ${fmtDate(u.lastSeenAt)}` : 'Offline'}
+                          />
+                          <span className="font-medium text-white">{u.firstName || u.lastName ? `${u.firstName ?? ''} ${u.lastName ?? ''}` : '—'}</span>
+                        </div>
+                        <div className="pl-4 text-xs text-ink-400">{u.email}</div>
                       </Link>
                     </td>
                     <td className="py-2.5 pr-4">{u.countryCode ?? '—'}</td>
@@ -91,6 +99,7 @@ export default function ClientsPage() {
                         <Badge tone={u.kyc.por ? 'success' : 'neutral'}>POR</Badge>
                       </div>
                     </td>
+                    <td className="tabular py-2.5 pr-4 text-right">{u.openTrades > 0 ? <span className="font-semibold text-white">{u.openTrades}</span> : <span className="text-ink-500">0</span>}</td>
                     <td className="tabular py-2.5 pr-4 text-right">{u.accountsCount}</td>
                     <td className="tabular py-2.5 pr-4 text-right">{fmtMoney(u.totalBalance)}</td>
                     <td className="whitespace-nowrap py-2.5 pr-4 text-ink-400">{fmtDate(u.createdAt, false)}</td>
