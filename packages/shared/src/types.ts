@@ -122,6 +122,24 @@ export interface AdminUserRowDto {
   totalBalance: string;
   createdAt: string;
   lastLoginAt: string | null;
+  /** last authenticated activity; drives the online dot */
+  lastSeenAt: string | null;
+  /** true when lastSeenAt is within the online window (~3 min) */
+  online: boolean;
+  /** currently open positions across the client's accounts */
+  openTrades: number;
+}
+
+/** Per-client trading / money summary for the admin detail view. */
+export interface AdminUserStatsDto {
+  openTrades: number;
+  closedTrades: number;
+  totalVolumeLots: string;
+  realizedPnl: string;
+  depositsApproved: string;
+  withdrawalsApproved: string;
+  pendingPayments: number;
+  openTickets: number;
 }
 
 export interface AdminUserDetailDto extends AdminUserRowDto {
@@ -129,6 +147,27 @@ export interface AdminUserDetailDto extends AdminUserRowDto {
   accounts: AccountDto[];
   notes: string | null;
   lastLoginIp: string | null;
+  stats: AdminUserStatsDto;
+}
+
+export interface ActivityEventDto {
+  id: string;
+  userId: string | null;
+  userEmail: string | null;
+  userName: string | null;
+  kind: string;
+  title: string;
+  detail: string | null;
+  meta: unknown;
+  ip: string | null;
+  createdAt: string;
+}
+
+export interface ActivityFeedDto {
+  items: ActivityEventDto[];
+  total: number;
+  page: number;
+  limit: number;
 }
 
 export interface AdminDashboardDto {

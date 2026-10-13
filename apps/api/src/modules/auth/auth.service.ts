@@ -6,6 +6,7 @@ import type { LoginInput, MeDto, RegisterInput } from '@spova/shared';
 import { PrismaService } from '../../infra/prisma.service';
 import { RedisService } from '../../infra/redis.service';
 import { MailService } from '../../infra/mail.service';
+import { ActivityService } from '../../infra/activity.service';
 import { AccountsService } from '../accounts/accounts.service';
 import { env, ttlToSeconds } from '../../config/env';
 import { ApiError } from '../../common/errors';
@@ -29,6 +30,7 @@ export class AuthService {
     private readonly jwt: JwtService,
     private readonly mail: MailService,
     private readonly accounts: AccountsService,
+    private readonly activity: ActivityService,
   ) {}
 
   // ---------------------------------------------------------------- register / login
@@ -72,6 +74,8 @@ export class AuthService {
 
     if (user.role === 'client' && user.profile?.notifEmail !== false) void this.mail.login(user.email, user.profile?.firstName ?? '', new Date(), meta.ip).catch((e) => this.log.warn(e.message));
 
+    void this.activity.record({ userId: user.id, kind: 'register', title: 'Signed up', detail: user.email, ip: meta.ip });
+
     const tokens = await this.issueTokens(user.id, user.role, meta);
     return { me: await this.toMe(user), tokens };
   }
@@ -93,6 +97,8 @@ export class AuthService {
       where: { id: user.id },
       data: { lastLoginAt: new Date(), lastLoginIp: meta.ip },
     });
+
+    if (user.role === 'client') void this.activity.record({ userId: user.id, kind: 'login', title: 'Logged in', detail: user.email, ip: meta.ip });
 
     const tokens = await this.issueTokens(user.id, user.role, meta);
     return { me: await this.toMe(user), tokens };
@@ -162,8 +168,37 @@ export class AuthService {
     return this.signPair(payload.sub, user.role, session.id);
   }
 
+  // ---------------------------------------------------------------- deposit magic-link
+  /** Admin-issued one-click deposit link: a 15-minute, single-use token that logs the client straight into the deposit page. */
+  async createDepositLinkToken(userId: string): Promise<string> {
+    const jti = randomBytes(16).toString('hex');
+    await this.redis.client.set(`dmagic:${jti}`, userId, 'EX', 900);
+    return this.jwt.signAsync({ sub: userId, purpose: 'deposit', jti }, { secret: env.JWT_ACCESS_SECRET, expiresIn: 900 });
+  }
+
+  /** Validate + burn a deposit link, then issue a normal session for that client. */
+  async consumeDepositLink(token: string, meta: { ip: string; ua?: string }): Promise<{ me: MeDto; tokens: TokenPair }> {
+    let payload: { sub: string; purpose?: string; jti?: string };
+    try {
+      payload = await this.jwt.verifyAsync(token, { secret: env.JWT_ACCESS_SECRET });
+    } catch {
+      throw ApiError.unauthorized('link_expired', 'This link has expired. Ask support for a new one.');
+    }
+    if (payload.purpose !== 'deposit' || !payload.jti) throw ApiError.unauthorized('link_invalid', 'Invalid link');
+    // single use: the key must still exist and is removed atomically
+    const burned = await this.redis.client.getdel(`dmagic:${payload.jti}`);
+    if (burned !== payload.sub) throw ApiError.unauthorized('link_used', 'This link has already been used. Ask support for a new one.');
+    const user = await this.prisma.user.findUnique({ where: { id: payload.sub }, include: { profile: true } });
+    if (!user || user.status !== 'active') throw ApiError.unauthorized('link_invalid', 'Invalid link');
+    const tokens = await this.issueTokens(user.id, user.role, meta);
+    void this.activity.record({ userId: user.id, kind: 'deposit_link', title: 'Opened a deposit link', detail: user.email, ip: meta.ip });
+    return { me: await this.toMe(user), tokens };
+  }
+
   async logout(sessionId: string) {
+    const sess = await this.prisma.session.findUnique({ where: { id: sessionId }, select: { userId: true, user: { select: { role: true, email: true } } } });
     await this.revokeSession(sessionId);
+    if (sess?.user?.role === 'client') void this.activity.record({ userId: sess.userId, kind: 'logout', title: 'Logged out', detail: sess.user.email });
   }
 
   async revokeSession(sessionId: string) {

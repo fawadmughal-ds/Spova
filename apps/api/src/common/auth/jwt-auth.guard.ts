@@ -9,6 +9,7 @@ import { PUBLIC_KEY, ROLES_KEY } from './decorators';
 import type { AccessPayload, AuthUser } from './auth.types';
 import type { Role } from '@spova/shared';
 import { RedisService } from '../../infra/redis.service';
+import { ActivityService } from '../../infra/activity.service';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
@@ -16,6 +17,7 @@ export class JwtAuthGuard implements CanActivate {
     private readonly reflector: Reflector,
     private readonly jwt: JwtService,
     private readonly redis: RedisService,
+    private readonly activity: ActivityService,
   ) {}
 
   async canActivate(ctx: ExecutionContext): Promise<boolean> {
@@ -39,6 +41,9 @@ export class JwtAuthGuard implements CanActivate {
     }
 
     req.user = { id: payload.sub, role: payload.role, sessionId: payload.sid };
+
+    // presence: refresh the online dot (throttled, best-effort, non-blocking) for clients
+    if (payload.role === 'client') void this.activity.touch(payload.sub);
 
     const roles = this.reflector.getAllAndOverride<Role[]>(ROLES_KEY, [ctx.getHandler(), ctx.getClass()]);
     if (roles?.length && !roles.includes(payload.role)) {

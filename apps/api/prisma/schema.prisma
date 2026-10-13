@@ -165,6 +165,8 @@ model User {
   riskAcceptedAt  DateTime?  @map("risk_accepted_at") @db.Timestamptz
   lastLoginAt     DateTime?  @map("last_login_at") @db.Timestamptz
   lastLoginIp     String?    @map("last_login_ip")
+  /// refreshed on authenticated activity; drives the admin "online" dot
+  lastSeenAt      DateTime?  @map("last_seen_at") @db.Timestamptz
   referralCode    String?    @unique @map("referral_code")
   referredBy      String?    @map("referred_by") @db.Uuid
   totpSecret      String?    @map("totp_secret")
@@ -181,6 +183,7 @@ model User {
   tickets         Ticket[]         @relation("TicketOwner")
   notifications   Notification[]
   auditActions    AdminAudit[]     @relation("AuditActor")
+  activity        ActivityEvent[]  @relation("ActivityUser")
 
   @@index([status])
   @@index([createdAt])
@@ -560,6 +563,25 @@ model AdminAudit {
   @@index([targetType, targetId])
   @@index([actorId])
   @@map("admin_audit")
+}
+
+/// Back-office activity feed: one row per notable thing a client does (login, deposit, trade, ticket...).
+model ActivityEvent {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String?  @map("user_id") @db.Uuid
+  kind      String
+  title     String
+  detail    String?
+  meta      Json?
+  ip        String?
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  user User? @relation("ActivityUser", fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([userId])
+  @@index([kind])
+  @@map("activity_events")
 }
 
 model Notification {

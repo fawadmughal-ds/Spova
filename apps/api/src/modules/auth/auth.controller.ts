@@ -86,6 +86,20 @@ export class AuthController {
   }
 
   @Public()
+  @Post('deposit-link')
+  @HttpCode(200)
+  async depositLink(
+    @Body(new ZodPipe(z.object({ token: z.string().min(10).max(2000) }))) body: { token: string },
+    @ClientIp() ip: string,
+    @Headers('user-agent') ua: string | undefined,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const { me, tokens } = await this.auth.consumeDepositLink(body.token, { ip, ua });
+    setAuthCookies(res, tokens);
+    return { ok: true, me, panel: 'deposit' };
+  }
+
+  @Public()
   @Post('forgot-password')
   @HttpCode(200)
   async forgot(@Body(new ZodPipe(forgotPasswordSchema)) body: z.infer<typeof forgotPasswordSchema>, @ClientIp() ip: string) {

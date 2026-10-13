@@ -24,6 +24,7 @@ import {
 } from '@spova/shared';
 import { PrismaService } from '../../infra/prisma.service';
 import { MailService } from '../../infra/mail.service';
+import { ActivityService } from '../../infra/activity.service';
 import { RedisService } from '../../infra/redis.service';
 import { StorageService } from '../../infra/storage.service';
 import { SettingsService } from '../../infra/settings.service';
@@ -85,6 +86,7 @@ export class PaymentsService {
     private readonly ws: RealtimeGateway,
     private readonly storage: StorageService,
     private readonly settings: SettingsService,
+    private readonly activity: ActivityService,
   ) {}
 
   /** Admin-edited deposit channels, falling back to the defaults field by field. */
@@ -167,6 +169,7 @@ export class PaymentsService {
       include: { account: { select: { loginCode: true } } },
     });
     this.afterNew(row, user.email);
+    void this.activity.record({ userId, kind: 'deposit_request', title: 'Requested a deposit', detail: `${money(row.amount)} ${row.currency} via ${method.label}`, meta: { amount: money(row.amount), method: input.method, loginCode: row.account.loginCode } });
     // bank / RTGS: finance confirms and emails the pay-to details, so send them now
     if (input.method === 'rtgs' && user.profile?.notifEmail) {
       const ch = depositChannelPublic(input.method, cfg, env.BRAND_NAME);
@@ -255,6 +258,7 @@ export class PaymentsService {
       include: { account: { select: { loginCode: true } } },
     });
     this.afterNew(row, user.email);
+    void this.activity.record({ userId, kind: 'withdraw_request', title: 'Requested a withdrawal', detail: `${money(row.amount)} ${row.currency} via ${method.label}`, meta: { amount: money(row.amount), method: input.method, loginCode: row.account.loginCode } });
     if (user.profile?.notifEmail) void this.mail.withdrawReceived(user.email, money(row.amount), row.currency, row.account.loginCode).catch((e) => this.log.warn(e.message));
     return paymentToDto(row);
   }

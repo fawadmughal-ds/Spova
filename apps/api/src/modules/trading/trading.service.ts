@@ -32,6 +32,7 @@ import { PrismaService } from '../../infra/prisma.service';
 import { RedisService } from '../../infra/redis.service';
 import { SettingsService } from '../../infra/settings.service';
 import { MailService } from '../../infra/mail.service';
+import { ActivityService } from '../../infra/activity.service';
 import { LedgerService } from '../ledger/ledger.service';
 import { AccountsService } from '../accounts/accounts.service';
 import { QuotesService, type SymbolSpec } from '../quotes/quotes.service';
@@ -66,6 +67,7 @@ export class TradingService {
     private readonly quotes: QuotesService,
     private readonly ws: RealtimeGateway,
     private readonly settings: SettingsService,
+    private readonly activity: ActivityService,
   ) {}
 
   // ---------------------------------------------------------------- helpers
@@ -209,6 +211,7 @@ export class TradingService {
     this.ws.user(result.account.userId, WS_EVENTS.ORDER_FILLED, orderToDto(result.order));
     this.ws.user(result.account.userId, WS_EVENTS.POSITION_OPENED, positionToDto(result.position));
     this.ws.admin(WS_EVENTS.ADMIN_POSITION, { type: 'opened', position: positionToDto(result.position), userId: result.account.userId });
+    void this.activity.record({ userId: result.account.userId, kind: 'trade_open', title: 'Opened a trade', detail: `${p.side.toUpperCase()} ${p.lots} ${p.spec.id}`, meta: { symbol: p.spec.id, side: p.side, lots: p.lots } });
     this.emit({ type: 'position.opened', accountId: p.acc.id, symbol: p.spec.id, id: result.position.id });
     await this.pushAccount(result.account);
     return result;
@@ -357,6 +360,7 @@ export class TradingService {
     const dto = positionToDto(out.updated, partial ? this.live(out.updated, book, await this.quotes.specs()) : null);
     this.ws.user(out.account.userId, partial ? WS_EVENTS.POSITION_UPDATED : WS_EVENTS.POSITION_CLOSED, { ...dto, closeReason: reason, closedLots: closeLots.toString(), closedPnl: money(pnl) });
     this.ws.admin(WS_EVENTS.ADMIN_POSITION, { type: partial ? 'partial' : 'closed', position: dto, reason, pnl: money(pnl), userId: out.account.userId });
+    void this.activity.record({ userId: out.account.userId, kind: 'trade_close', title: partial ? 'Partially closed a trade' : 'Closed a trade', detail: `${pos.side.toUpperCase()} ${closeLots.toString()} ${pos.symbolId} · P/L ${money(pnl)} USD (${reason})`, meta: { symbol: pos.symbolId, lots: closeLots.toString(), pnl: money(pnl), reason } });
     this.emit({ type: partial ? 'position.updated' : 'position.closed', accountId: pos.accountId, symbol: pos.symbolId, id: pos.id });
     await this.pushAccount(out.account);
     if (reason === 'sl' || reason === 'tp') {

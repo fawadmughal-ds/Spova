@@ -3,6 +3,7 @@ import { Prisma, Ticket, TicketMessage, TicketStatus } from '@prisma/client';
 import { WS_EVENTS, type CreateTicketInput, type Paginated, type TicketDetailDto, type TicketDto, type TicketMessageDto } from '@spova/shared';
 import { PrismaService } from '../../infra/prisma.service';
 import { MailService } from '../../infra/mail.service';
+import { ActivityService } from '../../infra/activity.service';
 import { RedisService } from '../../infra/redis.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { ApiError } from '../../common/errors';
@@ -40,6 +41,7 @@ export class SupportService {
     private readonly mail: MailService,
     private readonly redis: RedisService,
     private readonly ws: RealtimeGateway,
+    private readonly activity: ActivityService,
   ) {}
 
   // ---------------------------------------------------------------- client
@@ -63,6 +65,7 @@ export class SupportService {
     });
     this.ws.admin(WS_EVENTS.ADMIN_TICKET_NEW, { id: t.id, userId, subject: t.subject, email: user.email, createdAt: t.createdAt.toISOString() });
     void this.mail.adminAlert('New support ticket', `${user.email}: ${t.subject}\n\n${input.message}`).catch((e) => this.log.warn(e.message));
+    void this.activity.record({ userId, kind: 'ticket_open', title: 'Opened a support ticket', detail: t.subject });
     return { ...ticketToDto(t, false), messages: t.messages.map(msgToDto) };
   }
 

@@ -12,12 +12,14 @@ import { PrismaService } from '../../infra/prisma.service';
 import { MailService } from '../../infra/mail.service';
 import { RedisService } from '../../infra/redis.service';
 import { SettingsService } from '../../infra/settings.service';
+import { ActivityService } from '../../infra/activity.service';
 import { LedgerService } from '../ledger/ledger.service';
 import { AccountsService } from '../accounts/accounts.service';
 import { AuthService } from '../auth/auth.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { D, money } from '../../common/money';
 import { ApiError } from '../../common/errors';
+import { env } from '../../config/env';
 import { ledgerToDto } from '../accounts/accounts.controller';
 
 interface Actor {
@@ -39,7 +41,26 @@ export class AdminService {
     private readonly mail: MailService,
     private readonly redis: RedisService,
     private readonly settings: SettingsService,
+    private readonly activity: ActivityService,
   ) {}
+
+  /** A client is "online" if they made an authenticated request within this window. */
+  private static readonly ONLINE_WINDOW_MS = 3 * 60 * 1000;
+  private isOnline(lastSeenAt: Date | null): boolean {
+    return !!lastSeenAt && Date.now() - lastSeenAt.getTime() < AdminService.ONLINE_WINDOW_MS;
+  }
+
+  // ---------------------------------------------------------------- activity feed
+  activityFeed(q: { page: number; limit: number; kind?: string; userId?: string }) {
+    return this.activity.list(q);
+  }
+  async activityUnread(adminId: string) {
+    return { count: await this.activity.unreadCount(adminId) };
+  }
+  async activityMarkRead(adminId: string) {
+    await this.activity.markRead(adminId);
+    return { ok: true };
+  }
 
   // ---------------------------------------------------------------- dashboard
 
@@ -131,13 +152,18 @@ export class AdminService {
     const [rows, total] = await Promise.all([
       this.prisma.user.findMany({
         where,
-        include: { profile: true, accounts: { select: { balance: true } } },
+        include: { profile: true, accounts: { select: { id: true, balance: true } } },
         orderBy: { createdAt: 'desc' },
         skip: (q.page - 1) * q.limit,
         take: q.limit,
       }),
       this.prisma.user.count({ where }),
     ]);
+    // open-position counts for the page, in one grouped query
+    const acctIds = rows.flatMap((u) => u.accounts.map((a) => a.id));
+    const openGroups = acctIds.length ? await this.prisma.position.groupBy({ by: ['accountId'], where: { accountId: { in: acctIds }, status: 'open' }, _count: { _all: true } }) : [];
+    const openByAcct = new Map(openGroups.map((g) => [g.accountId, g._count._all]));
+    const openTradesOf = (u: (typeof rows)[number]) => u.accounts.reduce((n, a) => n + (openByAcct.get(a.id) ?? 0), 0);
     const items: AdminUserRowDto[] = rows.map((u) => ({
       id: u.id,
       email: u.email,
@@ -153,6 +179,9 @@ export class AdminService {
       totalBalance: money(u.accounts.reduce((s, a) => s.plus(D(a.balance)), D(0))),
       createdAt: u.createdAt.toISOString(),
       lastLoginAt: u.lastLoginAt?.toISOString() ?? null,
+      lastSeenAt: u.lastSeenAt?.toISOString() ?? null,
+      online: this.isOnline(u.lastSeenAt),
+      openTrades: openTradesOf(u),
     }));
     return { items, total, page: q.page, limit: q.limit };
   }
@@ -161,6 +190,27 @@ export class AdminService {
     const u = await this.prisma.user.findUnique({ where: { id }, include: { profile: true, accounts: { orderBy: { createdAt: 'asc' } } } });
     if (!u) throw ApiError.notFound('user_not_found', 'User not found');
     const me = await this.auth.toMe(u);
+    const acctIds = u.accounts.map((a) => a.id);
+    const [open, closed, vol, pnl, deps, wdrs, pendingPayments, openTickets] = await Promise.all([
+      this.prisma.position.count({ where: { accountId: { in: acctIds }, status: 'open' } }),
+      this.prisma.position.count({ where: { accountId: { in: acctIds }, status: 'closed' } }),
+      this.prisma.position.aggregate({ _sum: { lots: true }, where: { accountId: { in: acctIds } } }),
+      this.prisma.position.aggregate({ _sum: { realizedPnl: true }, where: { accountId: { in: acctIds }, status: 'closed' } }),
+      this.prisma.paymentRequest.aggregate({ _sum: { amount: true }, where: { userId: id, kind: 'deposit', status: 'approved' } }),
+      this.prisma.paymentRequest.aggregate({ _sum: { amount: true }, where: { userId: id, kind: 'withdraw', status: 'approved' } }),
+      this.prisma.paymentRequest.count({ where: { userId: id, status: 'pending' } }),
+      this.prisma.ticket.count({ where: { userId: id, status: { not: 'closed' } } }),
+    ]);
+    const stats = {
+      openTrades: open,
+      closedTrades: closed,
+      totalVolumeLots: D(vol._sum.lots ?? 0).toFixed(2),
+      realizedPnl: money(pnl._sum.realizedPnl ?? 0),
+      depositsApproved: money(deps._sum.amount ?? 0),
+      withdrawalsApproved: money(wdrs._sum.amount ?? 0),
+      pendingPayments,
+      openTickets,
+    };
     return {
       id: u.id,
       email: u.email,
@@ -176,10 +226,14 @@ export class AdminService {
       totalBalance: money(u.accounts.reduce((s, a) => s.plus(D(a.balance)), D(0))),
       createdAt: u.createdAt.toISOString(),
       lastLoginAt: u.lastLoginAt?.toISOString() ?? null,
+      lastSeenAt: u.lastSeenAt?.toISOString() ?? null,
+      online: this.isOnline(u.lastSeenAt),
+      openTrades: open,
       lastLoginIp: u.lastLoginIp,
       notes: u.adminNotes,
       profile: me.profile,
       accounts: await Promise.all(u.accounts.map((a) => this.accounts.toDto(a))),
+      stats,
     };
   }
 
@@ -300,7 +354,10 @@ export class AdminService {
   async sendDepositEmail(actor: Actor, userId: string) {
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { email: true, role: true, profile: { select: { firstName: true } } } });
     if (user.role !== 'client') throw ApiError.badRequest('not_a_client', 'Deposit emails go to clients only');
-    await this.mail.depositInvite(user.email, user.profile?.firstName ?? '');
+    const web = (env.WEB_ORIGIN || '').split(',')[0] || 'https://www.zerventa.com';
+    const token = await this.auth.createDepositLinkToken(userId);
+    const link = `${web}/deposit-link?token=${encodeURIComponent(token)}`;
+    await this.mail.depositInvite(user.email, user.profile?.firstName ?? '', link);
     await this.prisma.adminAudit.create({ data: { actorId: actor.id, action: 'user.deposit_email', targetType: 'user', targetId: userId, ip: actor.ip } });
     return { sent: true };
   }

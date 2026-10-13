@@ -29,6 +29,10 @@ const auditQuery = paginationSchema.extend({
   actorId: z.string().uuid().optional(),
 });
 const removeCreditSchema = z.object({ amount: moneySchema, reason: z.string().trim().min(3).max(300) });
+const activityQuery = paginationSchema.extend({
+  kind: z.string().trim().max(40).optional(),
+  userId: z.string().uuid().optional(),
+});
 
 @Controller('admin')
 @Roles('admin', 'superadmin')
@@ -108,5 +112,21 @@ export class AdminController {
   @Get('audit')
   audit(@Query(new ZodPipe(auditQuery)) q: z.infer<typeof auditQuery>) {
     return this.admin.audit(q);
+  }
+
+  // ---- activity feed (what clients are doing) ----
+  @Get('activity')
+  activity(@Query(new ZodPipe(activityQuery)) q: z.infer<typeof activityQuery>) {
+    return this.admin.activityFeed(q);
+  }
+
+  @Get('activity/unread')
+  activityUnread(@CurrentUser() actor: AuthUser) {
+    return this.admin.activityUnread(actor.id);
+  }
+
+  @Post('activity/read')
+  activityRead(@CurrentUser() actor: AuthUser) {
+    return this.admin.activityMarkRead(actor.id);
   }
 }
