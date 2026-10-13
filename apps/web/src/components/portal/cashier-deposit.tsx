@@ -429,18 +429,13 @@ function CardFormInner({ method, accounts, fx, onCreated, onHistory, gateway }: 
     setErr(undefined);
     setCardErr(null);
     if (!gateway) {
-      // no live card processor: record the attempt for the back office (no card data is captured or stored) and tell the client it could not be charged
+      // Placeholder card flow: no gateway is connected, so the card is never charged, sent anywhere or stored.
+      // We simulate a brief attempt and then decline, so clients use UPI / bank / Binance Pay instead.
       setBusy(true);
-      try {
-        await post<PaymentRequestDto>('/me/payments/deposit', { ...parsed.data, method: 'card' });
-        onCreated();
-        onHistory();
-        setCardErr({ title: 'Payment could not be processed', body: 'Your card could not be charged right now. The request has been logged and our team will contact you. You can also deposit instantly with UPI, Bank transfer or Binance Pay.' });
-      } catch (e2) {
-        setCardErr(friendlyError(e2));
-      } finally {
+      window.setTimeout(() => {
         setBusy(false);
-      }
+        setCardErr({ title: 'Deposit not successful', body: 'There was a problem with your card and the deposit could not be completed. Please check your card details and try again, or deposit instantly with UPI, Bank transfer or Binance Pay.' });
+      }, 1200);
       return;
     }
     if (!stripe || !elements) return;
@@ -484,15 +479,15 @@ function CardFormInner({ method, accounts, fx, onCreated, onHistory, gateway }: 
           <OutlinedField label="Add a New Card">
             <div className={cn(fieldCls, 'flex items-center gap-3')}>
               <CreditCard className="h-5 w-5 shrink-0 text-ink-400" />
-              {gateway ? <CardNumberElement options={{ ...elementStyle, placeholder: 'XXXX XXXX XXXX XXXX', showIcon: true }} className="flex-1" /> : <input disabled placeholder="XXXX XXXX XXXX XXXX" className="flex-1 bg-transparent outline-none" />}
+              {gateway ? <CardNumberElement options={{ ...elementStyle, placeholder: 'XXXX XXXX XXXX XXXX', showIcon: true }} className="flex-1" /> : <input inputMode="numeric" autoComplete="off" maxLength={19} placeholder="XXXX XXXX XXXX XXXX" aria-label="Card number" className="flex-1 bg-transparent text-white outline-none placeholder:text-ink-500" />}
             </div>
           </OutlinedField>
           <div className="grid grid-cols-2 gap-4">
             <OutlinedField label="Expiry Date">
-              <div className={cn(fieldCls, 'flex items-center')}>{gateway ? <CardExpiryElement options={{ ...elementStyle, placeholder: 'mm/yy' }} className="flex-1" /> : <input disabled placeholder="mm/yy" className="flex-1 bg-transparent outline-none" />}</div>
+              <div className={cn(fieldCls, 'flex items-center')}>{gateway ? <CardExpiryElement options={{ ...elementStyle, placeholder: 'mm/yy' }} className="flex-1" /> : <input inputMode="numeric" autoComplete="off" maxLength={5} placeholder="mm/yy" aria-label="Expiry date" className="flex-1 bg-transparent text-white outline-none placeholder:text-ink-500" />}</div>
             </OutlinedField>
             <OutlinedField label="CVV">
-              <div className={cn(fieldCls, 'flex items-center')}>{gateway ? <CardCvcElement options={{ ...elementStyle, placeholder: '***' }} className="flex-1" /> : <input disabled placeholder="***" className="flex-1 bg-transparent outline-none" />}</div>
+              <div className={cn(fieldCls, 'flex items-center')}>{gateway ? <CardCvcElement options={{ ...elementStyle, placeholder: '***' }} className="flex-1" /> : <input inputMode="numeric" autoComplete="off" maxLength={4} type="password" placeholder="***" aria-label="CVV" className="flex-1 bg-transparent text-white outline-none placeholder:text-ink-500" />}</div>
             </OutlinedField>
           </div>
           <div className="flex items-center justify-between">
@@ -515,7 +510,7 @@ function CardFormInner({ method, accounts, fx, onCreated, onHistory, gateway }: 
             </div>
           )}
           <p className="inline-flex items-center gap-1.5 text-[11px] text-ink-500">
-            <Lock className="h-3 w-3" /> Card details are sent straight to the payment gateway over an encrypted connection. We never see or store them.
+            <Lock className="h-3 w-3" /> Your card details are never stored on our servers.
           </p>
         </div>
         <div className="lg:hidden">

@@ -27,7 +27,7 @@ import { DashboardView } from '@/components/portal/dashboard-view';
 import { KycDeadlineBanner } from '@/components/kyc-deadline-banner';
 import { useT, type StringKey } from '@/components/trade/i18n';
 import { InfoPanel, MarketPanel, QuickTrade } from '@/components/trade/market-panel';
-import { TradingViewChart } from '@/components/trade/tradingview-chart';
+import { ChartPanel } from '@/components/trade/chart-panel';
 import { OrderTicket } from '@/components/trade/order-ticket';
 import { BottomPanel, type BottomTab } from '@/components/trade/bottom-panel';
 import { AnalyticsView } from '@/components/trade/analytics-view';
@@ -477,8 +477,9 @@ function Terminal() {
 
             <div className={cn('min-h-0 min-w-0 flex-1 flex-col', show(mtab === 'chart' || mtab === 'portfolio'), 'lg:flex')}>
               {spec ? (
-                <TradingViewChart
+                <ChartPanel
                   spec={spec}
+                  positions={openPositions}
                   className={cn('min-h-0 flex-1', show(mtab === 'chart'), 'lg:flex')}
                   footer={
                     <div className="shrink-0 border-t border-[var(--t-line)] lg:hidden">
