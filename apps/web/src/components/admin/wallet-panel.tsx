@@ -20,13 +20,15 @@ export function WalletPanel({ account, superadmin, onChanged }: { account: Accou
   const f = useForm<z.infer<typeof adminCreditSchema> | z.infer<typeof adminDebitSchema>>(schema as never, { type: mode === 'credit' ? 'deposit' : 'debit' });
 
   const amount = Number(f.values.amount ?? 0) || 0;
-  const bucket = f.values.type === 'bonus' || f.values.type === 'credit' ? 'credit' : 'balance';
+  const bucket = f.values.type === 'bonus' || f.values.type === 'credit' || f.values.type === 'remove_credit' ? 'credit' : 'balance';
   const preview =
     mode === 'credit'
       ? bucket === 'credit'
         ? { balance: Number(account.balance), credit: Number(account.credit) + amount }
         : { balance: Number(account.balance) + amount, credit: Number(account.credit) }
-      : { balance: Number(account.balance) - amount, credit: Number(account.credit) };
+      : bucket === 'credit'
+        ? { balance: Number(account.balance), credit: Number(account.credit) - amount }
+        : { balance: Number(account.balance) - amount, credit: Number(account.credit) };
 
   const switchMode = (m: Mode) => {
     setMode(m);
@@ -68,6 +70,7 @@ export function WalletPanel({ account, superadmin, onChanged }: { account: Accou
               <option value="debit">Debit</option>
               <option value="withdraw">Withdrawal</option>
               <option value="fee">Fee</option>
+              <option value="remove_credit">Remove credit (take back bonus/credit)</option>
             </>
           )}
         </Select>

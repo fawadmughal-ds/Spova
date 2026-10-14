@@ -432,18 +432,20 @@ export class AdminService {
   async debit(actor: Actor, accountId: string, input: AdminDebitInput) {
     const amount = D(input.amount).negated();
     const force = input.force && actor.role === 'superadmin';
+    // 'remove_credit' claws back non-withdrawable credit/bonus: it hits the CREDIT bucket (ledger type adjustment), not the cash balance
+    const removeCredit = input.type === 'remove_credit';
 
     const { result, entryId } = await this.prisma.$transaction(async (tx) => {
       const result = await this.ledger.postInTx(tx, {
         accountId,
-        type: input.type,
+        type: removeCredit ? 'adjustment' : (input.type as 'withdraw' | 'debit' | 'fee'),
         amount,
         reason: input.reason,
         refType: 'admin',
         refId: actor.id,
         actorId: actor.id,
-        bucket: 'balance',
-        allowNegative: force,
+        bucket: removeCredit ? 'credit' : 'balance',
+        allowNegative: removeCredit ? false : force,
       });
       await tx.adminAudit.create({
         data: {
@@ -451,15 +453,15 @@ export class AdminService {
           action: `account.${input.type}`,
           targetType: 'account',
           targetId: accountId,
-          before: { balance: result.balanceAfter.minus(amount).toFixed(2) },
-          after: { balance: result.balanceAfter.toFixed(2), amount: amount.toFixed(2), reason: input.reason, force: !!force },
+          before: removeCredit ? { credit: D(result.account.credit).minus(amount).toFixed(2) } : { balance: result.balanceAfter.minus(amount).toFixed(2) },
+          after: { balance: money(result.account.balance), credit: money(result.account.credit), amount: amount.toFixed(2), reason: input.reason, force: !!force },
           ip: actor.ip,
         },
       });
       return { result, entryId: result.entryId };
     });
 
-    await this.afterMoneyChange(result.account.userId, result.account, `${money(amount)} ${result.account.currency} ${input.type}`, input.reason);
+    await this.afterMoneyChange(result.account.userId, result.account, `${money(amount)} ${result.account.currency} ${removeCredit ? 'credit removed' : input.type}`, input.reason);
     return { entryId, account: await this.accounts.toDto(result.account) };
   }
 

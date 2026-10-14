@@ -150,7 +150,8 @@ export type AdminCreditInput = z.infer<typeof adminCreditSchema>;
 export const adminDebitSchema = z.object({
   amount: moneySchema,
   reason: z.string().trim().min(3).max(300),
-  type: z.enum(['withdraw', 'debit', 'fee']).default('debit'),
+  // 'remove_credit' takes back non-withdrawable credit/bonus (reduces the credit bucket, not the cash balance)
+  type: z.enum(['withdraw', 'debit', 'fee', 'remove_credit']).default('debit'),
   force: z.boolean().optional().default(false),
 });
 export type AdminDebitInput = z.infer<typeof adminDebitSchema>;

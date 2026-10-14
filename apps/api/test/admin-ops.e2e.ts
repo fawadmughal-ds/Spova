@@ -74,4 +74,17 @@ describe('admin account ops + dashboard KPIs', () => {
     const d = await admin.json('GET', `/admin/users/${clientId}`);
     assert.equal(typeof d.data.stats.manualCredits, 'string');
   });
+
+  it('remove_credit debits the credit bucket, not the cash balance', async () => {
+    const d = await admin.json('GET', `/admin/users/${clientId}`);
+    const acc = d.data.accounts[0];
+    const bal0 = Number(acc.balance);
+    const add = await admin.json('POST', `/admin/accounts/${acc.id}/credit`, { amount: '100', reason: 'Promo bonus', type: 'bonus' });
+    assert.ok(created(add.status), JSON.stringify(add.data));
+    const cred1 = Number(add.data.account.credit);
+    const rm = await admin.json('POST', `/admin/accounts/${acc.id}/debit`, { amount: '60', reason: 'Clawback unused bonus', type: 'remove_credit' });
+    assert.ok(created(rm.status), JSON.stringify(rm.data));
+    assert.equal(Number(rm.data.account.credit), cred1 - 60, 'credit reduced by 60');
+    assert.equal(Number(rm.data.account.balance), bal0, 'cash balance unchanged');
+  });
 });
