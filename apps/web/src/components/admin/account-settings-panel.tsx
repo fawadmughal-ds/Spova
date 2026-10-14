@@ -16,6 +16,7 @@ export function AccountSettingsPanel({ account, onChanged }: { account: AccountD
   const [status, setStatus] = useState<string>(account.status);
   const [blocked, setBlocked] = useState(account.tradingBlocked);
   const [swapFree, setSwapFree] = useState(account.swapFree);
+  const [usdRate, setUsdRate] = useState(account.usdRate ?? '');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -24,6 +25,7 @@ export function AccountSettingsPanel({ account, onChanged }: { account: AccountD
     setStatus(account.status);
     setBlocked(account.tradingBlocked);
     setSwapFree(account.swapFree);
+    setUsdRate(account.usdRate ?? '');
   }, [account]);
 
   const save = async () => {
@@ -35,6 +37,7 @@ export function AccountSettingsPanel({ account, onChanged }: { account: AccountD
         status,
         tradingBlocked: blocked,
         swapFree,
+        usdRate: usdRate === '' ? null : Number(usdRate),
       });
       onChanged(a);
       toast({ title: 'Account updated', level: 'success' });
@@ -81,6 +84,14 @@ export function AccountSettingsPanel({ account, onChanged }: { account: AccountD
           </span>
           <input type="checkbox" className="h-5 w-5 accent-brand-500" checked={swapFree} onChange={(e) => setSwapFree(e.target.checked)} />
         </label>
+        <Input
+          label="USD rate override (per account)"
+          type="number"
+          inputMode="decimal"
+          value={usdRate}
+          onChange={(e) => setUsdRate(e.target.value)}
+          placeholder="Blank = global cashier rate"
+        />
         <Input label="Login code" value={account.loginCode} readOnly disabled />
         <Button className="w-full" variant="secondary" onClick={() => void save()} loading={saving}>
           Save settings

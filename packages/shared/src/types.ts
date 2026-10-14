@@ -94,6 +94,8 @@ export interface AccountDto {
   tradingBlocked: boolean;
   /** overnight swap charges waived for this account (admin-controlled) */
   swapFree: boolean;
+  /** per-account USD->local FX override for deposits; null = use the global cashier rate */
+  usdRate: string | null;
   createdAt: string;
 }
 
@@ -156,6 +158,8 @@ export interface AdminUserStatsDto {
   realizedPnl: string;
   depositsApproved: string;
   withdrawalsApproved: string;
+  /** admin manual credits + bonuses added to this client's accounts (all time) */
+  manualCredits: string;
   pendingPayments: number;
   openTickets: number;
 }
@@ -203,6 +207,11 @@ export interface AdminDashboardDto {
   /** approved today (UTC) */
   depositsToday: string;
   withdrawalsToday: string;
+  /** approved all-time, across all clients */
+  depositsTotal: string;
+  withdrawalsTotal: string;
+  /** admin manual credits + bonuses, all-time */
+  manualCreditsTotal: string;
   pendingDepositsTotal: string;
   pendingWithdrawalsTotal: string;
   /** distinct clients with a session opened in the last 24 hours */

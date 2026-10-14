@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { AccountType, Prisma, TradingAccount } from '@prisma/client';
+import { AccountType, Prisma, type Tier, TradingAccount } from '@prisma/client';
 import { DEFAULT_PLATFORM_SETTINGS, type AccountDto, type PlatformSettings, type WsAccountSnapshot } from '@spova/shared';
 import { SettingsService } from '../../infra/settings.service';
 import { PrismaService } from '../../infra/prisma.service';
@@ -68,7 +68,7 @@ export class AccountsService {
       if (!platform.liveAccountsOpen) throw ApiError.forbidden('live_accounts_closed', 'Live account opening is paused at the moment');
     }
     const count = await this.prisma.tradingAccount.count({ where: { userId, type } });
-    if (type === 'demo' && count >= 3) throw ApiError.conflict('demo_limit', 'Maximum 3 demo accounts');
+    if (type === 'demo' && count >= 5) throw ApiError.conflict('demo_limit', 'Maximum 5 demo accounts');
     if (type === 'live' && count >= 1) throw ApiError.conflict('live_limit', 'You already have a live account');
 
     const account = await this.prisma.$transaction((tx) => this.createInTx(tx, userId, type));
@@ -78,6 +78,24 @@ export class AccountsService {
       if (!u?.kycDeadlineAt) await this.prisma.user.update({ where: { id: userId }, data: { kycDeadlineAt: new Date(Date.now() + 15 * 86_400_000), kycReminderSentAt: null } });
     }
     return account;
+  }
+
+  /** Admin opens an account for a client: no self-serve limit, optional tier/leverage. Returns the DTO. */
+  async adminCreate(userId: string, type: AccountType, opts: { tier?: Tier; leverage?: number } = {}) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
+    if (!user) throw ApiError.notFound('user_not_found', 'User not found');
+    const account = await this.prisma.$transaction(async (tx) => {
+      const acc = await this.createInTx(tx, userId, type);
+      if (opts.tier || opts.leverage) {
+        return tx.tradingAccount.update({ where: { id: acc.id }, data: { ...(opts.tier && { tier: opts.tier }), ...(opts.leverage && { leverage: opts.leverage }) } });
+      }
+      return acc;
+    });
+    if (type === 'live') {
+      const u = await this.prisma.user.findUnique({ where: { id: userId }, select: { kycDeadlineAt: true } });
+      if (!u?.kycDeadlineAt) await this.prisma.user.update({ where: { id: userId }, data: { kycDeadlineAt: new Date(Date.now() + 15 * 86_400_000), kycReminderSentAt: null } });
+    }
+    return this.toDto(account);
   }
 
   listForUser(userId: string) {
@@ -143,6 +161,7 @@ export class AccountsService {
       status: acc.status,
       tradingBlocked: acc.tradingBlocked,
       swapFree: acc.swapFree,
+      usdRate: acc.usdRate ? acc.usdRate.toString() : null,
       createdAt: acc.createdAt.toISOString(),
     };
   }

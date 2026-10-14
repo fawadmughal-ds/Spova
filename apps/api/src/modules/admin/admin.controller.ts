@@ -1,6 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { z } from 'zod';
 import {
+  adminCreateAccountSchema,
   adminCreditSchema,
   adminDebitSchema,
   adminUpdateAccountSchema,
@@ -8,6 +9,7 @@ import {
   clientNoteSchema,
   moneySchema,
   paginationSchema,
+  type AdminCreateAccountInput,
   type AdminCreditInput,
   type AdminDebitInput,
   type ClientNoteInput,
@@ -90,6 +92,12 @@ export class AdminController {
   @Delete('notes/:noteId')
   deleteNote(@CurrentUser() actor: AuthUser, @ClientIp() ip: string, @Param('noteId') noteId: string) {
     return this.admin.deleteNote({ ...actor, ip }, noteId);
+  }
+
+  /** Admin opens a demo/live account for a client. */
+  @Post('users/:id/accounts')
+  createAccount(@CurrentUser() actor: AuthUser, @ClientIp() ip: string, @Param('id') id: string, @Body(new ZodPipe(adminCreateAccountSchema)) body: AdminCreateAccountInput) {
+    return this.admin.createAccount({ ...actor, ip }, id, body);
   }
 
   @Get('accounts')

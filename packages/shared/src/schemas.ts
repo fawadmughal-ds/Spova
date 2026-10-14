@@ -168,7 +168,17 @@ export const adminUpdateAccountSchema = z.object({
   status: z.enum(['enabled', 'disabled', 'readonly']).optional(),
   tradingBlocked: z.boolean().optional(),
   swapFree: z.boolean().optional(),
+  /** per-account USD->local FX override used for this client's deposits (null clears it, back to the global cashier rate) */
+  usdRate: z.number().positive().max(100000).nullable().optional(),
 });
+
+/** Admin opens an account for a client — no self-serve limit; optional tier/leverage. */
+export const adminCreateAccountSchema = z.object({
+  type: z.enum(ACCOUNT_TYPES),
+  tier: z.enum(['classic', 'silver', 'gold', 'platinum', 'vip']).optional(),
+  leverage: z.number().int().min(1).max(1000).optional(),
+});
+export type AdminCreateAccountInput = z.infer<typeof adminCreateAccountSchema>;
 
 export const paginationSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),

@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, type Tier } from '@prisma/client';
 import type {
   AdminCreditInput,
   AdminDashboardDto,
@@ -69,7 +69,7 @@ export class AdminService {
     const weekAgo = new Date(Date.now() - 7 * 86400 * 1000);
     const dayAgo = new Date(Date.now() - 86400 * 1000);
     const todayUtc = new Date(new Date().toISOString().slice(0, 10));
-    const [clients, newClients7d, pendingKyc, pendingPayments, openPositions, demoSum, liveSum, openTickets, depToday, wdToday, pendDep, pendWd, active, exposureRows, feedStatus, platform, kycFrozen, dueSoonUsers] = await Promise.all([
+    const [clients, newClients7d, pendingKyc, pendingPayments, openPositions, demoSum, liveSum, openTickets, depToday, wdToday, pendDep, pendWd, active, exposureRows, feedStatus, platform, kycFrozen, dueSoonUsers, depTotal, wdTotal, manualTotal] = await Promise.all([
       this.prisma.user.count({ where: { role: 'client' } }),
       this.prisma.user.count({ where: { role: 'client', createdAt: { gte: weekAgo } } }),
       this.prisma.kycDocument.count({ where: { status: 'pending' } }),
@@ -88,6 +88,9 @@ export class AdminService {
       this.settings.get<{ tradingHalt?: { enabled?: boolean } }>('platform', {}),
       this.prisma.user.count({ where: { role: 'client', status: 'active', kycFrozenAt: { not: null } } }),
       this.prisma.user.findMany({ where: { role: 'client', status: 'active', kycFrozenAt: null, kycDeadlineAt: { lte: new Date(Date.now() + 3 * 86400 * 1000) } }, select: { id: true } }),
+      this.prisma.paymentRequest.aggregate({ _sum: { amount: true }, where: { kind: 'deposit', status: 'approved' } }),
+      this.prisma.paymentRequest.aggregate({ _sum: { amount: true }, where: { kind: 'withdraw', status: 'approved' } }),
+      this.prisma.ledgerEntry.aggregate({ _sum: { amount: true }, where: { type: { in: ['credit', 'bonus'] } } }),
     ]);
     const bySymbol = new Map<string, { buy: number; sell: number; positions: number }>();
     for (const r of exposureRows) {
@@ -112,6 +115,9 @@ export class AdminService {
       openTickets,
       depositsToday: money(depToday._sum.amount),
       withdrawalsToday: money(wdToday._sum.amount),
+      depositsTotal: money(depTotal._sum.amount),
+      withdrawalsTotal: money(wdTotal._sum.amount),
+      manualCreditsTotal: money(manualTotal._sum.amount),
       pendingDepositsTotal: money(pendDep._sum.amount),
       pendingWithdrawalsTotal: money(pendWd._sum.amount),
       activeClients24h: active.length,
@@ -192,7 +198,7 @@ export class AdminService {
     if (!u) throw ApiError.notFound('user_not_found', 'User not found');
     const me = await this.auth.toMe(u);
     const acctIds = u.accounts.map((a) => a.id);
-    const [open, closed, vol, pnl, deps, wdrs, pendingPayments, openTickets] = await Promise.all([
+    const [open, closed, vol, pnl, deps, wdrs, pendingPayments, openTickets, manual] = await Promise.all([
       this.prisma.position.count({ where: { accountId: { in: acctIds }, status: 'open' } }),
       this.prisma.position.count({ where: { accountId: { in: acctIds }, status: 'closed' } }),
       this.prisma.position.aggregate({ _sum: { lots: true }, where: { accountId: { in: acctIds } } }),
@@ -201,6 +207,7 @@ export class AdminService {
       this.prisma.paymentRequest.aggregate({ _sum: { amount: true }, where: { userId: id, kind: 'withdraw', status: 'approved' } }),
       this.prisma.paymentRequest.count({ where: { userId: id, status: 'pending' } }),
       this.prisma.ticket.count({ where: { userId: id, status: { not: 'closed' } } }),
+      this.prisma.ledgerEntry.aggregate({ _sum: { amount: true }, where: { accountId: { in: acctIds }, type: { in: ['credit', 'bonus'] } } }),
     ]);
     const stats = {
       openTrades: open,
@@ -209,6 +216,7 @@ export class AdminService {
       realizedPnl: money(pnl._sum.realizedPnl ?? 0),
       depositsApproved: money(deps._sum.amount ?? 0),
       withdrawalsApproved: money(wdrs._sum.amount ?? 0),
+      manualCredits: money(manual._sum.amount ?? 0),
       pendingPayments,
       openTickets,
     };
@@ -325,10 +333,18 @@ export class AdminService {
 
   // ---------------------------------------------------------------- accounts
 
+  /** Admin opens an account for a client (no self-serve limit). */
+  async createAccount(actor: Actor, userId: string, input: { type: 'demo' | 'live'; tier?: Tier; leverage?: number }) {
+    const dto = await this.accounts.adminCreate(userId, input.type, { tier: input.tier, leverage: input.leverage });
+    await this.prisma.adminAudit.create({ data: { actorId: actor.id, action: 'account.create', targetType: 'account', targetId: dto.id, before: {}, after: { type: dto.type, tier: dto.tier, loginCode: dto.loginCode }, ip: actor.ip } });
+    void this.activity.record({ userId, kind: 'account_open', title: `Admin opened a ${input.type} account`, detail: `#${dto.loginCode} · ${dto.tier}`, meta: { loginCode: dto.loginCode, type: input.type } });
+    return dto;
+  }
+
   async updateAccount(
     actor: Actor,
     accountId: string,
-    patch: { leverage?: number; tier?: 'classic' | 'silver' | 'gold' | 'platinum' | 'vip'; status?: 'enabled' | 'disabled' | 'readonly'; tradingBlocked?: boolean; swapFree?: boolean },
+    patch: { leverage?: number; tier?: 'classic' | 'silver' | 'gold' | 'platinum' | 'vip'; status?: 'enabled' | 'disabled' | 'readonly'; tradingBlocked?: boolean; swapFree?: boolean; usdRate?: number | null },
   ) {
     const before = await this.prisma.tradingAccount.findUnique({ where: { id: accountId } });
     if (!before) throw ApiError.notFound('account_not_found', 'Account not found');

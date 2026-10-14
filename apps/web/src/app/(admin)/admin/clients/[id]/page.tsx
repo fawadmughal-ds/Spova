@@ -58,6 +58,19 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
     setLedgerVersion((v) => v + 1);
   };
 
+  const openAccount = async (type: 'demo' | 'live') => {
+    setBusy(true);
+    try {
+      await post(`/admin/users/${id}/accounts`, { type });
+      toast({ title: `${type === 'live' ? 'Live' : 'Demo'} account opened`, level: 'success' });
+      await load();
+    } catch (e) {
+      toast({ title: 'Could not open account', body: e instanceof ApiError ? e.message : undefined, level: 'danger' });
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const setStatus = async (status: 'active' | 'frozen') => {
     if (!confirm(status === 'frozen' ? 'Freeze this client? They will be logged out and cannot sign in or trade.' : 'Unfreeze this client?')) return;
     setBusy(true);
@@ -183,6 +196,7 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
             ['Margin level', liveAcc?.marginLevel ? `${Number(liveAcc.marginLevel).toFixed(0)}%` : '—', false],
             ['Deposits', fmtMoney(u.stats.depositsApproved), false],
             ['Withdrawals', fmtMoney(u.stats.withdrawalsApproved), false],
+            ['Manual credits', fmtMoney(u.stats.manualCredits), false],
             ['Pending payments', String(u.stats.pendingPayments), u.stats.pendingPayments > 0],
             ['Open tickets', String(u.stats.openTickets), u.stats.openTickets > 0],
           ] as [string, string, boolean][]
@@ -240,6 +254,18 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
 
         {/* accounts */}
         <Card title="Trading accounts" className="xl:col-span-2">
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <span className="text-xs text-ink-500">
+              {u.accounts.filter((a) => a.type === 'demo').length} demo · {u.accounts.filter((a) => a.type === 'live').length} live
+            </span>
+            <span className="flex-1" />
+            <Button size="sm" variant="outline" onClick={() => void openAccount('demo')} disabled={busy}>
+              + Demo
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => void openAccount('live')} disabled={busy}>
+              + Live
+            </Button>
+          </div>
           {u.accounts.length === 0 ? (
             <p className="text-sm text-ink-400">No accounts.</p>
           ) : (

@@ -253,10 +253,10 @@ function DepositButton({ loading, disabled }: { loading: boolean; disabled: bool
   );
 }
 
-const chargedLine = (amount: string, currency: string, fx: Record<string, number>) => {
+const chargedLine = (amount: string, currency: string, fx: Record<string, number>, rateOverride?: number) => {
   const n = Number(amount);
   if (!n || !currency || currency === 'USD') return null;
-  const rate = fx[currency];
+  const rate = rateOverride ?? fx[currency];
   if (!rate) return null;
   const locale = currency === 'INR' ? 'en-IN' : 'en-US';
   return `${(n * rate).toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`;
@@ -279,7 +279,8 @@ function ManualForm({ method, label, accounts, fx, onCreated, onHistory }: { met
   const [financeModal, setFinanceModal] = useState<PaymentRequestDto | null>(null);
   const financeHandled = method.id === 'rtgs';
   const channel = method.deposit;
-  const charged = chargedLine(amount, channel?.currency ?? 'USD', fx);
+  const acctRate = accounts.find((a) => a.id === account)?.usdRate;
+  const charged = chargedLine(amount, channel?.currency ?? 'USD', fx, acctRate ? Number(acctRate) : undefined);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
