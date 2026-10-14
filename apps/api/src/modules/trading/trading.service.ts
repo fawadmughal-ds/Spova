@@ -346,6 +346,14 @@ export class TradingService {
       } else {
         account = await tx.tradingAccount.findUniqueOrThrow({ where: { id: pos.accountId } });
       }
+      // settle the swap accrued while the trade was open into the cash balance (proportional on a partial close);
+      // swap reduced equity night by night, and lands in the balance only now, at close
+      const swapAccrued = dec(fresh.swapAccrued);
+      const swapShare = (partial ? swapAccrued.times(share) : swapAccrued).toDecimalPlaces(2);
+      if (!swapShare.isZero()) {
+        const sr = await this.ledger.postInTx(tx, { accountId: pos.accountId, type: 'swap', amount: swapShare, reason: `Swap on ${partial ? 'partial ' : ''}close ${pos.side} ${closeLots.toString()} ${pos.symbolId}`, refType: 'position', refId: pos.id, actorId: actor.id, allowNegative: true });
+        account = sr.account;
+      }
       // negative balance protection: a gap through stop-out never leaves the client owing money
       if (dec(account.balance).lt(0)) {
         const fix = await this.ledger.postInTx(tx, { accountId: pos.accountId, type: 'adjustment', amount: dec(account.balance).negated(), reason: 'Negative balance protection', refType: 'position', refId: pos.id, actorId: null, allowNegative: true });
@@ -353,7 +361,7 @@ export class TradingService {
       }
 
       const data: Prisma.PositionUpdateInput = partial
-        ? { lots: toDb(dec(pos.lots).minus(closeLots)), marginUsed: toDb(dec(pos.marginUsed).times(dec(1).minus(share))) }
+        ? { lots: toDb(dec(pos.lots).minus(closeLots)), marginUsed: toDb(dec(pos.marginUsed).times(dec(1).minus(share))), swapAccrued: toDb(swapAccrued.minus(swapShare)) }
         : { status: 'closed', closePrice: toPx(price, spec), closeAt: new Date(), realizedPnl: toDb(pnl), closeReason: reason, closedBy: actor.id };
       const updated = await tx.position.update({ where: { id: pos.id }, data });
       await tx.positionClose.create({
@@ -417,7 +425,12 @@ export class TradingService {
     return { closed };
   }
 
-  /** Nightly swap: lots x rate (x3 Wednesday) per open position -> ledger `swap`, mirrored into swap_accrued. Idempotent per date. */
+  /**
+   * Nightly swap: lots x rate (x3 Wednesday) per open position, accrued onto the position's `swap_accrued`.
+   * The swap is NOT posted to the cash balance — it reduces EQUITY while the trade is open (the account
+   * snapshot and the risk engine add swap_accrued to floating) and is settled into the balance when the
+   * position closes. Idempotent per date.
+   */
   async accrueSwap(date: string) {
     const key = `swap:done:${date}`;
     if (!(await this.redis.client.set(key, '1', 'EX', 7 * 86400, 'NX'))) return { applied: 0, skipped: true };
@@ -435,11 +448,8 @@ export class TradingService {
       if (freeAccts.has(p.accountId)) continue; // admin made this account swap-free
       const swap = swapFor(p.lots.toString(), p.side, spec.swapLong.toString(), spec.swapShort.toString(), day).toDecimalPlaces(2);
       if (swap.isZero()) continue;
-      await this.prisma.$transaction(async (tx) => {
-        await tx.$queryRaw`SELECT id FROM trading_accounts WHERE id = ${p.accountId}::uuid FOR UPDATE`;
-        await this.ledger.postInTx(tx, { accountId: p.accountId, type: 'swap', amount: swap, reason: `Overnight swap ${p.side} ${p.lots} ${p.symbolId} (${date})`, refType: 'position', refId: p.id, actorId: null, allowNegative: true });
-        await tx.position.update({ where: { id: p.id }, data: { swapAccrued: { increment: toDb(swap) } } });
-      });
+      // accrue onto the trade only; equity reflects it live, the balance is touched at close
+      await this.prisma.position.update({ where: { id: p.id }, data: { swapAccrued: { increment: toDb(swap) } } });
       touched.add(p.accountId);
       applied++;
     }

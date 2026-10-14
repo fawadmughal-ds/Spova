@@ -189,7 +189,8 @@ export class RiskEngine {
       const m = accountMath(
         a.balance,
         a.credit,
-        positions.map((p) => ({ symbol: p.symbol, side: p.side as 'buy' | 'sell', marginUsed: p.marginUsed, floatingUsd: this.floating.get(p.id) ?? dec(0) })),
+        // swap accrues against equity while open (settled into balance at close), so add swap_accrued to floating here
+        positions.map((p) => ({ symbol: p.symbol, side: p.side as 'buy' | 'sell', marginUsed: p.marginUsed, floatingUsd: (this.floating.get(p.id) ?? dec(0)).plus(dec(p.swapAccrued)) })),
       );
       const snap: WsAccountSnapshot = {
         accountId: id,

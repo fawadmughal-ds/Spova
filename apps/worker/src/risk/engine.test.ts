@@ -186,6 +186,18 @@ test('account loop publishes a snapshot to user and account rooms with correct m
   assert.equal(redis.hashes.get('acct:a1')!.equity, '10300.00');
 });
 
+test('swap accrues against equity (not balance) while the trade is open, kept separate from the trade P/L', async () => {
+  const { redis, engine } = setup(dto([pos({ marginUsed: '1085.00', swapAccrued: '-25.00' })], [], { credit: '200.00' }));
+  engine.onTick(tick('EURUSD', q('1.08600', '1.08610')));
+  await engine.accountLoop();
+  await flush();
+  const snap = redis.published[0]!.payload;
+  assert.equal(snap.equity, '10275.00'); // 10000 balance + 200 credit + 100 floating - 25 swap
+  assert.equal(snap.freeMargin, '9190.00'); // 10275 - 1085
+  // the per-trade floating shown to the client stays price-only; swap is displayed as its own line
+  assert.equal(redis.hashes.get('pos:p1')!.floatingUsd, '100.00');
+});
+
 test('stop-out when level <= 20%, debounced to one request; margin call once per hour', async () => {
   // balance 1000, margin used 1085 -> a loss of ~800 pushes the level under 20%
   const { api, engine } = setup(dto([pos({ marginUsed: '1085.00' })], [], { balance: '1000.00' }));
