@@ -75,6 +75,20 @@ describe('admin account ops + dashboard KPIs', () => {
     assert.equal(typeof d.data.stats.manualCredits, 'string');
   });
 
+  it('a manual deposit (admin, no client request) shows in the dashboard deposit totals', async () => {
+    const acc = await admin.json('POST', `/admin/users/${clientId}/accounts`, { type: 'live' });
+    assert.ok(created(acc.status), JSON.stringify(acc.data));
+    const before = await admin.json('GET', '/admin/dashboard');
+    const dep0 = Number(before.data.depositsTotal);
+    const r = await admin.json('POST', `/admin/accounts/${acc.data.id}/credit`, { amount: '500', reason: 'Manual bank deposit', type: 'deposit' });
+    assert.ok(created(r.status), JSON.stringify(r.data));
+    const after = await admin.json('GET', '/admin/dashboard');
+    assert.equal(Number(after.data.depositsTotal), dep0 + 500, 'manual deposit counted in dashboard deposits');
+    // and in the client's own deposit figure
+    const d = await admin.json('GET', `/admin/users/${clientId}`);
+    assert.ok(Number(d.data.stats.depositsApproved) >= 500);
+  });
+
   it('remove_credit debits the credit bucket, not the cash balance', async () => {
     const d = await admin.json('GET', `/admin/users/${clientId}`);
     const acc = d.data.accounts[0];

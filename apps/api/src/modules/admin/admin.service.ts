@@ -78,8 +78,9 @@ export class AdminService {
       this.prisma.tradingAccount.aggregate({ _sum: { balance: true }, where: { type: 'demo' } }),
       this.prisma.tradingAccount.aggregate({ _sum: { balance: true }, where: { type: 'live' } }),
       this.prisma.ticket.count({ where: { status: 'open' } }),
-      this.prisma.paymentRequest.aggregate({ _sum: { amount: true }, where: { kind: 'deposit', status: 'approved', decidedAt: { gte: todayUtc } } }),
-      this.prisma.paymentRequest.aggregate({ _sum: { amount: true }, where: { kind: 'withdraw', status: 'approved', decidedAt: { gte: todayUtc } } }),
+      // deposits/withdrawals are counted from the LEDGER (live accounts) so admin manual deposits — not just client requests — are included
+      this.prisma.ledgerEntry.aggregate({ _sum: { amount: true }, where: { type: 'deposit', createdAt: { gte: todayUtc }, account: { type: 'live' } } }),
+      this.prisma.ledgerEntry.aggregate({ _sum: { amount: true }, where: { type: 'withdraw', createdAt: { gte: todayUtc }, account: { type: 'live' } } }),
       this.prisma.paymentRequest.aggregate({ _sum: { amount: true }, where: { kind: 'deposit', status: 'pending' } }),
       this.prisma.paymentRequest.aggregate({ _sum: { amount: true }, where: { kind: 'withdraw', status: 'pending' } }),
       this.prisma.session.findMany({ where: { createdAt: { gte: dayAgo }, revokedAt: null, user: { role: 'client' } }, distinct: ['userId'], select: { userId: true } }),
@@ -88,9 +89,10 @@ export class AdminService {
       this.settings.get<{ tradingHalt?: { enabled?: boolean } }>('platform', {}),
       this.prisma.user.count({ where: { role: 'client', status: 'active', kycFrozenAt: { not: null } } }),
       this.prisma.user.findMany({ where: { role: 'client', status: 'active', kycFrozenAt: null, kycDeadlineAt: { lte: new Date(Date.now() + 3 * 86400 * 1000) } }, select: { id: true } }),
-      this.prisma.paymentRequest.aggregate({ _sum: { amount: true }, where: { kind: 'deposit', status: 'approved' } }),
-      this.prisma.paymentRequest.aggregate({ _sum: { amount: true }, where: { kind: 'withdraw', status: 'approved' } }),
-      this.prisma.ledgerEntry.aggregate({ _sum: { amount: true }, where: { type: { in: ['credit', 'bonus'] } } }),
+      this.prisma.ledgerEntry.aggregate({ _sum: { amount: true }, where: { type: 'deposit', account: { type: 'live' } } }),
+      this.prisma.ledgerEntry.aggregate({ _sum: { amount: true }, where: { type: 'withdraw', account: { type: 'live' } } }),
+      // admin manual credits/bonuses only (refType 'admin'); excludes demo opening balances (refType 'system')
+      this.prisma.ledgerEntry.aggregate({ _sum: { amount: true }, where: { type: { in: ['credit', 'bonus'] }, refType: 'admin' } }),
     ]);
     const bySymbol = new Map<string, { buy: number; sell: number; positions: number }>();
     for (const r of exposureRows) {
@@ -114,9 +116,9 @@ export class AdminService {
       liveBalanceTotal: money(liveSum._sum.balance),
       openTickets,
       depositsToday: money(depToday._sum.amount),
-      withdrawalsToday: money(wdToday._sum.amount),
+      withdrawalsToday: money(D(wdToday._sum.amount ?? 0).negated()),
       depositsTotal: money(depTotal._sum.amount),
-      withdrawalsTotal: money(wdTotal._sum.amount),
+      withdrawalsTotal: money(D(wdTotal._sum.amount ?? 0).negated()),
       manualCreditsTotal: money(manualTotal._sum.amount),
       pendingDepositsTotal: money(pendDep._sum.amount),
       pendingWithdrawalsTotal: money(pendWd._sum.amount),
@@ -203,11 +205,12 @@ export class AdminService {
       this.prisma.position.count({ where: { accountId: { in: acctIds }, status: 'closed' } }),
       this.prisma.position.aggregate({ _sum: { lots: true }, where: { accountId: { in: acctIds } } }),
       this.prisma.position.aggregate({ _sum: { realizedPnl: true }, where: { accountId: { in: acctIds }, status: 'closed' } }),
-      this.prisma.paymentRequest.aggregate({ _sum: { amount: true }, where: { userId: id, kind: 'deposit', status: 'approved' } }),
-      this.prisma.paymentRequest.aggregate({ _sum: { amount: true }, where: { userId: id, kind: 'withdraw', status: 'approved' } }),
+      // from the ledger so admin manual deposits/debits count too (not only approved client requests)
+      this.prisma.ledgerEntry.aggregate({ _sum: { amount: true }, where: { accountId: { in: acctIds }, type: 'deposit' } }),
+      this.prisma.ledgerEntry.aggregate({ _sum: { amount: true }, where: { accountId: { in: acctIds }, type: 'withdraw' } }),
       this.prisma.paymentRequest.count({ where: { userId: id, status: 'pending' } }),
       this.prisma.ticket.count({ where: { userId: id, status: { not: 'closed' } } }),
-      this.prisma.ledgerEntry.aggregate({ _sum: { amount: true }, where: { accountId: { in: acctIds }, type: { in: ['credit', 'bonus'] } } }),
+      this.prisma.ledgerEntry.aggregate({ _sum: { amount: true }, where: { accountId: { in: acctIds }, type: { in: ['credit', 'bonus'] }, refType: 'admin' } }),
     ]);
     const stats = {
       openTrades: open,
@@ -215,7 +218,7 @@ export class AdminService {
       totalVolumeLots: D(vol._sum.lots ?? 0).toFixed(2),
       realizedPnl: money(pnl._sum.realizedPnl ?? 0),
       depositsApproved: money(deps._sum.amount ?? 0),
-      withdrawalsApproved: money(wdrs._sum.amount ?? 0),
+      withdrawalsApproved: money(D(wdrs._sum.amount ?? 0).negated()),
       manualCredits: money(manual._sum.amount ?? 0),
       pendingPayments,
       openTickets,
