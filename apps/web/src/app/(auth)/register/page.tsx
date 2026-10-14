@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowRight } from 'lucide-react';
-import { registerSchema, type MeDto, type RegisterInput } from '@spova/shared';
+import { registerSchema, SUITABILITY_LABELS, type MeDto, type RegisterInput } from '@spova/shared';
 import { usePlatform } from '@/lib/platform';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
@@ -30,6 +30,17 @@ export default function RegisterPage() {
   const { setMe } = useAuth();
   const [show, setShow] = useState(false);
   const f = useForm<RegisterInput>(registerSchema, { countryCode: 'AE' });
+
+  const QSelect = ({ label, field, options }: { label: string; field: keyof RegisterInput; options: Record<string, string> }) => (
+    <Select label={label} {...f.bind(field)}>
+      <option value="">Select…</option>
+      {Object.entries(options).map(([v, l]) => (
+        <option key={v} value={v}>
+          {l}
+        </option>
+      ))}
+    </Select>
+  );
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -74,7 +85,25 @@ export default function RegisterPage() {
             <Input label="Phone" type="tel" placeholder="+971501234567" autoComplete="tel" {...f.bind('phone')} />
           </div>
 
-          <Step n="03">Security</Step>
+          <Step n="03">Residential address</Step>
+          <Input label="Address" autoComplete="street-address" {...f.bind('address')} />
+          <div className="grid grid-cols-2 gap-3">
+            <Input label="City" autoComplete="address-level2" {...f.bind('city')} />
+            <Input label="ZIP / Postal code (optional)" autoComplete="postal-code" {...f.bind('zip')} />
+          </div>
+
+          <Step n="04">Your trading profile</Step>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <QSelect label="Source of funds" field="sourceOfFunds" options={SUITABILITY_LABELS.sourceOfFunds} />
+            <QSelect label="Employment status" field="employmentStatus" options={SUITABILITY_LABELS.employmentStatus} />
+            <QSelect label="Annual income" field="annualIncome" options={SUITABILITY_LABELS.annualIncome} />
+            <QSelect label="Estimated net worth" field="netWorth" options={SUITABILITY_LABELS.netWorth} />
+            <QSelect label="Expected deposit" field="expectedDeposit" options={SUITABILITY_LABELS.expectedDeposit} />
+            <QSelect label="Trading experience" field="tradingExperience" options={SUITABILITY_LABELS.tradingExperience} />
+            <QSelect label="Trading objective" field="tradingObjective" options={SUITABILITY_LABELS.tradingObjective} />
+          </div>
+
+          <Step n="05">Security</Step>
           <Input
             label="Password"
             type={show ? 'text' : 'password'}

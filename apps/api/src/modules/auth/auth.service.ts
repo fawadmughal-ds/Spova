@@ -59,6 +59,16 @@ export class AuthService {
               phone: input.phone,
               dob: new Date(input.dob),
               countryCode: input.countryCode,
+              address: input.address,
+              city: input.city,
+              zip: input.zip || null,
+              sourceOfFunds: input.sourceOfFunds,
+              employmentStatus: input.employmentStatus,
+              annualIncome: input.annualIncome,
+              netWorth: input.netWorth,
+              expectedDeposit: input.expectedDeposit,
+              tradingExperience: input.tradingExperience,
+              tradingObjective: input.tradingObjective,
             },
           },
         },
@@ -293,6 +303,13 @@ export class AuthService {
       notifSms: boolean;
       notifPush: boolean;
       notifCalls: boolean;
+      sourceOfFunds: string | null;
+      employmentStatus: string | null;
+      annualIncome: string | null;
+      netWorth: string | null;
+      expectedDeposit: string | null;
+      tradingExperience: string | null;
+      tradingObjective: string | null;
     } | null;
   }): Promise<MeDto> {
     const groups = user.role === 'client' ? await this.prisma.kycDocument.findMany({ where: { userId: user.id, status: { not: 'rejected' } }, select: { group: true }, distinct: ['group'] }) : [];
@@ -327,6 +344,13 @@ export class AuthService {
             notifSms: user.profile.notifSms,
             notifPush: user.profile.notifPush,
             notifCalls: user.profile.notifCalls,
+            sourceOfFunds: user.profile.sourceOfFunds,
+            employmentStatus: user.profile.employmentStatus,
+            annualIncome: user.profile.annualIncome,
+            netWorth: user.profile.netWorth,
+            expectedDeposit: user.profile.expectedDeposit,
+            tradingExperience: user.profile.tradingExperience,
+            tradingObjective: user.profile.tradingObjective,
           }
         : null,
     };

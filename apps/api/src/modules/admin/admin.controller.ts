@@ -1,14 +1,16 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { z } from 'zod';
 import {
   adminCreditSchema,
   adminDebitSchema,
   adminUpdateAccountSchema,
   adminUpdateUserSchema,
+  clientNoteSchema,
   moneySchema,
   paginationSchema,
   type AdminCreditInput,
   type AdminDebitInput,
+  type ClientNoteInput,
 } from '@spova/shared';
 import { AdminService } from './admin.service';
 import { ClientIp, CurrentUser, Roles } from '../../common/auth/decorators';
@@ -67,6 +69,27 @@ export class AdminController {
     @Body(new ZodPipe(adminUpdateUserSchema)) body: z.infer<typeof adminUpdateUserSchema>,
   ) {
     return this.admin.updateUser({ ...actor, ip }, id, body);
+  }
+
+  // ---- client comment log (agent call notes) ----
+  @Get('users/:id/notes')
+  listNotes(@Param('id') id: string) {
+    return this.admin.listNotes(id);
+  }
+
+  @Post('users/:id/notes')
+  addNote(@CurrentUser() actor: AuthUser, @ClientIp() ip: string, @Param('id') id: string, @Body(new ZodPipe(clientNoteSchema)) body: ClientNoteInput) {
+    return this.admin.addNote({ ...actor, ip }, id, body.body);
+  }
+
+  @Patch('notes/:noteId')
+  editNote(@CurrentUser() actor: AuthUser, @ClientIp() ip: string, @Param('noteId') noteId: string, @Body(new ZodPipe(clientNoteSchema)) body: ClientNoteInput) {
+    return this.admin.editNote({ ...actor, ip }, noteId, body.body);
+  }
+
+  @Delete('notes/:noteId')
+  deleteNote(@CurrentUser() actor: AuthUser, @ClientIp() ip: string, @Param('noteId') noteId: string) {
+    return this.admin.deleteNote({ ...actor, ip }, noteId);
   }
 
   @Get('accounts')

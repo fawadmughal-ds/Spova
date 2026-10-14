@@ -6,6 +6,7 @@ import type {
   AdminDebitInput,
   AdminUserDetailDto,
   AdminUserRowDto,
+  ClientNoteDto,
 } from '@spova/shared';
 import { WS_EVENTS } from '@spova/shared';
 import { PrismaService } from '../../infra/prisma.service';
@@ -211,6 +212,7 @@ export class AdminService {
       pendingPayments,
       openTickets,
     };
+    const comments = await this.listNotes(id);
     return {
       id: u.id,
       email: u.email,
@@ -231,10 +233,58 @@ export class AdminService {
       openTrades: open,
       lastLoginIp: u.lastLoginIp,
       notes: u.adminNotes,
+      comments,
       profile: me.profile,
       accounts: await Promise.all(u.accounts.map((a) => this.accounts.toDto(a))),
       stats,
     };
+  }
+
+  // ---------------------------------------------------------------- client comment log (agent call notes)
+
+  private noteToDto(n: { id: string; body: string; authorId: string; createdAt: Date; updatedAt: Date; author?: { profile: { firstName: string; lastName: string } | null; email: string } | null }): ClientNoteDto {
+    const name = n.author?.profile ? `${n.author.profile.firstName} ${n.author.profile.lastName}`.trim() : (n.author?.email ?? 'staff');
+    return { id: n.id, body: n.body, authorId: n.authorId, authorName: name, createdAt: n.createdAt.toISOString(), updatedAt: n.updatedAt.toISOString() };
+  }
+
+  /** All comments on a client's file, newest first. */
+  async listNotes(userId: string): Promise<ClientNoteDto[]> {
+    const rows = await this.prisma.clientNote.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      include: { author: { select: { email: true, profile: { select: { firstName: true, lastName: true } } } } },
+    });
+    return rows.map((n) => this.noteToDto(n));
+  }
+
+  async addNote(actor: Actor, userId: string, body: string): Promise<ClientNoteDto> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
+    if (!user) throw ApiError.notFound('user_not_found', 'User not found');
+    const row = await this.prisma.clientNote.create({
+      data: { userId, authorId: actor.id, body },
+      include: { author: { select: { email: true, profile: { select: { firstName: true, lastName: true } } } } },
+    });
+    return this.noteToDto(row);
+  }
+
+  async editNote(actor: Actor, noteId: string, body: string): Promise<ClientNoteDto> {
+    const existing = await this.prisma.clientNote.findUnique({ where: { id: noteId }, select: { authorId: true } });
+    if (!existing) throw ApiError.notFound('note_not_found', 'Comment not found');
+    if (existing.authorId !== actor.id && actor.role !== 'superadmin') throw ApiError.forbidden('not_author', 'Only the author or a superadmin can edit this comment');
+    const row = await this.prisma.clientNote.update({
+      where: { id: noteId },
+      data: { body },
+      include: { author: { select: { email: true, profile: { select: { firstName: true, lastName: true } } } } },
+    });
+    return this.noteToDto(row);
+  }
+
+  async deleteNote(actor: Actor, noteId: string): Promise<{ id: string }> {
+    const existing = await this.prisma.clientNote.findUnique({ where: { id: noteId }, select: { authorId: true } });
+    if (!existing) throw ApiError.notFound('note_not_found', 'Comment not found');
+    if (existing.authorId !== actor.id && actor.role !== 'superadmin') throw ApiError.forbidden('not_author', 'Only the author or a superadmin can delete this comment');
+    await this.prisma.clientNote.delete({ where: { id: noteId } });
+    return { id: noteId };
   }
 
   async updateUser(actor: Actor, id: string, patch: { status?: 'active' | 'frozen' | 'closed'; notes?: string | null; kycDeadlineAt?: string }) {

@@ -13,7 +13,7 @@
     "prisma:deploy": "prisma migrate deploy",
     "prisma:studio": "prisma studio",
     "prisma:seed": "tsx prisma/seed.ts",
-    "test:e2e": "tsx --test --test-concurrency=1 test/phase2.e2e.ts test/phase3.e2e.ts test/payments-card.e2e.ts test/card-attempt.e2e.ts",
+    "test:e2e": "tsx --test --test-concurrency=1 test/phase2.e2e.ts test/phase3.e2e.ts test/payments-card.e2e.ts test/card-attempt.e2e.ts test/client-crm.e2e.ts",
     "test:e2e:trading": "tsx --test test/phase3.e2e.ts"
   },
   "prisma": {

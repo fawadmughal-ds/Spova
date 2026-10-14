@@ -21,6 +21,39 @@ export const moneySchema = z
   .refine((v) => Number(v) > 0, 'Amount must be greater than 0');
 
 // ---------- auth ----------
+// ---------- client suitability / KYC questionnaire (collected at sign-up, shown in the admin client view) ----------
+export const SOURCE_OF_FUNDS = ['salary', 'savings', 'investments', 'business', 'inheritance', 'other'] as const;
+export const EMPLOYMENT_STATUS = ['employed', 'self_employed', 'unemployed', 'retired', 'student'] as const;
+export const INCOME_BRACKETS = ['under_25k', '25k_50k', '50k_100k', '100k_250k', 'over_250k'] as const;
+export const NET_WORTH_BRACKETS = ['under_50k', '50k_250k', '250k_1m', 'over_1m'] as const;
+export const DEPOSIT_BRACKETS = ['under_1k', '1k_10k', '10k_50k', 'over_50k'] as const;
+export const TRADING_EXPERIENCE = ['none', 'under_1y', '1_3y', 'over_3y'] as const;
+export const TRADING_OBJECTIVE = ['speculation', 'hedging', 'income', 'long_term'] as const;
+
+/** Human labels for each answer — used on the signup form and in the admin client view. */
+export const SUITABILITY_LABELS = {
+  sourceOfFunds: { salary: 'Salary / employment', savings: 'Personal savings', investments: 'Investment returns', business: 'Business income', inheritance: 'Inheritance / gift', other: 'Other' },
+  employmentStatus: { employed: 'Employed', self_employed: 'Self-employed', unemployed: 'Unemployed', retired: 'Retired', student: 'Student' },
+  annualIncome: { under_25k: 'Under $25,000', '25k_50k': '$25,000 – $50,000', '50k_100k': '$50,000 – $100,000', '100k_250k': '$100,000 – $250,000', over_250k: 'Over $250,000' },
+  netWorth: { under_50k: 'Under $50,000', '50k_250k': '$50,000 – $250,000', '250k_1m': '$250,000 – $1M', over_1m: 'Over $1M' },
+  expectedDeposit: { under_1k: 'Under $1,000', '1k_10k': '$1,000 – $10,000', '10k_50k': '$10,000 – $50,000', over_50k: 'Over $50,000' },
+  tradingExperience: { none: 'No experience', under_1y: 'Less than 1 year', '1_3y': '1 – 3 years', over_3y: 'Over 3 years' },
+  tradingObjective: { speculation: 'Speculation / capital growth', hedging: 'Hedging', income: 'Regular income', long_term: 'Long-term investment' },
+} as const;
+
+/** The suitability questions as zod fields, reused by registerSchema and the profile update. */
+const suitabilityShape = {
+  sourceOfFunds: z.enum(SOURCE_OF_FUNDS),
+  employmentStatus: z.enum(EMPLOYMENT_STATUS),
+  annualIncome: z.enum(INCOME_BRACKETS),
+  netWorth: z.enum(NET_WORTH_BRACKETS),
+  expectedDeposit: z.enum(DEPOSIT_BRACKETS),
+  tradingExperience: z.enum(TRADING_EXPERIENCE),
+  tradingObjective: z.enum(TRADING_OBJECTIVE),
+};
+export const suitabilitySchema = z.object(suitabilityShape);
+export type SuitabilityInput = z.infer<typeof suitabilitySchema>;
+
 export const registerSchema = z.object({
   email: emailSchema,
   password: passwordSchema,
@@ -41,10 +74,19 @@ export const registerSchema = z.object({
       eighteen.setFullYear(eighteen.getFullYear() - 18);
       return d <= eighteen;
     }, 'You must be at least 18'),
+  // residential address is required at sign-up (zip optional — not every country uses one)
+  address: z.string().trim().min(3, 'Enter your residential address').max(200),
+  city: z.string().trim().min(1, 'Enter your city').max(80),
+  zip: z.string().trim().max(20).optional(),
+  ...suitabilityShape,
   tcAccepted: z.literal(true, { errorMap: () => ({ message: 'You must accept the terms' }) }),
   riskAccepted: z.literal(true, { errorMap: () => ({ message: 'You must accept the risk disclosure' }) }),
 });
 export type RegisterInput = z.infer<typeof registerSchema>;
+
+/** Admin adds a timestamped comment to a client's file (agent call notes). */
+export const clientNoteSchema = z.object({ body: z.string().trim().min(1, 'Write a comment').max(2000) });
+export type ClientNoteInput = z.infer<typeof clientNoteSchema>;
 
 export const loginSchema = z.object({
   email: emailSchema,

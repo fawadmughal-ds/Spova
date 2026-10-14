@@ -4,6 +4,7 @@ import { use, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Lock, Unlock, Mail } from 'lucide-react';
 import type { AccountDto, AdminUserDetailDto } from '@spova/shared';
+import { SUITABILITY_LABELS } from '@spova/shared';
 import { get, patch, post, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { cn, fmtAgo, fmtDate, fmtMoney } from '@/lib/utils';
@@ -16,7 +17,12 @@ import { AccountSettingsPanel } from '@/components/admin/account-settings-panel'
 import { KycQueue } from '@/components/admin/kyc-queue';
 import { PaymentsQueue } from '@/components/admin/payments-queue';
 import { TicketInbox } from '@/components/admin/ticket-inbox';
+import { ClientNotesPanel } from '@/components/admin/client-notes';
 import { SlidingTabs } from '@/components/portal/sliding-tabs';
+
+/** Translate a stored suitability code to its human label (e.g. 'over_250k' -> 'Over $250,000'). */
+const sl = <K extends keyof typeof SUITABILITY_LABELS>(group: K, code: string | null | undefined) =>
+  code ? ((SUITABILITY_LABELS[group] as Record<string, string>)[code] ?? code) : null;
 
 type Section = 'kyc' | 'payments' | 'tickets';
 const SECTIONS: { value: Section; label: string }[] = [
@@ -209,6 +215,27 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
               </div>
             ))}
           </dl>
+          {u.profile && (u.profile.sourceOfFunds || u.profile.netWorth) && (
+            <div className="mt-5 border-t border-white/5 pt-4">
+              <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-ink-400">Suitability (from sign-up)</div>
+              <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+                {[
+                  ['Source of funds', sl('sourceOfFunds', u.profile.sourceOfFunds)],
+                  ['Employment', sl('employmentStatus', u.profile.employmentStatus)],
+                  ['Annual income', sl('annualIncome', u.profile.annualIncome)],
+                  ['Net worth', sl('netWorth', u.profile.netWorth)],
+                  ['Expected deposit', sl('expectedDeposit', u.profile.expectedDeposit)],
+                  ['Experience', sl('tradingExperience', u.profile.tradingExperience)],
+                  ['Objective', sl('tradingObjective', u.profile.tradingObjective)],
+                ].map(([k, v]) => (
+                  <div key={k as string}>
+                    <dt className="text-[11px] uppercase tracking-wider text-ink-500">{k}</dt>
+                    <dd className="text-ink-200">{v || '—'}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          )}
         </Card>
 
         {/* accounts */}
@@ -266,6 +293,11 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
           </Card>
         </div>
       )}
+
+      {/* agent notes + call log */}
+      <div className="mt-6 grid grid-cols-[minmax(0,1fr)] gap-6 xl:grid-cols-3">
+        <ClientNotesPanel userId={u.id} initialNotes={u.notes} initialComments={u.comments} />
+      </div>
 
       {/* compliance + support for this client; same components as the queues, narrowed to one user */}
       <section className="mt-6">

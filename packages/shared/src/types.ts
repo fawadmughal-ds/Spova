@@ -57,6 +57,24 @@ export interface ProfileDto {
   notifSms: boolean;
   notifPush: boolean;
   notifCalls: boolean;
+  /** suitability / KYC questionnaire answers captured at sign-up (null for accounts created before it existed) */
+  sourceOfFunds: string | null;
+  employmentStatus: string | null;
+  annualIncome: string | null;
+  netWorth: string | null;
+  expectedDeposit: string | null;
+  tradingExperience: string | null;
+  tradingObjective: string | null;
+}
+
+/** One timestamped agent comment on a client's file. */
+export interface ClientNoteDto {
+  id: string;
+  body: string;
+  authorId: string;
+  authorName: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface AccountDto {
@@ -145,7 +163,10 @@ export interface AdminUserStatsDto {
 export interface AdminUserDetailDto extends AdminUserRowDto {
   profile: ProfileDto | null;
   accounts: AccountDto[];
+  /** the single free-text "about this client" note (User.adminNotes) */
   notes: string | null;
+  /** timestamped agent comment log (newest first) */
+  comments: ClientNoteDto[];
   lastLoginIp: string | null;
   stats: AdminUserStatsDto;
 }
