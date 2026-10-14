@@ -108,8 +108,10 @@ export interface AccountMath {
 
 /** equity = balance + credit + sum(floating); used = sum(margin_used); level = equity / used x 100 */
 /**
- * Hedged used margin (MT4-style): opposite positions on the same symbol offset, so per symbol the required
- * margin is the LARGER of the total buy-side vs total sell-side margin, not the sum of both.
+ * Hedged used margin (full-offset / MT4 classic): opposite positions on the same symbol net out, so per
+ * symbol the required margin is only the margin of the UNHEDGED remainder — the absolute difference between
+ * total buy-side and total sell-side margin. A perfectly hedged pair (equal buy + sell) uses ZERO margin;
+ * closing one leg immediately re-applies the full margin of the side left open.
  */
 export function hedgedUsedMargin(positions: { symbol: string; side: 'buy' | 'sell'; marginUsed: Decimal.Value }[]): Decimal {
   const bySymbol = new Map<string, { buy: Decimal; sell: Decimal }>();
@@ -120,7 +122,7 @@ export function hedgedUsedMargin(positions: { symbol: string; side: 'buy' | 'sel
     bySymbol.set(p.symbol, e);
   }
   let used = dec(0);
-  for (const e of bySymbol.values()) used = used.plus(Decimal.max(e.buy, e.sell));
+  for (const e of bySymbol.values()) used = used.plus(e.buy.minus(e.sell).abs());
   return used;
 }
 
