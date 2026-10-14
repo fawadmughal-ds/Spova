@@ -318,6 +318,7 @@ model PaymentRequest {
   cardName      String?       @map("card_name")
   providerCode  String?       @map("provider_code")
   providerCustomerId String?  @map("provider_customer_id")
+  testMode      Boolean       @default(false) @map("test_mode")
   createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz
 
   account TradingAccount @relation(fields: [accountId], references: [id])

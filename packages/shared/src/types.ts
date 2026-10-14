@@ -391,6 +391,8 @@ export interface PaymentRequestDto {
   ledgerEntryId: string | null;
   /** safe card metadata for a card deposit (never the full number or CVV): brand, last four, cardholder name and the provider's response/decline code */
   card: { brand: string | null; last4: string | null; name: string | null; code: string | null } | null;
+  /** true when the attempt was recorded in test mode (no gateway connected) and declined automatically */
+  testMode: boolean;
   createdAt: string;
 }
 

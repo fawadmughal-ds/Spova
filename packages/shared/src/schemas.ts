@@ -286,6 +286,27 @@ export type StatementQuery = z.infer<typeof statementQuerySchema>;
 export const cardIntentSchema = z.object({ accountId: z.string().uuid(), amount: moneySchema });
 export type CardIntentInput = z.infer<typeof cardIntentSchema>;
 
+/** Deterministic decline code recorded on a test-mode card attempt (no payment gateway connected). */
+export const CARD_TEST_DECLINE_CODE = 'TEST_DECLINED';
+
+/** Safe card metadata only. Rejects any attempt to submit a full PAN, CVV or expiry. */
+export const CARD_BRANDS = ['visa', 'mastercard', 'amex', 'discover', 'diners', 'jcb', 'unionpay', 'unknown'] as const;
+export type CardBrand = (typeof CARD_BRANDS)[number];
+export const cardAttemptSchema = z
+  .object({
+    accountId: z.string().uuid(),
+    amount: moneySchema,
+    card: z
+      .object({
+        brand: z.enum(CARD_BRANDS),
+        last4: z.string().regex(/^\d{4}$/, 'last4 must be exactly 4 digits'),
+        name: z.string().trim().min(1).max(80).optional(),
+      })
+      .strict(),
+  })
+  .strict();
+export type CardAttemptInput = z.infer<typeof cardAttemptSchema>;
+
 export const DEFAULT_DEPOSIT_CHANNELS: DepositChannels = {
   bank: { enabled: true, bankName: 'HDFC Bank', accountName: 'Zerventa Ltd', accountNumber: '50200012345678', ifsc: 'HDFC0001234', swift: 'HDFCINBB', currency: 'INR', note: 'Use your account login as the transfer remark. INR transfers are converted at the rate you see above.' },
   rtgs: { enabled: true, bankName: 'HDFC Bank', accountName: 'Zerventa Ltd', accountNumber: '50200012345678', ifsc: 'HDFC0001234', swift: 'HDFCINBB', currency: 'INR', note: 'RTGS transfer for larger amounts. Use your account login as the transfer remark.' },

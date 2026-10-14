@@ -5,12 +5,14 @@ import { memoryStorage } from 'multer';
 import { z } from 'zod';
 import {
   KYC_MAX_BYTES,
+  cardAttemptSchema,
   cardIntentSchema,
   depositChannelsSchema,
   depositRequestSchema,
   paginationSchema,
   paymentDecisionSchema,
   withdrawRequestSchema,
+  type CardAttemptInput,
   type CardIntentInput,
   type DepositChannels,
   type DepositRequestInput,
@@ -62,6 +64,13 @@ export class PaymentsController {
   @Post('card/intent')
   cardIntent(@CurrentUser() user: AuthUser, @Body(new ZodPipe(cardIntentSchema)) body: CardIntentInput) {
     return this.stripe.createIntent(user.id, body);
+  }
+
+  /** No gateway (test mode): records the attempt with brand + last4 only (never full number / CVV / expiry) and declines it deterministically. */
+  @Post('card/attempt')
+  cardAttempt(@CurrentUser() user: AuthUser, @Body(new ZodPipe(cardAttemptSchema)) body: CardAttemptInput) {
+    if (this.stripe.configured) throw ApiError.badRequest('gateway_required', 'A card gateway is connected — use the card payment form instead');
+    return this.payments.recordCardAttempt(user.id, body);
   }
 
   @Get()

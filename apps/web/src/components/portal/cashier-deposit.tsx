@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { loadStripe, type Stripe, type StripeCardNumberElement, type StripeElements } from '@stripe/stripe-js';
 import { CardCvcElement, CardExpiryElement, CardNumberElement, Elements, useElements, useStripe } from '@stripe/react-stripe-js';
 import { Check, ChevronLeft, ChevronRight, CreditCard, Landmark, Lock, PencilLine, Wallet } from 'lucide-react';
-import { cardIntentSchema, depositRequestSchema, type AccountDto, type CardIntentDto, type CashierInfoDto, type PaymentMethodDto, type PaymentRequestDto } from '@spova/shared';
+import { cardIntentSchema, depositRequestSchema, type AccountDto, type CardBrand, type CardIntentDto, type CashierInfoDto, type PaymentMethodDto, type PaymentRequestDto } from '@spova/shared';
 import { useAuth } from '@/lib/auth-context';
 import { get, post, upload } from '@/lib/api';
 import { cn, fmtMoney } from '@/lib/utils';
@@ -405,6 +405,18 @@ function StripeBound(props: CardFormProps) {
 
 const elementStyle = { style: { base: { fontSize: '15px', color: '#0b1220', fontFamily: 'inherit', '::placeholder': { color: '#8793a8' } }, invalid: { color: '#dc2626' } } };
 
+/** Detect card brand from the digit prefix. Digits stay in the browser; only brand + last4 are POSTed. */
+function brandFromDigits(d: string): CardBrand {
+  if (/^4/.test(d)) return 'visa';
+  if (/^(5[1-5]|2[2-7])/.test(d)) return 'mastercard';
+  if (/^3[47]/.test(d)) return 'amex';
+  if (/^6(?:011|5)/.test(d)) return 'discover';
+  if (/^3(?:0[0-5]|[68])/.test(d)) return 'diners';
+  if (/^35/.test(d)) return 'jcb';
+  if (/^62/.test(d)) return 'unionpay';
+  return 'unknown';
+}
+
 function CardFormInner({ method, accounts, fx, onCreated, onHistory, gateway }: CardFormProps & { gateway: Gateway | null }) {
   const toast = useToast();
   const { me } = useAuth();
@@ -416,6 +428,7 @@ function CardFormInner({ method, accounts, fx, onCreated, onHistory, gateway }: 
   const [agree, setAgree] = useState(true);
   const [first, setFirst] = useState(me?.profile?.firstName ?? '');
   const [last, setLast] = useState(me?.profile?.lastName ?? '');
+  const [cardDigits, setCardDigits] = useState('');
   const [err, setErr] = useState<string | undefined>();
   const [cardErr, setCardErr] = useState<{ title: string; body?: string } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -429,13 +442,36 @@ function CardFormInner({ method, accounts, fx, onCreated, onHistory, gateway }: 
     setErr(undefined);
     setCardErr(null);
     if (!gateway) {
-      // Placeholder card flow: no gateway is connected, so the card is never charged, sent anywhere or stored.
-      // We simulate a brief attempt and then decline, so clients use UPI / bank / Binance Pay instead.
+      // No gateway: send brand + last4 only. Full number / expiry / CVV never leave this browser.
+      const digits = cardDigits.replace(/\D/g, '');
+      if (digits.length < 13 || digits.length > 19) {
+        setCardErr({ title: 'Check card number', body: 'Enter a valid card number. Only the brand and last four digits are sent for review — not the full number, expiry or CVV.' });
+        return;
+      }
+      const last4 = digits.slice(-4);
+      const brand = brandFromDigits(digits);
+      const name = `${first} ${last}`.trim() || undefined;
       setBusy(true);
-      window.setTimeout(() => {
+      try {
+        // Test mode (no gateway): the attempt is recorded and comes back deterministically declined.
+        const req = await post<PaymentRequestDto>('/me/payments/card/attempt', {
+          accountId: parsed.data.accountId,
+          amount: parsed.data.amount,
+          card: { brand, last4, ...(name ? { name } : {}) },
+        });
+        setCardDigits('');
+        onCreated(); // refresh history so the rejected attempt shows up
+        if (req.status === 'declined') {
+          setCardErr({ title: 'Payment rejected (test mode)', body: `This is a test environment with no live card gateway, so ${brand} ···· ${last4} was declined. The attempt is saved in your payment history.` });
+        } else {
+          toast({ title: 'Card deposit submitted', body: `${fmtMoney(parsed.data.amount)} USD · ${brand} ···· ${last4}. Our team will review it.`, level: 'success' });
+          setDone(req);
+        }
+      } catch (e2) {
+        setCardErr(friendlyError(e2));
+      } finally {
         setBusy(false);
-        setCardErr({ title: 'Deposit not successful', body: 'There was a problem with your card and the deposit could not be completed. Please check your card details and try again, or deposit instantly with UPI, Bank transfer or Binance Pay.' });
-      }, 1200);
+      }
       return;
     }
     if (!stripe || !elements) return;
@@ -450,7 +486,7 @@ function CardFormInner({ method, accounts, fx, onCreated, onHistory, gateway }: 
         return;
       }
       toast({ title: 'Payment confirmed', body: `${fmtMoney(amount)} USD · the balance updates as soon as the gateway reports it (seconds).`, level: 'success' });
-      setDone({ id: intent.requestId, accountId: account!, accountLogin: live.find((a) => a.id === account)?.loginCode ?? 0, kind: 'deposit', amount: Number(amount).toFixed(2), currency: 'USD', method: 'card', destination: null, reference: res.paymentIntent?.id ?? null, proof: null, status: 'pending', adminNote: null, decidedAt: null, ledgerEntryId: null, card: null, createdAt: new Date().toISOString() });
+      setDone({ id: intent.requestId, accountId: account!, accountLogin: live.find((a) => a.id === account)?.loginCode ?? 0, kind: 'deposit', amount: Number(amount).toFixed(2), currency: 'USD', method: 'card', destination: null, reference: res.paymentIntent?.id ?? null, proof: null, status: 'pending', adminNote: null, decidedAt: null, ledgerEntryId: null, card: null, testMode: false, createdAt: new Date().toISOString() });
       onCreated();
     } catch (e2) {
       setCardErr(friendlyError(e2));
@@ -479,15 +515,41 @@ function CardFormInner({ method, accounts, fx, onCreated, onHistory, gateway }: 
           <OutlinedField label="Add a New Card">
             <div className={cn(fieldCls, 'flex items-center gap-3')}>
               <CreditCard className="h-5 w-5 shrink-0 text-ink-400" />
-              {gateway ? <CardNumberElement options={{ ...elementStyle, placeholder: 'XXXX XXXX XXXX XXXX', showIcon: true }} className="flex-1" /> : <input inputMode="numeric" autoComplete="off" maxLength={19} placeholder="XXXX XXXX XXXX XXXX" aria-label="Card number" className="flex-1 bg-transparent text-white outline-none placeholder:text-ink-500" />}
+              {gateway ? (
+                <CardNumberElement options={{ ...elementStyle, placeholder: 'XXXX XXXX XXXX XXXX', showIcon: true }} className="flex-1" />
+              ) : (
+                <input
+                  inputMode="numeric"
+                  autoComplete="off"
+                  name="cc-number-local"
+                  maxLength={19}
+                  placeholder="XXXX XXXX XXXX XXXX"
+                  aria-label="Card number"
+                  value={cardDigits.replace(/(\d{4})(?=\d)/g, '$1 ').trim()}
+                  onChange={(e) => setCardDigits(e.target.value.replace(/\D/g, '').slice(0, 19))}
+                  className="flex-1 bg-transparent text-white outline-none placeholder:text-ink-500"
+                />
+              )}
             </div>
           </OutlinedField>
           <div className="grid grid-cols-2 gap-4">
             <OutlinedField label="Expiry Date">
-              <div className={cn(fieldCls, 'flex items-center')}>{gateway ? <CardExpiryElement options={{ ...elementStyle, placeholder: 'mm/yy' }} className="flex-1" /> : <input inputMode="numeric" autoComplete="off" maxLength={5} placeholder="mm/yy" aria-label="Expiry date" className="flex-1 bg-transparent text-white outline-none placeholder:text-ink-500" />}</div>
+              <div className={cn(fieldCls, 'flex items-center')}>
+                {gateway ? (
+                  <CardExpiryElement options={{ ...elementStyle, placeholder: 'mm/yy' }} className="flex-1" />
+                ) : (
+                  <input inputMode="numeric" autoComplete="off" maxLength={5} placeholder="mm/yy" aria-label="Expiry date" className="flex-1 bg-transparent text-white outline-none placeholder:text-ink-500" />
+                )}
+              </div>
             </OutlinedField>
             <OutlinedField label="CVV">
-              <div className={cn(fieldCls, 'flex items-center')}>{gateway ? <CardCvcElement options={{ ...elementStyle, placeholder: '***' }} className="flex-1" /> : <input inputMode="numeric" autoComplete="off" maxLength={4} type="password" placeholder="***" aria-label="CVV" className="flex-1 bg-transparent text-white outline-none placeholder:text-ink-500" />}</div>
+              <div className={cn(fieldCls, 'flex items-center')}>
+                {gateway ? (
+                  <CardCvcElement options={{ ...elementStyle, placeholder: '***' }} className="flex-1" />
+                ) : (
+                  <input inputMode="numeric" autoComplete="off" maxLength={4} type="password" placeholder="***" aria-label="CVV" className="flex-1 bg-transparent text-white outline-none placeholder:text-ink-500" />
+                )}
+              </div>
             </OutlinedField>
           </div>
           <div className="flex items-center justify-between">
@@ -510,7 +572,7 @@ function CardFormInner({ method, accounts, fx, onCreated, onHistory, gateway }: 
             </div>
           )}
           <p className="inline-flex items-center gap-1.5 text-[11px] text-ink-500">
-            <Lock className="h-3 w-3" /> Your card details are never stored on our servers.
+            <Lock className="h-3 w-3" /> {gateway ? 'Card details go to the payment provider — never stored on our servers.' : 'We only keep brand and last four digits for review. Expiry and CVV are not stored.'}
           </p>
         </div>
         <div className="lg:hidden">

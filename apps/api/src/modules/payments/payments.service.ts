@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PaymentKind, PaymentRequest, PaymentStatus, Prisma, TradingAccount } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import {
+  CARD_TEST_DECLINE_CODE,
   DEFAULT_DEPOSIT_CHANNELS,
   KYC_MAX_BYTES,
   KYC_MIME_TYPES,
@@ -12,6 +13,7 @@ import {
   depositEnabled,
   type DepositChannels,
   type AdminPaymentRowDto,
+  type CardAttemptInput,
   type CardIntentInput,
   type CashierInfoDto,
   type DepositRequestInput,
@@ -58,6 +60,7 @@ export const paymentToDto = (p: PaymentWithAccount): PaymentRequestDto => ({
   decidedAt: p.decidedAt?.toISOString() ?? null,
   ledgerEntryId: p.ledgerEntryId,
   card: p.cardBrand || p.cardLast4 || p.cardName || p.providerCode ? { brand: p.cardBrand ?? null, last4: p.cardLast4 ?? null, name: p.cardName ?? null, code: p.providerCode ?? null } : null,
+  testMode: p.testMode,
   createdAt: p.createdAt.toISOString(),
 });
 
@@ -187,6 +190,53 @@ export class PaymentsService {
       include: { account: { select: { loginCode: true } } },
     });
     this.afterNew(row, user.email);
+    return paymentToDto(row);
+  }
+
+  /**
+   * No payment gateway connected: record a card deposit attempt in deterministic TEST MODE.
+   * Every attempt is persisted and immediately declined — no money moves and no ledger entry is
+   * created. Only safe card metadata (brand + last4 + cardholder name) is stored; the schema rejects
+   * the full card number, expiry and CVV so they never reach us. Returns the declined request.
+   */
+  async recordCardAttempt(userId: string, input: CardAttemptInput) {
+    if (!(await this.redis.allow(`payments:card:${userId}`, 10, 3600))) throw ApiError.tooMany('Too many card attempts. Try again later.');
+    await this.guardUser(userId);
+    const acc = await this.liveAccount(userId, input.accountId);
+    const method = methodOf('card')!;
+    const cfg = await this.channels();
+    if (!depositEnabled('card', cfg)) throw ApiError.badRequest('method_unavailable', 'Card deposits are not available');
+    const amount = D(input.amount);
+    if (amount.lt(method.minDeposit)) throw ApiError.badRequest('amount_min', `Minimum card deposit is ${method.minDeposit} USD`);
+    if (amount.gt(method.maxDeposit)) throw ApiError.badRequest('amount_max', `Maximum card deposit is ${method.maxDeposit} USD`);
+
+    const row = await this.prisma.paymentRequest.create({
+      data: {
+        userId,
+        accountId: acc.id,
+        kind: 'deposit',
+        amount: amount.toFixed(2),
+        currency: acc.currency,
+        method: 'card',
+        status: 'declined',
+        testMode: true,
+        cardBrand: input.card.brand,
+        cardLast4: input.card.last4,
+        cardName: input.card.name ?? null,
+        providerCode: CARD_TEST_DECLINE_CODE,
+        decidedAt: new Date(),
+        adminNote: 'Payment rejected (test mode). No payment gateway is connected, so card attempts are declined automatically and no funds are moved.',
+      },
+      include: { account: { select: { loginCode: true } } },
+    });
+    // No afterNew(): a test-mode decline is terminal — there is nothing for the back office to review.
+    void this.activity.record({
+      userId,
+      kind: 'deposit_request',
+      title: 'Card deposit rejected (test mode)',
+      detail: `${money(row.amount)} ${row.currency} · ${input.card.brand} ···· ${input.card.last4}`,
+      meta: { amount: money(row.amount), method: 'card', brand: input.card.brand, last4: input.card.last4, status: 'declined', testMode: true, code: CARD_TEST_DECLINE_CODE, loginCode: row.account.loginCode },
+    });
     return paymentToDto(row);
   }
 

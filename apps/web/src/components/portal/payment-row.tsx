@@ -72,6 +72,11 @@ export function PaymentRow({ p, methods, index = 0, onChanged, compact }: { p: P
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <span className="text-sm font-semibold capitalize text-white">{withdraw ? 'Withdrawal' : 'Deposit'}</span>
             <PaymentChip status={p.status} />
+            {p.testMode && (
+              <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-ink-400 ring-1 ring-inset ring-white/10">
+                Test mode
+              </span>
+            )}
             {!compact && (
               <span className="text-xs text-ink-500">
                 via {method} · acc <span className="tabular font-mono">{fmtLogin(p.accountLogin)}</span>
@@ -94,6 +99,13 @@ export function PaymentRow({ p, methods, index = 0, onChanged, compact }: { p: P
           {!compact && p.reference && (
             <div className="mt-1 text-xs text-ink-400">
               {withdraw ? 'Reason' : 'Reference'}: <span className="font-mono text-ink-300">{p.reference}</span>
+            </div>
+          )}
+          {!compact && p.card && (p.card.brand || p.card.last4) && (
+            <div className="mt-1 text-xs text-ink-400">
+              Card: <span className="font-medium capitalize text-ink-200">{p.card.brand ?? 'card'}</span>
+              {p.card.last4 ? <span className="font-mono text-ink-300"> ···· {p.card.last4}</span> : null}
+              {p.card.name ? <span className="text-ink-500"> · {p.card.name}</span> : null}
             </div>
           )}
           {!compact && !withdraw && (
