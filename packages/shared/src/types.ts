@@ -431,6 +431,14 @@ export interface AdminPaymentRowDto extends PaymentRequestDto {
   account: { type: AccountType; balance: string; freeMargin: string };
 }
 
+/** One row in the admin "Trading accounts" list (all accounts across clients). */
+export interface AdminAccountRowDto extends AccountDto {
+  userId: string;
+  userEmail: string;
+  firstName: string | null;
+  lastName: string | null;
+}
+
 /** Totals for the payments tab summary strip (respects the current date range / client filter). */
 export interface PaymentsSummaryDto {
   deposits: { count: number; requested: string; approved: string };

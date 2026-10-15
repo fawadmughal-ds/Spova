@@ -23,10 +23,11 @@ const listUsersQuery = paginationSchema.extend({
   q: z.string().trim().max(100).optional(),
   status: z.enum(['active', 'frozen', 'closed']).optional(),
 });
-const listAccountsQuery = z.object({
+const listAccountsQuery = paginationSchema.extend({
+  q: z.string().trim().max(100).optional(),
   userId: z.string().uuid().optional(),
   type: z.enum(['demo', 'live']).optional(),
-  loginCode: z.coerce.number().int().optional(),
+  tier: z.enum(['classic', 'silver', 'gold', 'platinum', 'vip']).optional(),
 });
 const auditQuery = paginationSchema.extend({
   targetId: z.string().uuid().optional(),

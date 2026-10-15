@@ -1,12 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Prisma, type Tier } from '@prisma/client';
 import type {
+  AdminAccountRowDto,
   AdminCreditInput,
   AdminDashboardDto,
   AdminDebitInput,
   AdminUserDetailDto,
   AdminUserRowDto,
   ClientNoteDto,
+  Paginated,
 } from '@spova/shared';
 import { WS_EVENTS } from '@spova/shared';
 import { PrismaService } from '../../infra/prisma.service';
@@ -530,14 +532,37 @@ export class AdminService {
     return { ...r, items: r.items.map(ledgerToDto) };
   }
 
-  async listAccounts(q: { userId?: string; type?: 'demo' | 'live'; loginCode?: number }) {
-    const rows = await this.prisma.tradingAccount.findMany({
-      where: { ...(q.userId && { userId: q.userId }), ...(q.type && { type: q.type }), ...(q.loginCode && { loginCode: q.loginCode }) },
-      include: { user: { select: { email: true } } },
-      orderBy: { createdAt: 'desc' },
-      take: 100,
-    });
-    return Promise.all(rows.map(async (a) => ({ ...(await this.accounts.toDto(a)), userId: a.userId, userEmail: a.user.email })));
+  /** All trading accounts across clients, searchable by name / email / login code, filterable by type and tier. */
+  async listAccounts(q: { q?: string; userId?: string; type?: 'demo' | 'live'; tier?: Tier; page: number; limit: number }): Promise<Paginated<AdminAccountRowDto>> {
+    const search = q.q?.trim();
+    const digits = !!search && /^\d+$/.test(search);
+    const where: Prisma.TradingAccountWhereInput = {
+      ...(q.userId && { userId: q.userId }),
+      ...(q.type && { type: q.type }),
+      ...(q.tier && { tier: q.tier }),
+      ...(search && {
+        OR: [
+          ...(digits ? [{ loginCode: Number(search) }] : []),
+          { user: { is: { email: { contains: search, mode: 'insensitive' as const } } } },
+          { user: { is: { profile: { is: { firstName: { contains: search, mode: 'insensitive' as const } } } } } },
+          { user: { is: { profile: { is: { lastName: { contains: search, mode: 'insensitive' as const } } } } } },
+        ],
+      }),
+    };
+    const [total, rows] = await Promise.all([
+      this.prisma.tradingAccount.count({ where }),
+      this.prisma.tradingAccount.findMany({
+        where,
+        include: { user: { select: { email: true, profile: { select: { firstName: true, lastName: true } } } } },
+        orderBy: { createdAt: 'desc' },
+        skip: (q.page - 1) * q.limit,
+        take: q.limit,
+      }),
+    ]);
+    const items = await Promise.all(
+      rows.map(async (a) => ({ ...(await this.accounts.toDto(a)), userId: a.userId, userEmail: a.user.email, firstName: a.user.profile?.firstName ?? null, lastName: a.user.profile?.lastName ?? null })),
+    );
+    return { items, total, page: q.page, limit: q.limit };
   }
 
   async audit(q: { page: number; limit: number; targetId?: string; actorId?: string }) {

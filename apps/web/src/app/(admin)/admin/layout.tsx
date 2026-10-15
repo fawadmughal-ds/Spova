@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
-import { Activity, BookOpenCheck, CandlestickChart, FileCheck2, Landmark, LayoutDashboard, ListChecks, MessagesSquare, ShieldHalf, SlidersHorizontal, UserCog, Users } from 'lucide-react';
+import { Activity, BookOpenCheck, CandlestickChart, FileCheck2, Landmark, LayoutDashboard, ListChecks, MessagesSquare, ShieldHalf, SlidersHorizontal, UserCog, Users, Wallet } from 'lucide-react';
 import { RequireAuth } from '@/lib/auth-context';
 import { get } from '@/lib/api';
 import { AppShell, type NavItem } from '@/components/app-shell';
@@ -11,6 +11,7 @@ const NAV: NavItem[] = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard, exact: true },
   { href: '/admin/activity', label: 'Activity', icon: Activity },
   { href: '/admin/clients', label: 'Clients', icon: Users },
+  { href: '/admin/accounts', label: 'Trading accounts', icon: Wallet },
   { href: '/admin/kyc', label: 'KYC queue', icon: FileCheck2 },
   { href: '/admin/payments', label: 'Payments', icon: Landmark },
   { href: '/admin/tickets', label: 'Tickets', icon: MessagesSquare },

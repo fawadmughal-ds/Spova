@@ -130,6 +130,23 @@ describe('admin account ops + dashboard KPIs', () => {
     assert.equal(list.data.items.length, 0, 'old date range list is empty');
   });
 
+  it('trading-accounts list returns rows with name + balance/equity/margin and filters by type/tier/search', async () => {
+    const all = await admin.json('GET', '/admin/accounts');
+    assert.ok(created(all.status), JSON.stringify(all.data));
+    assert.ok(Array.isArray(all.data.items) && typeof all.data.total === 'number');
+    const row = all.data.items[0];
+    for (const k of ['userId', 'userEmail', 'loginCode', 'type', 'tier', 'balance', 'equity', 'marginLevel']) {
+      assert.ok(k in row, `row has ${k}`);
+    }
+    assert.ok('firstName' in row, 'row has client name');
+    const demo = await admin.json('GET', '/admin/accounts?type=demo');
+    assert.ok(demo.data.items.every((a: { type: string }) => a.type === 'demo'), 'type filter works');
+    const classic = await admin.json('GET', '/admin/accounts?tier=classic');
+    assert.ok(classic.data.items.every((a: { tier: string }) => a.tier === 'classic'), 'tier filter works');
+    const mine = await admin.json('GET', `/admin/accounts?userId=${clientId}`);
+    assert.ok(mine.data.items.every((a: { userId: string }) => a.userId === clientId), 'userId filter works');
+  });
+
   it('remove_credit debits the credit bucket, not the cash balance', async () => {
     const d = await admin.json('GET', `/admin/users/${clientId}`);
     const acc = d.data.accounts[0];
