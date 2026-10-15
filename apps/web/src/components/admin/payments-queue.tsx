@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { ArrowDownToLine, ArrowUpFromLine, Landmark, Paperclip } from 'lucide-react';
-import { PAYMENT_METHODS, WS_EVENTS, paymentDecisionSchema, type AdminPaymentRowDto, type Paginated, type PaymentKind, type PaymentRequestDto, type PaymentStatus } from '@spova/shared';
+import { PAYMENT_METHODS, WS_EVENTS, paymentDecisionSchema, type AdminPaymentRowDto, type Paginated, type PaymentKind, type PaymentRequestDto, type PaymentStatus, type PaymentsSummaryDto } from '@spova/shared';
 import { fileUrl, get, patch, post, ApiError } from '@/lib/api';
 import { useUserEvent } from '@/lib/ws';
 import { cn, fmtMoney } from '@/lib/utils';
@@ -40,9 +40,22 @@ export function PaymentsQueue({ userId, compact, onChanged }: { userId?: string;
   const toast = useToast();
   const [tab, setTab] = useState<Tab>(userId ? 'all' : 'pending');
   const [kind, setKind] = useState<'' | PaymentKind>('');
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
   const limit = compact ? 10 : 20;
-  const q = useQueue<AdminPaymentRowDto>('/admin/payments', { status: tab === 'all' ? undefined : tab, kind: kind || undefined, userId }, limit);
+  const q = useQueue<AdminPaymentRowDto>('/admin/payments', { status: tab === 'all' ? undefined : tab, kind: kind || undefined, userId, from: from || undefined, to: to || undefined }, limit);
   const items = q.data?.items ?? [];
+
+  // summary totals for the strip (respects the date range + client); refreshed on filter change and after a decision
+  const [summary, setSummary] = useState<PaymentsSummaryDto | null>(null);
+  const [sv, setSv] = useState(0);
+  useEffect(() => {
+    const p = new URLSearchParams();
+    if (userId) p.set('userId', userId);
+    if (from) p.set('from', from);
+    if (to) p.set('to', to);
+    get<PaymentsSummaryDto>(`/admin/payments/summary?${p}`).then(setSummary).catch(() => {});
+  }, [userId, from, to, sv]);
 
   const [confirm, setConfirm] = useState<{ id: string; status: Decision } | null>(null);
   const [sendFor, setSendFor] = useState<AdminPaymentRowDto | null>(null);
@@ -54,6 +67,7 @@ export function PaymentsQueue({ userId, compact, onChanged }: { userId?: string;
   useUserEvent<WsPaymentNew>(WS_EVENTS.ADMIN_PAYMENT_NEW, (p) => {
     if (userId && p.userId !== userId) return;
     q.refresh();
+    setSv((v) => v + 1);
     onChanged?.();
     toast({ title: `New ${p.kind === 'deposit' ? 'deposit' : 'withdrawal'} request`, body: `${p.email} · ${fmtMoney(p.amount)} via ${methodLabel(p.method)}`, level: 'info' });
   });
@@ -96,6 +110,7 @@ export function PaymentsQueue({ userId, compact, onChanged }: { userId?: string;
       onChanged?.();
       // balances on sibling rows change after an approval; re-read quietly
       q.refresh();
+      setSv((v) => v + 1);
     } catch (e) {
       // 422 insufficient_balance, 409 not pending, …: the row stays as it is and the message shows inline
       setErr(e instanceof ApiError ? e.message : 'Something went wrong. Please try again.');
@@ -184,6 +199,14 @@ export function PaymentsQueue({ userId, compact, onChanged }: { userId?: string;
   return (
     <>
     <Card className={cn(compact && 'p-4')}>
+      {summary && !compact && (
+        <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <Stat label="Deposits" value={fmtMoney(summary.deposits.approved)} sub={`${summary.deposits.count} request${summary.deposits.count === 1 ? '' : 's'} · ${fmtMoney(summary.deposits.requested)} requested`} tone="up" />
+          <Stat label="Withdrawals" value={fmtMoney(summary.withdrawals.approved)} sub={`${summary.withdrawals.count} request${summary.withdrawals.count === 1 ? '' : 's'} · ${fmtMoney(summary.withdrawals.requested)} requested`} tone="down" />
+          <Stat label="Net flow" value={fmtMoney((Number(summary.deposits.approved) - Number(summary.withdrawals.approved)).toFixed(2))} sub="approved in / out" />
+          <Stat label="Pending" value={summary.pending} sub="awaiting review" tone={summary.pending > 0 ? 'down' : undefined} />
+        </div>
+      )}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 max-w-full flex-wrap items-center gap-3">
           <StatusTabs
@@ -210,6 +233,12 @@ export function PaymentsQueue({ userId, compact, onChanged }: { userId?: string;
               <option value="withdraw">Withdrawals</option>
             </Select>
           </div>
+          <input type="date" aria-label="From date" value={from} onChange={(e) => { setFrom(e.target.value); q.setPage(1); }} className="h-9 rounded-lg border border-white/10 bg-white/[0.03] px-2.5 text-sm text-white outline-none focus:border-brand-500" />
+          <span className="text-xs text-ink-500">to</span>
+          <input type="date" aria-label="To date" value={to} onChange={(e) => { setTo(e.target.value); q.setPage(1); }} className="h-9 rounded-lg border border-white/10 bg-white/[0.03] px-2.5 text-sm text-white outline-none focus:border-brand-500" />
+          {(from || to) && (
+            <button type="button" onClick={() => { setFrom(''); setTo(''); q.setPage(1); }} className="h-9 rounded-lg border border-white/10 px-2.5 text-xs text-ink-300 hover:text-white">Clear</button>
+          )}
         </div>
         <span className="font-mono text-[11px] text-ink-400">
           {q.data ? (

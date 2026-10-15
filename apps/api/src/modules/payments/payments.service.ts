@@ -18,6 +18,7 @@ import {
   type CashierInfoDto,
   type DepositRequestInput,
   type Paginated,
+  type PaymentsSummaryDto,
   type PaymentDecisionInput,
   type PaymentMethodDto,
   type PaymentRequestDto,
@@ -352,8 +353,33 @@ export class PaymentsService {
 
   // ---------------------------------------------------------------- admin
 
-  async queue(q: { status?: PaymentStatus; kind?: PaymentKind; userId?: string; page: number; limit: number }): Promise<Paginated<AdminPaymentRowDto>> {
-    const where: Prisma.PaymentRequestWhereInput = { ...(q.status && { status: q.status }), ...(q.kind && { kind: q.kind }), ...(q.userId && { userId: q.userId }) };
+  /** createdAt range filter shared by the queue and the summary. */
+  private dateWhere(from?: string, to?: string): Prisma.PaymentRequestWhereInput {
+    if (!from && !to) return {};
+    return { createdAt: { ...(from && { gte: new Date(from) }), ...(to && { lte: new Date(`${to.slice(0, 10)}T23:59:59.999Z`) }) } };
+  }
+
+  /** Totals for the payments tab summary (deposits / withdrawals counts + requested + approved, and pending), for the date range. */
+  async paymentsSummary(q: { userId?: string; from?: string; to?: string }): Promise<PaymentsSummaryDto> {
+    const base: Prisma.PaymentRequestWhereInput = { ...(q.userId && { userId: q.userId }), ...this.dateWhere(q.from, q.to) };
+    const [depCount, depReq, depApp, wdCount, wdReq, wdApp, pending] = await Promise.all([
+      this.prisma.paymentRequest.count({ where: { ...base, kind: 'deposit' } }),
+      this.prisma.paymentRequest.aggregate({ _sum: { amount: true }, where: { ...base, kind: 'deposit' } }),
+      this.prisma.paymentRequest.aggregate({ _sum: { amount: true }, where: { ...base, kind: 'deposit', status: 'approved' } }),
+      this.prisma.paymentRequest.count({ where: { ...base, kind: 'withdraw' } }),
+      this.prisma.paymentRequest.aggregate({ _sum: { amount: true }, where: { ...base, kind: 'withdraw' } }),
+      this.prisma.paymentRequest.aggregate({ _sum: { amount: true }, where: { ...base, kind: 'withdraw', status: 'approved' } }),
+      this.prisma.paymentRequest.count({ where: { ...base, status: 'pending' } }),
+    ]);
+    return {
+      deposits: { count: depCount, requested: money(depReq._sum.amount), approved: money(depApp._sum.amount) },
+      withdrawals: { count: wdCount, requested: money(wdReq._sum.amount), approved: money(wdApp._sum.amount) },
+      pending,
+    };
+  }
+
+  async queue(q: { status?: PaymentStatus; kind?: PaymentKind; userId?: string; from?: string; to?: string; page: number; limit: number }): Promise<Paginated<AdminPaymentRowDto>> {
+    const where: Prisma.PaymentRequestWhereInput = { ...(q.status && { status: q.status }), ...(q.kind && { kind: q.kind }), ...(q.userId && { userId: q.userId }), ...this.dateWhere(q.from, q.to) };
     const [total, rows] = await Promise.all([
       this.prisma.paymentRequest.count({ where }),
       this.prisma.paymentRequest.findMany({

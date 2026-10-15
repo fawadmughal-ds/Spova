@@ -29,7 +29,8 @@ const listQuery = paginationSchema.extend({
   kind: z.enum(['deposit', 'withdraw']).optional(),
   status: z.enum(['pending', 'approved', 'declined', 'cancelled']).optional(),
 });
-const adminQuery = listQuery.extend({ userId: z.string().uuid().optional() });
+const adminQuery = listQuery.extend({ userId: z.string().uuid().optional(), from: z.string().optional(), to: z.string().optional() });
+const summaryQuery = z.object({ userId: z.string().uuid().optional(), from: z.string().optional(), to: z.string().optional() });
 
 /** Streams a payment slip with headers that stop the browser from executing it. */
 async function streamProof(res: Response, svc: PaymentsService, id: string, requester: { id: string; isAdmin: boolean }) {
@@ -127,6 +128,12 @@ export class PaymentsAdminController {
   @Get()
   queue(@Query(new ZodPipe(adminQuery)) q: z.infer<typeof adminQuery>) {
     return this.payments.queue(q);
+  }
+
+  /** Deposit/withdrawal totals for the summary strip (respects the date range + client). */
+  @Get('summary')
+  summary(@Query(new ZodPipe(summaryQuery)) q: z.infer<typeof summaryQuery>) {
+    return this.payments.paymentsSummary(q);
   }
 
   /** Deposit channels (bank / UPI / Binance Pay / USDT / card) shown to clients. */

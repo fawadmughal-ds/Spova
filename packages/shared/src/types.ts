@@ -431,6 +431,13 @@ export interface AdminPaymentRowDto extends PaymentRequestDto {
   account: { type: AccountType; balance: string; freeMargin: string };
 }
 
+/** Totals for the payments tab summary strip (respects the current date range / client filter). */
+export interface PaymentsSummaryDto {
+  deposits: { count: number; requested: string; approved: string };
+  withdrawals: { count: number; requested: string; approved: string };
+  pending: number;
+}
+
 export interface TicketMessageDto {
   id: string;
   authorId: string;

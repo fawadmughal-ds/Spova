@@ -117,6 +117,19 @@ describe('admin account ops + dashboard KPIs', () => {
     assert.ok(reg.data.items.length >= 1, 'sign-up is in the timeline');
   });
 
+  it('payments summary returns deposit/withdraw totals and respects the date range', async () => {
+    const s = await admin.json('GET', '/admin/payments/summary');
+    assert.ok(created(s.status), JSON.stringify(s.data));
+    assert.equal(typeof s.data.deposits.count, 'number');
+    assert.equal(typeof s.data.withdrawals.approved, 'string');
+    assert.equal(typeof s.data.pending, 'number');
+    const ranged = await admin.json('GET', '/admin/payments/summary?from=2020-01-01&to=2020-01-02');
+    assert.equal(ranged.data.deposits.count, 0, 'an old date range has no deposits');
+    const list = await admin.json('GET', '/admin/payments?from=2020-01-01&to=2020-01-02');
+    assert.ok(created(list.status), JSON.stringify(list.data));
+    assert.equal(list.data.items.length, 0, 'old date range list is empty');
+  });
+
   it('remove_credit debits the credit bucket, not the cash balance', async () => {
     const d = await admin.json('GET', `/admin/users/${clientId}`);
     const acc = d.data.accounts[0];

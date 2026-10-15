@@ -181,7 +181,8 @@ export function validateLots(lots: Decimal.Value, min: Decimal.Value, max: Decim
 /** Nightly swap for one position in USD terms as stored (rates are per lot per night; x3 on Wednesday). */
 export function swapFor(lots: Decimal.Value, side: 'buy' | 'sell', swapLong: Decimal.Value, swapShort: Decimal.Value, date: Date) {
   const nights = date.getUTCDay() === 3 ? 3 : 1;
-  return dec(lots).times(side === 'buy' ? swapLong : swapShort).times(nights);
+  // swap is always a cost: it only ever deducts from the trade's profit, never adds to it (abs -> negative)
+  return dec(lots).times(side === 'buy' ? swapLong : swapShort).times(nights).abs().negated();
 }
 
 /** Worst position first for stop-out: most negative floating P/L. */
