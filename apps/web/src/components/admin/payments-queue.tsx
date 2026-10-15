@@ -10,6 +10,7 @@ import { AnimatedNumber } from '@/components/motion';
 import { useToast } from '@/components/toast';
 import { Alert, Badge, Button, Card, Empty, Select, Skeleton, Stat } from '@/components/ui';
 import { ClientCell, Pager, StatusTabs, TableSkeleton, Textarea, TimeAgo, useQueue } from './queue-bits';
+import { DatePresets } from './date-presets';
 
 type Tab = PaymentStatus | 'all';
 const TABS: { value: Tab; label: string }[] = [
@@ -239,6 +240,7 @@ export function PaymentsQueue({ userId, compact, onChanged }: { userId?: string;
           {(from || to) && (
             <button type="button" onClick={() => { setFrom(''); setTo(''); q.setPage(1); }} className="h-9 rounded-lg border border-white/10 px-2.5 text-xs text-ink-300 hover:text-white">Clear</button>
           )}
+          <DatePresets onPick={(f, t) => { setFrom(f); setTo(t); q.setPage(1); }} />
         </div>
         <span className="font-mono text-[11px] text-ink-400">
           {q.data ? (

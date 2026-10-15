@@ -10,6 +10,7 @@ import type { ActivityFeedDto, ActivityEventDto } from '@spova/shared';
 import { get } from '@/lib/api';
 import { fmtDate } from '@/lib/utils';
 import { Select, Spinner, Button } from '@/components/ui';
+import { DatePresets } from './date-presets';
 
 export const ACTIVITY_KINDS: { value: string; label: string }[] = [
   { value: '', label: 'All activity' },
@@ -112,6 +113,9 @@ export function ActivityFeed({ userId, initialKind = '' }: { userId?: string; in
             Clear
           </button>
         )}
+      </div>
+      <div className="mb-4">
+        <DatePresets onPick={(f, t) => { setFrom(f); setTo(t); }} />
       </div>
 
       {data && <div className="mb-2 text-xs text-ink-500">{data.total} event{data.total === 1 ? '' : 's'}</div>}
