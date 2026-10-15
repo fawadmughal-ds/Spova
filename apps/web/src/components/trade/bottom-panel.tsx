@@ -230,7 +230,9 @@ const PositionRow = memo(function PositionRow({ p, spec, mode, onMode, account, 
   useQuote(c2);
   const digits = spec?.digits ?? 2;
   const live = livePnl(p, spec, q);
-  const pct = live.pnl !== null && Number(p.marginUsed) > 0 ? (live.pnl / Number(p.marginUsed)) * 100 : null;
+  // the client sees swap netted into the trade's profit; the separate Swap line stays in the details
+  const net = live.pnl !== null ? live.pnl + Number(p.swapAccrued ?? 0) : null;
+  const pct = net !== null && Number(p.marginUsed) > 0 ? (net / Number(p.marginUsed)) * 100 : null;
   const [d1, t1] = fmtDateTimeParts(p.openAt);
   return (
     <>
@@ -265,7 +267,7 @@ const PositionRow = memo(function PositionRow({ p, spec, mode, onMode, account, 
           <TwoLine a={d1} b={t1} />
         </td>
         <td className="text-right">
-          <TwoLine a={<Pnl v={live.pnl} live={live.live} className="text-[14px]" />} b={<span className={cn(pct === null ? '' : pct > 0 ? 't-pnl-up' : pct < 0 ? 't-pnl-down' : '')}>{pct === null ? '' : `${pct.toFixed(2)}%`}</span>} />
+          <TwoLine a={<Pnl v={net} live={live.live} className="text-[14px]" />} b={<span className={cn(pct === null ? '' : pct > 0 ? 't-pnl-up' : pct < 0 ? 't-pnl-down' : '')}>{pct === null ? '' : `${pct.toFixed(2)}%`}</span>} />
         </td>
         <td className="text-right">
           <span className="inline-flex gap-1.5">

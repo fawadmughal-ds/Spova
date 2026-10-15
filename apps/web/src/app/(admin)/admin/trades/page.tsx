@@ -27,8 +27,10 @@ const Pnl = ({ v }: { v: string | null }) => (v === null ? <span className="text
 /** Back-office view of the book: live positions (force close), closed history and pending orders. */
 export default function AdminTradesPage() {
   const [tab, setTab] = useState<Tab>('open');
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
   const toast = useToast();
-  const positions = useQueue<PosRow>('/admin/positions', { open: tab === 'closed' ? 'false' : 'true' }, 25);
+  const positions = useQueue<PosRow>('/admin/positions', { open: tab === 'closed' ? 'false' : 'true', ...(tab === 'closed' && { from: from || undefined, to: to || undefined }) }, 25);
   const orders = useQueue<OrdRow>('/admin/orders', { status: 'pending' }, 25);
   const [closing, setClosing] = useState<{ id: string; reason: string; busy: boolean; error: string | null } | null>(null);
 
@@ -72,6 +74,24 @@ export default function AdminTradesPage() {
         onChange={setTab}
         className="mb-4"
       />
+
+      {tab === 'closed' && (
+        <div className="mb-4 flex flex-wrap items-end gap-3">
+          <label className="text-xs text-ink-400">
+            <span className="mb-1 block uppercase tracking-wider text-ink-500">Closed from</span>
+            <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white outline-none focus:border-brand-500" />
+          </label>
+          <label className="text-xs text-ink-400">
+            <span className="mb-1 block uppercase tracking-wider text-ink-500">To</span>
+            <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white outline-none focus:border-brand-500" />
+          </label>
+          {(from || to) && (
+            <button type="button" onClick={() => { setFrom(''); setTo(''); }} className="rounded-lg border border-white/10 px-3 py-2 text-xs text-ink-300 hover:text-white">
+              Clear
+            </button>
+          )}
+        </div>
+      )}
 
       {tab === 'pending' ? (
         <Card>

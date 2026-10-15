@@ -115,6 +115,11 @@ export class AdminController {
     return this.admin.updateAccount({ ...actor, ip }, id, body);
   }
 
+  @Delete('accounts/:id')
+  deleteAccount(@CurrentUser() actor: AuthUser, @ClientIp() ip: string, @Param('id') id: string) {
+    return this.admin.deleteAccount({ ...actor, ip }, id);
+  }
+
   @Post('accounts/:id/credit')
   credit(@CurrentUser() actor: AuthUser, @ClientIp() ip: string, @Param('id') id: string, @Body(new ZodPipe(adminCreditSchema)) body: AdminCreditInput) {
     return this.admin.credit({ ...actor, ip }, id, body);

@@ -139,7 +139,14 @@ export class InternalTradingController {
   }
 }
 
-const adminPosQuery = paginationSchema.extend({ open: z.coerce.boolean().optional(), symbol: z.string().optional(), accountId: z.string().uuid().optional() });
+// NB: z.coerce.boolean() turns the string "false" into true — take the literal string and convert in the service
+const adminPosQuery = paginationSchema.extend({
+  open: z.enum(['true', 'false']).optional(),
+  symbol: z.string().optional(),
+  accountId: z.string().uuid().optional(),
+  from: z.string().optional(),
+  to: z.string().optional(),
+});
 const adminOrdQuery = paginationSchema.extend({ status: z.enum(['pending', 'filled', 'cancelled', 'rejected', 'expired']).optional() });
 const forceCloseSchema = z.object({ reason: z.string().trim().min(3).max(300) });
 

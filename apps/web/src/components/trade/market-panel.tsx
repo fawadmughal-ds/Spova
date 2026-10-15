@@ -272,10 +272,13 @@ export function MarketPanel({ symbols, selected, onSelect, account, onPlaced, on
       return q ? symbols.filter((s) => s.id.includes(q) || s.name.toUpperCase().includes(q)) : symbols;
     }
     if (tab === 'movers') {
+      // only the major, most-liquid instruments (the featured set) — not the whole share/alt list
       return symbols
+        .filter((s) => s.featured)
         .map((s) => ({ s, c: dailyChange(quoteStore.get(s.id)) }))
         .filter((x) => x.c !== null)
         .sort((a, b) => Math.abs(b.c!) - Math.abs(a.c!))
+        .slice(0, 12)
         .map((x) => x.s);
     }
     const set = new Set(favs.ids);

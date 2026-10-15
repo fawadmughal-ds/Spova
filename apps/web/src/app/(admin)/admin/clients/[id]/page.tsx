@@ -189,6 +189,7 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
             ['Closed trades', String(u.stats.closedTrades), false],
             ['Volume (lots)', u.stats.totalVolumeLots, false],
             ['Realized P/L', fmtMoney(u.stats.realizedPnl), false],
+            ['Balance', fmtMoney(u.accounts.reduce((s, a) => s + Number(a.balance), 0).toFixed(2)), false],
             ['Equity', fmtMoney(totEquity.toFixed(2)), false],
             ['In market (margin)', fmtMoney(totUsed.toFixed(2)), totUsed > 0],
             ['Available to withdraw', fmtMoney(totFree.toFixed(2)), false],
@@ -313,7 +314,7 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
       {account && (
         <div className="mt-6 grid grid-cols-[minmax(0,1fr)] gap-6 xl:grid-cols-3">
           <WalletPanel account={account} superadmin={me?.role === 'superadmin'} onChanged={onAccountChanged} />
-          <AccountSettingsPanel account={account} onChanged={onAccountChanged} />
+          <AccountSettingsPanel account={account} onChanged={onAccountChanged} onDeleted={() => { setSelected(null); void load(); }} />
           <Card title={`Ledger · ${account.loginCode}`} className="xl:col-span-3">
             <LedgerTable basePath={`/admin/accounts/${account.id}`} version={ledgerVersion} />
           </Card>

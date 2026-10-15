@@ -490,11 +490,13 @@ export class TradingService {
 
   // ---------------------------------------------------------------- admin
 
-  async adminPositions(q: { open?: boolean; symbol?: string; accountId?: string; page: number; limit: number }) {
-    const where: Prisma.PositionWhereInput = { ...(q.open !== false && { status: 'open' }), ...(q.symbol && { symbolId: q.symbol }), ...(q.accountId && { accountId: q.accountId }) };
+  async adminPositions(q: { open?: 'true' | 'false'; symbol?: string; accountId?: string; from?: string; to?: string; page: number; limit: number }) {
+    const closed = q.open === 'false';
+    const dateRange = closed && (q.from || q.to) ? { closeAt: { ...(q.from && { gte: new Date(q.from) }), ...(q.to && { lte: new Date(`${q.to.slice(0, 10)}T23:59:59.999Z`) }) } } : {};
+    const where: Prisma.PositionWhereInput = { status: closed ? 'closed' : 'open', ...(q.symbol && { symbolId: q.symbol }), ...(q.accountId && { accountId: q.accountId }), ...dateRange };
     const [total, rows, book, specs] = await Promise.all([
       this.prisma.position.count({ where }),
-      this.prisma.position.findMany({ where, orderBy: { openAt: 'desc' }, skip: (q.page - 1) * q.limit, take: q.limit, include: { account: { select: { loginCode: true, type: true, user: { select: { id: true, email: true } } } } } }),
+      this.prisma.position.findMany({ where, orderBy: closed ? { closeAt: 'desc' } : { openAt: 'desc' }, skip: (q.page - 1) * q.limit, take: q.limit, include: { account: { select: { loginCode: true, type: true, user: { select: { id: true, email: true } } } } } }),
       this.quotes.book(),
       this.quotes.specs(),
     ]);

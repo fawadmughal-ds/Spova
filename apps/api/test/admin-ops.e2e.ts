@@ -89,6 +89,21 @@ describe('admin account ops + dashboard KPIs', () => {
     assert.ok(Number(d.data.stats.depositsApproved) >= 500);
   });
 
+  it('admin can delete an account (hard delete)', async () => {
+    const acc = await admin.json('POST', `/admin/users/${clientId}/accounts`, { type: 'demo' });
+    const id = acc.data.id;
+    const d = await admin.json('DELETE', `/admin/accounts/${id}`);
+    assert.ok(created(d.status), JSON.stringify(d.data));
+    const after = await admin.json('GET', `/admin/users/${clientId}`);
+    assert.ok(!after.data.accounts.some((x: { id: string }) => x.id === id), 'deleted account is gone');
+  });
+
+  it('closed-positions query returns only closed (open=false is not coerced to true)', async () => {
+    const r = await admin.json('GET', '/admin/positions?open=false&limit=50');
+    assert.ok(created(r.status), JSON.stringify(r.data));
+    assert.ok(r.data.items.every((p: { status: string }) => p.status === 'closed'), 'all items are closed');
+  });
+
   it('remove_credit debits the credit bucket, not the cash balance', async () => {
     const d = await admin.json('GET', `/admin/users/${clientId}`);
     const acc = d.data.accounts[0];

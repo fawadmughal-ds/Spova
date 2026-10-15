@@ -2,15 +2,16 @@
 
 import { useEffect, useState } from 'react';
 import type { AccountDto } from '@spova/shared';
-import { patch, ApiError } from '@/lib/api';
+import { del, patch, ApiError } from '@/lib/api';
 import { useToast } from '@/components/toast';
 import { Button, Card, Input, Select } from '@/components/ui';
 
 const TIERS = ['classic', 'silver', 'gold', 'platinum', 'vip'] as const;
 
 /** Leverage / tier / status / trading block. Each save = PATCH /admin/accounts/:id (+audit). */
-export function AccountSettingsPanel({ account, onChanged }: { account: AccountDto; onChanged: (a: AccountDto) => void }) {
+export function AccountSettingsPanel({ account, onChanged, onDeleted }: { account: AccountDto; onChanged: (a: AccountDto) => void; onDeleted?: (id: string) => void }) {
   const toast = useToast();
+  const [deleting, setDeleting] = useState(false);
   const [leverage, setLeverage] = useState(String(account.leverage));
   const [tier, setTier] = useState<string>(account.tier);
   const [status, setStatus] = useState<string>(account.status);
@@ -45,6 +46,20 @@ export function AccountSettingsPanel({ account, onChanged }: { account: AccountD
       toast({ title: 'Update failed', body: e instanceof ApiError ? e.message : undefined, level: 'danger' });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const remove = async () => {
+    if (!confirm(`Delete ${account.type} account ${account.loginCode}? This permanently removes the account and all its trades, orders and ledger history. This cannot be undone.`)) return;
+    setDeleting(true);
+    try {
+      await del(`/admin/accounts/${account.id}`);
+      toast({ title: `Account ${account.loginCode} deleted`, level: 'success' });
+      onDeleted?.(account.id);
+    } catch (e) {
+      toast({ title: 'Delete failed', body: e instanceof ApiError ? e.message : undefined, level: 'danger' });
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -95,6 +110,9 @@ export function AccountSettingsPanel({ account, onChanged }: { account: AccountD
         <Input label="Login code" value={account.loginCode} readOnly disabled />
         <Button className="w-full" variant="secondary" onClick={() => void save()} loading={saving}>
           Save settings
+        </Button>
+        <Button className="w-full" variant="danger" onClick={() => void remove()} loading={deleting}>
+          Delete account
         </Button>
       </div>
     </Card>

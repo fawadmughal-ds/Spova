@@ -344,6 +344,28 @@ export class AdminService {
     return dto;
   }
 
+  /** Hard-delete an account and all its records. Demo: any admin. Live: superadmin only (it destroys the money trail). */
+  async deleteAccount(actor: Actor, accountId: string) {
+    const acc = await this.prisma.tradingAccount.findUnique({ where: { id: accountId }, select: { id: true, type: true, userId: true, loginCode: true, balance: true } });
+    if (!acc) throw ApiError.notFound('account_not_found', 'Account not found');
+    if (acc.type === 'live' && actor.role !== 'superadmin') throw ApiError.forbidden('superadmin_required', 'Only a superadmin can delete a live account');
+    await this.prisma.$transaction(async (tx) => {
+      await tx.positionClose.deleteMany({ where: { position: { accountId } } });
+      await tx.position.deleteMany({ where: { accountId } });
+      await tx.order.deleteMany({ where: { accountId } });
+      // ledger_entries is append-only (a BEFORE DELETE trigger); lift it only for this account's rows inside the tx, then restore it
+      await tx.$executeRawUnsafe('ALTER TABLE ledger_entries DISABLE TRIGGER ledger_entries_append_only');
+      await tx.ledgerEntry.deleteMany({ where: { accountId } });
+      await tx.$executeRawUnsafe('ALTER TABLE ledger_entries ENABLE TRIGGER ledger_entries_append_only');
+      await tx.paymentRequest.deleteMany({ where: { accountId } });
+      await tx.statementExport.deleteMany({ where: { accountId } });
+      await tx.tradingAccount.delete({ where: { id: accountId } });
+      await tx.adminAudit.create({ data: { actorId: actor.id, action: 'account.delete', targetType: 'account', targetId: accountId, before: { type: acc.type, loginCode: acc.loginCode, balance: money(acc.balance) }, after: {}, ip: actor.ip } });
+    });
+    void this.activity.record({ userId: acc.userId, kind: 'account_delete', title: `Admin deleted a ${acc.type} account`, detail: `#${acc.loginCode}`, meta: { loginCode: acc.loginCode, type: acc.type } });
+    return { id: accountId };
+  }
+
   async updateAccount(
     actor: Actor,
     accountId: string,
