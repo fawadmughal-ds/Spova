@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { ArrowRight } from 'lucide-react';
 import { buttonClass } from '@/lib/button';
 import { Reveal, Words } from '@/components/motion';
@@ -19,6 +20,8 @@ export function CtaBand({
     <section className="mx-auto max-w-7xl px-4 pb-24 pt-4 sm:px-6 sm:pb-32">
       <Reveal variant="scale">
         <div className="beam noise relative overflow-hidden rounded-3xl border border-white/[0.08] bg-ink-900 p-8 sm:p-14">
+          <Image src="/images/cta-bg.jpg" alt="" fill sizes="(max-width: 1280px) 100vw, 1280px" className="pointer-events-none absolute inset-0 object-cover opacity-25" />
+          <div className="absolute inset-0 bg-gradient-to-r from-ink-900 via-ink-900/80 to-ink-900/30" />
           <div className="aurora-blob -left-24 -top-44 h-[380px] w-[620px] bg-[rgb(var(--c,var(--brand-rgb))/0.22)]" />
           <div className="bg-dots absolute inset-0 opacity-60" />
           <Reveal variant="none" className="relative flex flex-wrap items-end justify-between gap-8">

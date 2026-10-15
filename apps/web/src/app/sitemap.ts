@@ -2,8 +2,9 @@ import type { MetadataRoute } from 'next';
 import { MARKET_LIST } from '@/lib/markets';
 import { COMPANY_LINKS, EDUCATION_LINKS, TIER_LINKS, TRADING_LINKS, tierHref } from '@/lib/site-nav';
 import { LEGAL_DOCS } from '@spova/shared';
+import { SITE_URL } from '@/lib/site';
 
-const BASE = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000';
+const BASE = SITE_URL;
 
 /** Public pages only; /app, /trade and /admin are noindex (see next.config.ts). */
 export default function sitemap(): MetadataRoute.Sitemap {

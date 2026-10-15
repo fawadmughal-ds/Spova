@@ -49,10 +49,18 @@ const STEPS = [
   { icon: LineChart, title: 'Fund & trade', body: '' },
 ];
 
-export const tierMetadata = (tier: TierSlug): Metadata => ({
-  title: `${tierName(tier)} account`,
-  description: `${COPY[tier].lead} Compare the ${tierName(tier)} account with the other ${BRAND} tiers.`,
-});
+export const tierMetadata = (tier: TierSlug): Metadata => {
+  const title = `${tierName(tier)} account`;
+  const description = `${COPY[tier].lead} Compare the ${tierName(tier)} account with the other ${BRAND} tiers.`;
+  const image = `/images/tier-${tier}.jpg`;
+  return {
+    title,
+    description,
+    alternates: { canonical: tierHref(tier) },
+    openGraph: { title: `${title} | ${BRAND}`, description, images: [{ url: image, width: 1024, height: 1024, alt: `${BRAND} ${tierName(tier)} account` }] },
+    twitter: { card: 'summary_large_image', title: `${title} | ${BRAND}`, description, images: [image] },
+  };
+};
 
 /** Signal bars: one more lit per tier. */
 function Bars({ level, className }: { level: number; className?: string }) {

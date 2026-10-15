@@ -1,0 +1,31 @@
+# Zerventa
+
+> Zerventa is an online CFD broker. Trade Forex, Indices, Commodities, Shares, Crypto and Metals as CFDs with tight spreads, leverage up to 1:400, fast execution and a browser-based web terminal that works on any device. Sign-up opens a free demo account with $10,000 virtual funds; live accounts start from a $200 deposit.
+
+## Accounts
+- [Compare trading accounts](https://www.zerventa.com/trading-account): account tiers, leverage, spreads and features.
+- [Classic account](https://www.zerventa.com/classic-account): the standard account — every instrument and the full web terminal.
+- [Silver account](https://www.zerventa.com/silver-account): spread discount and priority support.
+- [Gold account](https://www.zerventa.com/gold-account): larger spread discount, trading signals and a dedicated account manager.
+- [Platinum account](https://www.zerventa.com/platinum-account): deeper discounts, VPS hosting and premium analysis.
+- [VIP account](https://www.zerventa.com/vip-account): bespoke pricing and service.
+
+## Markets
+- [CFDs list](https://www.zerventa.com/cfds-list): the full instrument catalogue (forex, indices, commodities, shares, crypto, metals).
+- [Swap & financing fees](https://www.zerventa.com/swap-fees): overnight swap rates.
+- [Market holidays](https://www.zerventa.com/market-holidays) and [CFD expiries](https://www.zerventa.com/cfd-expiries).
+- [Economic calendar](https://www.zerventa.com/economic-calendar): upcoming market events.
+
+## Learn
+- [Education](https://www.zerventa.com/education) and [Trading education](https://www.zerventa.com/trading-education).
+- [Trading signals](https://www.zerventa.com/signals), [Chart analysis](https://www.zerventa.com/chart-analysis), [Risk management tools](https://www.zerventa.com/risk-management-tools).
+- [Glossary](https://www.zerventa.com/glossary), [eBooks](https://www.zerventa.com/ebooks), [Daily market videos](https://www.zerventa.com/daily-market-videos), [Latest market news](https://www.zerventa.com/latest-market-news).
+
+## Company
+- [Become a partner](https://www.zerventa.com/become-a-partner).
+- [Complaints](https://www.zerventa.com/complaints) and [Cookies & privacy](https://www.zerventa.com/cookies-privacy).
+- [Legal documents](https://www.zerventa.com/legal): client agreement, risk disclosure and policies.
+
+## Notes
+- Contact: info@zerventa.com
+- CFDs are complex instruments and carry a high risk of losing money rapidly due to leverage. Trading is not suitable for everyone.

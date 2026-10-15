@@ -4,6 +4,7 @@ import { Bricolage_Grotesque, Geist, Instrument_Serif, JetBrains_Mono } from 'ne
 import './globals.css';
 import { Providers } from './providers';
 import { BRAND } from '@/lib/utils';
+import { OG_IMAGE, OG_IMAGE_H, OG_IMAGE_W, SITE_DESCRIPTION, SITE_URL, SOCIALS } from '@/lib/site';
 
 /** Meta (Facebook) Pixel — site-wide ad/analytics tracking. */
 const META_PIXEL_ID = '1482472313703037';
@@ -14,9 +15,55 @@ const display = Bricolage_Grotesque({ subsets: ['latin'], variable: '--ff-displa
 const serif = Instrument_Serif({ subsets: ['latin'], weight: '400', style: ['normal', 'italic'], variable: '--ff-serif', display: 'swap' });
 const mono = JetBrains_Mono({ subsets: ['latin'], variable: '--ff-mono', display: 'swap' });
 
+const TITLE = `${BRAND} — Online Forex & CFD Trading`;
+
 export const metadata: Metadata = {
-  title: { default: `${BRAND} - Online Forex & CFD Trading`, template: `%s | ${BRAND}` },
-  description: `Trade Forex, Indices, Commodities, Shares, Crypto and Metals CFDs with ${BRAND}. Tight spreads, fast execution, 24/5 support.`,
+  metadataBase: new URL(SITE_URL),
+  title: { default: TITLE, template: `%s | ${BRAND}` },
+  description: SITE_DESCRIPTION,
+  applicationName: BRAND,
+  keywords: ['forex trading', 'CFD trading', 'online trading', 'trade forex', 'indices', 'commodities', 'shares CFDs', 'crypto CFDs', 'metals', 'gold trading', 'web trading terminal', 'MetaTrader alternative', BRAND],
+  authors: [{ name: BRAND }],
+  creator: BRAND,
+  publisher: BRAND,
+  alternates: { canonical: '/' },
+  robots: { index: true, follow: true, googleBot: { index: true, follow: true, 'max-image-preview': 'large', 'max-snippet': -1 } },
+  openGraph: {
+    type: 'website',
+    siteName: BRAND,
+    url: SITE_URL,
+    title: TITLE,
+    description: SITE_DESCRIPTION,
+    locale: 'en_US',
+    images: [{ url: OG_IMAGE, width: OG_IMAGE_W, height: OG_IMAGE_H, alt: TITLE }],
+  },
+  twitter: { card: 'summary_large_image', title: TITLE, description: SITE_DESCRIPTION, images: [OG_IMAGE] },
+  category: 'finance',
+};
+
+/** Organization + WebSite structured data for rich results. */
+const JSON_LD = {
+  '@context': 'https://schema.org',
+  '@graph': [
+    {
+      '@type': 'Organization',
+      '@id': `${SITE_URL}/#organization`,
+      name: BRAND,
+      url: SITE_URL,
+      logo: `${SITE_URL}/brand/zerventa-mark.png`,
+      description: SITE_DESCRIPTION,
+      sameAs: SOCIALS,
+    },
+    {
+      '@type': 'WebSite',
+      '@id': `${SITE_URL}/#website`,
+      url: SITE_URL,
+      name: BRAND,
+      description: SITE_DESCRIPTION,
+      publisher: { '@id': `${SITE_URL}/#organization` },
+      inLanguage: 'en',
+    },
+  ],
 };
 
 /**
@@ -29,6 +76,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" data-scroll-behavior="smooth" className={`${body.variable} ${display.variable} ${serif.variable} ${mono.variable}`}>
       <body className="min-h-screen">
+        {/* structured data for search engines */}
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD) }} />
         {/* Meta Pixel */}
         <Script id="meta-pixel" strategy="afterInteractive">{META_PIXEL}</Script>
         <noscript>

@@ -1,4 +1,10 @@
 User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /client-area
 Disallow: /app
 Disallow: /trade
-Disallow: /admin
+Disallow: /deposit-link
+Disallow: /api
+
+Sitemap: https://www.zerventa.com/sitemap.xml

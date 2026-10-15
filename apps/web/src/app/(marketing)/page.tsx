@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import type { CSSProperties } from 'react';
 import { ArrowRight, ArrowUpRight, FileCheck2, LineChart, UserPlus } from 'lucide-react';
 import { BRAND, cn, fmtMoney } from '@/lib/utils';
@@ -28,6 +29,7 @@ export default async function HomePage() {
     <>
       {/* ============================== HERO ============================== */}
       <section className="noise relative overflow-hidden pt-32 sm:pt-40">
+        <Image src="/images/hero-home.jpg" alt="" fill priority sizes="100vw" className="pointer-events-none absolute inset-0 object-cover opacity-[0.12] [mask-image:linear-gradient(to_bottom,black,transparent_85%)]" />
         <div className="bg-grid absolute inset-0" />
         <div className="aurora-blob -top-48 left-[4%] h-[540px] w-[640px] bg-brand-500/20" />
         <div className="aurora-blob right-[-12%] top-24 h-[460px] w-[560px] bg-iris/20 [animation-delay:-9s]" />
@@ -126,6 +128,75 @@ export default async function HomePage() {
               <div className="mt-4 text-sm font-semibold">{m.label}</div>
               <div className="label mt-1">up to {m.leverage}</div>
             </Spotlight>
+          ))}
+        </Reveal>
+      </section>
+
+      {/* ============================== SHOWCASE ============================== */}
+      <section className="mx-auto max-w-7xl px-4 py-24 sm:px-6 sm:py-32">
+        <SectionHead eyebrow="01b — Everything in one account" title="A full trading desk, *in your browser*" sub="Markets, signals, tools and education — wherever you are, on any device." />
+        <Reveal variant="stagger" step={80} className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {[
+            { img: 'hero-markets', title: '250+ markets', body: 'Forex, indices, commodities, shares, crypto and metals as CFDs.', href: '/cfds-list' },
+            { img: 'hero-signals', title: 'Trading signals', body: 'Actionable ideas and alerts to time your entries and exits.', href: '/signals' },
+            { img: 'hero-tools', title: 'Risk tools', body: 'Margin, pip and swap calculators to size every position.', href: '/risk-management-tools' },
+            { img: 'hero-accounts', title: 'Account tiers', body: 'From Classic to VIP — tighter spreads as you grow.', href: '/trading-account' },
+            { img: 'hero-education', title: 'Education', body: 'Guides, eBooks and daily videos to sharpen your edge.', href: '/education' },
+            { img: 'hero-partner', title: 'Partner with us', body: 'Earn by introducing clients to the Zerventa platform.', href: '/become-a-partner' },
+          ].map((c) => (
+            <Link key={c.img} href={c.href} className="card card-hover group overflow-hidden">
+              <div className="relative aspect-[4/3] overflow-hidden border-b border-white/[0.05]">
+                <Image src={`/images/${c.img}.jpg`} alt={c.title} fill sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw" className="object-cover transition-transform duration-500 group-hover:scale-[1.04]" />
+              </div>
+              <div className="p-6">
+                <h3 className="text-lg font-semibold text-white">{c.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-ink-400">{c.body}</p>
+              </div>
+            </Link>
+          ))}
+        </Reveal>
+      </section>
+
+      {/* ============================== LIFESTYLE ============================== */}
+      <section className="relative overflow-hidden border-y border-white/[0.06] bg-ink-900/40">
+        <div className="relative mx-auto grid max-w-7xl items-center gap-12 px-4 py-20 sm:px-6 lg:grid-cols-2 lg:py-28">
+          <Reveal variant="scale" className="relative overflow-hidden rounded-3xl border border-white/10 shadow-lift">
+            <Image src="/images/trader-lifestyle.jpg" alt="Trade from anywhere on the Zerventa web terminal" width={1376} height={768} className="w-full object-cover" />
+          </Reveal>
+          <Reveal>
+            <span className="eyebrow">Trade anywhere</span>
+            <h2 className="mt-5 font-display text-4xl font-extrabold leading-[1.02] tracking-tighter sm:text-5xl">
+              <Words text="Your markets, *in your pocket*" />
+            </h2>
+            <p className="mt-6 max-w-xl text-lg leading-relaxed text-ink-300">
+              The {BRAND} web terminal runs in any browser — desktop or phone. Open positions, manage risk and track your account without installing anything.
+            </p>
+            <div className="mt-8">
+              <Link href="/register" className={buttonClass('primary', 'lg', 'group h-13 rounded-2xl px-7')}>
+                Open free demo <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
+              </Link>
+            </div>
+          </Reveal>
+        </div>
+      </section>
+
+      {/* ============================== TRUST ============================== */}
+      <section className="mx-auto max-w-7xl px-4 pt-20 sm:px-6 sm:pt-28">
+        <Reveal variant="stagger" step={80} className="grid gap-5 sm:grid-cols-3">
+          {[
+            { img: 'feat-security', title: 'Your funds, protected', body: 'Negative-balance protection on every account — you never owe more than your balance.' },
+            { img: 'feat-speed', title: 'Instant execution', body: 'Market orders fill at live bid/ask. No requotes, no dealing-desk delays.' },
+            { img: 'feat-support', title: 'Real human support', body: 'Chat, email and phone — with a dedicated manager from Gold tier.' },
+          ].map((c) => (
+            <div key={c.img} className="card flex items-center gap-4 p-5">
+              <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-2xl border border-white/10">
+                <Image src={`/images/${c.img}.jpg`} alt="" fill sizes="64px" className="object-cover" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-white">{c.title}</h3>
+                <p className="mt-1 text-xs leading-relaxed text-ink-400">{c.body}</p>
+              </div>
+            </div>
           ))}
         </Reveal>
       </section>
