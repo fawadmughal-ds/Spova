@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Bell } from 'lucide-react';
+import { Bell, X } from 'lucide-react';
 import Link from 'next/link';
 import type { ActivityFeedDto, ActivityEventDto } from '@spova/shared';
 import { get, post } from '@/lib/api';
@@ -66,9 +66,14 @@ export function NotificationBell() {
         <div className="absolute right-0 top-11 z-50 w-80 max-w-[90vw] overflow-hidden rounded-2xl border border-white/10 bg-ink-950 shadow-2xl">
           <div className="flex items-center justify-between border-b border-white/5 px-4 py-2.5">
             <span className="text-sm font-semibold text-white">Notifications</span>
-            <button type="button" onClick={() => void markSeen()} className="text-xs text-brand-300 hover:underline">
-              Mark all seen
-            </button>
+            <span className="flex items-center gap-3">
+              <button type="button" onClick={() => void markSeen()} className="text-xs text-brand-300 hover:underline">
+                Mark all seen
+              </button>
+              <button type="button" onClick={() => setOpen(false)} aria-label="Close notifications" className="flex h-6 w-6 items-center justify-center rounded-full text-ink-400 transition-colors hover:bg-white/[0.08] hover:text-white">
+                <X className="h-4 w-4" />
+              </button>
+            </span>
           </div>
           <div className="max-h-[60vh] overflow-y-auto">
             {items.length === 0 ? (

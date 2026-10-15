@@ -56,11 +56,19 @@ export default function AdminHome() {
             <Link href="/admin/tickets" className="block rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/60">
               <Stat label="Open tickets" value={d.openTickets} sub={link('/admin/tickets', 'Answer')} icon={<MessagesSquare className="h-4 w-4" />} />
             </Link>
-            <Stat label="Deposits today" value={fmtMoney(d.depositsToday)} sub={`${fmtMoney(d.depositsTotal)} all-time`} tone="up" />
-            <Stat label="Withdrawals today" value={fmtMoney(d.withdrawalsToday)} sub={`${fmtMoney(d.withdrawalsTotal)} all-time`} tone="down" />
-            <Stat label="Manual credits" value={fmtMoney(d.manualCreditsTotal)} sub="Admin credits + bonuses, all-time" />
+            <Link href="/admin/activity?kind=deposit" className="block rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/60">
+              <Stat label="Deposits today" value={fmtMoney(d.depositsToday)} sub={`${fmtMoney(d.depositsTotal)} all-time · view all`} tone="up" />
+            </Link>
+            <Link href="/admin/activity?kind=withdraw" className="block rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/60">
+              <Stat label="Withdrawals today" value={fmtMoney(d.withdrawalsToday)} sub={`${fmtMoney(d.withdrawalsTotal)} all-time · view all`} tone="down" />
+            </Link>
+            <Link href="/admin/activity?kind=credit" className="block rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/60">
+              <Stat label="Manual credits" value={fmtMoney(d.manualCreditsTotal)} sub="Admin credits + bonuses · view all" />
+            </Link>
             <Stat label="Live balances" value={fmtMoney(d.liveBalanceTotal)} sub="USD, client money" />
-            <Stat label="Open positions" value={d.openPositions} sub={`Demo balances ${fmtMoney(d.demoBalanceTotal)} (virtual)`} />
+            <Link href="/admin/trades" className="block rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/60">
+              <Stat label="Open positions" value={d.openPositions} sub={`Demo balances ${fmtMoney(d.demoBalanceTotal)} (virtual) · view book`} />
+            </Link>
             <Link href="/admin/kyc" className="block rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/60">
               <Stat label="Documents due in 3 days" value={d.kycDueSoon} sub="Clients reminded, not yet complete" tone={d.kycDueSoon > 0 ? 'down' : undefined} />
             </Link>

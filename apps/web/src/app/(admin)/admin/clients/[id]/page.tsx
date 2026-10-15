@@ -18,6 +18,7 @@ import { KycQueue } from '@/components/admin/kyc-queue';
 import { PaymentsQueue } from '@/components/admin/payments-queue';
 import { TicketInbox } from '@/components/admin/ticket-inbox';
 import { ClientNotesPanel } from '@/components/admin/client-notes';
+import { ActivityFeed } from '@/components/admin/activity-feed';
 import { SlidingTabs } from '@/components/portal/sliding-tabs';
 
 /** Translate a stored suitability code to its human label (e.g. 'over_250k' -> 'Over $250,000'). */
@@ -325,6 +326,13 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
       <div className="mt-6 grid grid-cols-[minmax(0,1fr)] gap-6 xl:grid-cols-3">
         <ClientNotesPanel userId={u.id} initialNotes={u.notes} initialComments={u.comments} />
       </div>
+
+      {/* complete activity timeline for this client (logins, trades, deposits, withdrawals, admin money moves…) */}
+      <section className="mt-6">
+        <Card title="Activity — everything this client has done">
+          <ActivityFeed userId={u.id} />
+        </Card>
+      </section>
 
       {/* compliance + support for this client; same components as the queues, narrowed to one user */}
       <section className="mt-6">

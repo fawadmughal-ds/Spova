@@ -104,6 +104,19 @@ describe('admin account ops + dashboard KPIs', () => {
     assert.ok(r.data.items.every((p: { status: string }) => p.status === 'closed'), 'all items are closed');
   });
 
+  it('admin money moves are recorded in the per-client activity feed and are searchable', async () => {
+    const acc = await admin.json('POST', `/admin/users/${clientId}/accounts`, { type: 'live' });
+    await admin.json('POST', `/admin/accounts/${acc.data.id}/credit`, { amount: '123', reason: 'ActivityProbe deposit', type: 'deposit' });
+    const feed = await admin.json('GET', `/admin/activity?userId=${clientId}&kind=deposit`);
+    assert.ok(created(feed.status), JSON.stringify(feed.data));
+    assert.ok(feed.data.items.length >= 1, 'manual deposit shows in the client activity feed');
+    const search = await admin.json('GET', `/admin/activity?userId=${clientId}&q=ActivityProbe`);
+    assert.ok(search.data.items.length >= 1, 'search finds the event');
+    // the client's own actions are there too (sign-up)
+    const reg = await admin.json('GET', `/admin/activity?userId=${clientId}&kind=register`);
+    assert.ok(reg.data.items.length >= 1, 'sign-up is in the timeline');
+  });
+
   it('remove_credit debits the credit bucket, not the cash balance', async () => {
     const d = await admin.json('GET', `/admin/users/${clientId}`);
     const acc = d.data.accounts[0];

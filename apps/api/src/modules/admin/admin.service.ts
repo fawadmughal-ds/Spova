@@ -436,6 +436,7 @@ export class AdminService {
     });
 
     await this.afterMoneyChange(result.account.userId, result.account, `+${money(amount)} ${result.account.currency} ${input.type}`, input.reason);
+    void this.activity.record({ userId: result.account.userId, kind: input.type === 'deposit' ? 'deposit' : 'credit', title: `Admin ${input.type}`, detail: `+${money(amount)} ${result.account.currency} · ${input.reason}`, meta: { amount: money(amount), type: input.type, loginCode: result.account.loginCode, manual: true } });
     const cu = await this.prisma.user.findUnique({ where: { id: result.account.userId }, select: { email: true, profile: { select: { firstName: true, notifEmail: true } } } });
     if (cu?.profile?.notifEmail !== false) void this.mail.creditAdded(cu!.email, cu!.profile?.firstName ?? '', money(amount), result.account.currency, result.account.loginCode, input.type).catch((e) => this.log.warn(e.message));
     return { entryId, account: await this.accounts.toDto(result.account) };
@@ -487,6 +488,7 @@ export class AdminService {
     });
 
     await this.afterMoneyChange(result.account.userId, result.account, `${money(amount)} ${result.account.currency} ${removeCredit ? 'credit removed' : input.type}`, input.reason);
+    void this.activity.record({ userId: result.account.userId, kind: removeCredit ? 'credit_removed' : input.type === 'withdraw' ? 'withdraw' : 'debit', title: `Admin ${removeCredit ? 'credit removal' : input.type}`, detail: `${money(amount)} ${result.account.currency} · ${input.reason}`, meta: { amount: money(amount), type: removeCredit ? 'remove_credit' : input.type, loginCode: result.account.loginCode, manual: true } });
     return { entryId, account: await this.accounts.toDto(result.account) };
   }
 
@@ -510,6 +512,7 @@ export class AdminService {
       return { result };
     });
     await this.afterMoneyChange(result.account.userId, result.account, `${money(amount)} credit removed`, input.reason);
+    void this.activity.record({ userId: result.account.userId, kind: 'credit_removed', title: 'Admin credit removal', detail: `${money(amount)} · ${input.reason}`, meta: { amount: money(amount), loginCode: result.account.loginCode, manual: true } });
     return { entryId: result.entryId, account: await this.accounts.toDto(result.account) };
   }
 

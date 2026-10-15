@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from './prisma.service';
 import { RedisService } from './redis.service';
 
@@ -45,8 +46,25 @@ export class ActivityService {
   }
 
   /** Paged feed for the admin dashboard, newest first. */
-  async list(q: { page: number; limit: number; kind?: string; userId?: string }) {
-    const where = { ...(q.kind ? { kind: q.kind } : {}), ...(q.userId ? { userId: q.userId } : {}) };
+  async list(q: { page: number; limit: number; kind?: string; userId?: string; q?: string; from?: string; to?: string }) {
+    const where: Prisma.ActivityEventWhereInput = {
+      ...(q.kind ? { kind: q.kind } : {}),
+      ...(q.userId ? { userId: q.userId } : {}),
+      ...(q.from || q.to
+        ? { createdAt: { ...(q.from ? { gte: new Date(q.from) } : {}), ...(q.to ? { lte: new Date(`${q.to.slice(0, 10)}T23:59:59.999Z`) } : {}) } }
+        : {}),
+      ...(q.q
+        ? {
+            OR: [
+              { title: { contains: q.q, mode: 'insensitive' } },
+              { detail: { contains: q.q, mode: 'insensitive' } },
+              { user: { is: { email: { contains: q.q, mode: 'insensitive' } } } },
+              { user: { is: { profile: { is: { firstName: { contains: q.q, mode: 'insensitive' } } } } } },
+              { user: { is: { profile: { is: { lastName: { contains: q.q, mode: 'insensitive' } } } } } },
+            ],
+          }
+        : {}),
+    };
     const [rows, total] = await Promise.all([
       this.prisma.activityEvent.findMany({
         where,

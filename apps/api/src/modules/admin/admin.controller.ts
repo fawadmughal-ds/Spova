@@ -36,6 +36,9 @@ const removeCreditSchema = z.object({ amount: moneySchema, reason: z.string().tr
 const activityQuery = paginationSchema.extend({
   kind: z.string().trim().max(40).optional(),
   userId: z.string().uuid().optional(),
+  q: z.string().trim().max(100).optional(),
+  from: z.string().optional(),
+  to: z.string().optional(),
 });
 
 @Controller('admin')
