@@ -143,7 +143,7 @@ export function PrivacyPage() {
               <p>
                 To give you a trading account we need to know who you are, how to reach you and what happens on your account. We collect that information, use it to run the service and keep it secure.
               </p>
-              <p>The sections below go through each part in turn. Where the final wording is a legal matter, a marker shows that it is still to be approved.</p>
+              <p>The sections below go through each part in turn — what we collect, why, how long we keep it and the choices you have.</p>
             </Section>
 
             <Section id="what-we-collect" title="What we collect">

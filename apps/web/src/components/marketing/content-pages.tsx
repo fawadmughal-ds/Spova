@@ -344,7 +344,7 @@ function About({ copy }: { copy: ContentCopy }) {
         </Reveal>
       </section>
 
-      {/* regulation + safeguards: both blocks wait for the client */}
+      {/* regulation + safeguards */}
       <section className="mx-auto max-w-7xl px-4 pb-24 sm:px-6">
         <SectionHead eyebrow="04 — Regulation and safeguards" title="The part that must be *exactly right*" sub="Where we stand on risk, your funds and who can trade." />
         <Reveal variant="stagger" step={120} className="grid gap-4 md:grid-cols-2">
