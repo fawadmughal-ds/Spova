@@ -104,7 +104,6 @@ export const FAQ_TOPICS: FaqTopic[] = [
       {
         q: 'In which currency are accounts held?',
         a: 'Accounts are denominated in US dollars.',
-        pending: '[PLACEHOLDER - confirm whether other account currencies will be offered]',
       },
     ],
   },
@@ -122,7 +121,6 @@ export const FAQ_TOPICS: FaqTopic[] = [
       {
         q: 'Which payment methods can I use?',
         a: 'The list of available payment methods will be shown on the deposit screen and in the General Fees document.',
-        pending: '[PLACEHOLDER - payment methods to be confirmed by the client]',
       },
       {
         q: 'Can I open an account without depositing?',
@@ -136,7 +134,6 @@ export const FAQ_TOPICS: FaqTopic[] = [
       {
         q: 'Can I deposit from, or send funds to, someone else\'s account?',
         a: 'Rules on third-party payments are set out in the AML & CFT Policy.',
-        pending: '[PLACEHOLDER - third-party payment policy to be confirmed by compliance]',
         link: { href: '/legal', label: 'Legal documents' },
       },
     ],
@@ -163,7 +160,6 @@ export const FAQ_TOPICS: FaqTopic[] = [
       {
         q: 'Can I withdraw while I have open positions?',
         a: 'A withdrawal reduces your balance and therefore your free margin and margin level. Make sure the remaining equity comfortably covers your open positions before you request one.',
-        pending: '[PLACEHOLDER - rule for withdrawals with open positions to be confirmed]',
       },
       {
         q: 'Why would a withdrawal be declined?',
@@ -172,7 +168,6 @@ export const FAQ_TOPICS: FaqTopic[] = [
       {
         q: 'Is there a minimum withdrawal amount?',
         a: 'Minimum amounts per payment method will be listed in the General Fees document.',
-        pending: '[PLACEHOLDER - minimum withdrawal amounts to be confirmed]',
       },
     ],
   },
@@ -195,17 +190,14 @@ export const FAQ_TOPICS: FaqTopic[] = [
       {
         q: 'Are there deposit or withdrawal fees?',
         a: 'Any charges on deposits and withdrawals will be published in the General Fees document.',
-        pending: '[PLACEHOLDER - deposit and withdrawal fees to be confirmed]',
       },
       {
         q: 'Is there an inactivity fee?',
         a: 'Any inactivity charge will be published in the General Fees document.',
-        pending: '[PLACEHOLDER - inactivity fee policy to be confirmed]',
       },
       {
         q: 'Do you charge commission?',
         a: 'Any commission that applies in addition to the spread will be published in the General Fees document.',
-        pending: '[PLACEHOLDER - commission schedule to be confirmed]',
       },
     ],
   },
@@ -218,12 +210,10 @@ export const FAQ_TOPICS: FaqTopic[] = [
       {
         q: 'Are you regulated?',
         a: 'Zerventa is an online CFD broker offering forex, indices, commodities, shares, crypto and metals. CFDs are complex, leveraged products that can lose money rapidly, and the service is available only where local law permits trading.',
-        pending: '[PLACEHOLDER - regulator, licence and entity details to be supplied by the client]',
       },
       {
         q: 'Are client funds protected?',
         a: 'Every account type includes negative balance protection, so you cannot lose more than your account balance.',
-        pending: '[PLACEHOLDER - segregated funds wording to be confirmed]',
       },
       {
         q: 'Is my personal information safe?',
@@ -233,12 +223,10 @@ export const FAQ_TOPICS: FaqTopic[] = [
       {
         q: 'Is there a minimum age?',
         a: 'You must be an adult to open an account, and we ask for your date of birth at registration. The exact age requirement is set out in the Client Agreement.',
-        pending: '[PLACEHOLDER - minimum age by jurisdiction to be confirmed]',
       },
       {
         q: 'Which countries do you accept clients from?',
         a: 'We do not offer services to residents of certain jurisdictions, where CFD trading is restricted.',
-        pending: '[PLACEHOLDER - full list of restricted jurisdictions]',
       },
       {
         q: 'How do I make a complaint?',

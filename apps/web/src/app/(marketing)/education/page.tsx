@@ -215,7 +215,6 @@ export default function EducationPage() {
             eyebrow="03 — In preparation"
             title="Five tools *on the way*"
             sub="These depend on an external content feed. Each page shows what it will offer and a sample layout, with no real data yet."
-            action={<Pending>[PLACEHOLDER - content feed / provider to be connected]</Pending>}
           />
           <Reveal variant="stagger" step={90} className="border-t border-white/[0.08]">
             {COMING.map((t, i) => (

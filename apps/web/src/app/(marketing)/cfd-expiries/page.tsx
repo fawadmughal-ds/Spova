@@ -170,7 +170,6 @@ export default async function CfdExpiriesPage() {
             <p className="max-w-3xl text-xs leading-relaxed text-ink-500">
               When an expiring contract is added it will be listed with its contract month and last trading day before trading opens, so the date is known from the first order.
             </p>
-            <Pending>[PLACEHOLDER - rollover policy (close at expiry or roll to next contract, and any price adjustment) to be confirmed before expiring contracts are listed]</Pending>
           </Reveal>
         </div>
       </section>

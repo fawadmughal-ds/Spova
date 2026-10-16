@@ -270,9 +270,6 @@ export async function TierPage({ tier }: { tier: TierSlug }) {
                 </span>
               ))}
             </div>
-            {PERKS[tier]?.some((p) => p.includes('manager') || p.includes('analyst') || p.includes('VPS') || p.includes('Custom')) && (
-              <Pending className="mt-6">[PLACEHOLDER - service scope for {own.join(', ').toLowerCase()} to be confirmed]</Pending>
-            )}
           </div>
         </Reveal>
       </section>

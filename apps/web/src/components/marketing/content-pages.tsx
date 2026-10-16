@@ -289,7 +289,7 @@ function About({ copy }: { copy: ContentCopy }) {
       <section className="relative overflow-x-clip border-y border-white/[0.06] bg-ink-900/40">
         <div className="bg-dots absolute inset-0 opacity-40" />
         <div className="relative mx-auto max-w-7xl px-4 py-24 sm:px-6 sm:py-28">
-          <SectionHead eyebrow="02 — Values and vision" title="What we *hold ourselves to*" action={<Pending>[PLACEHOLDER - values and vision wording to be approved by the client]</Pending>} />
+          <SectionHead eyebrow="02 — Values and vision" title="What we *hold ourselves to*" />
           <div className="grid gap-4 lg:grid-cols-[1.15fr_1fr]">
             <Reveal variant="stagger" step={110} className="grid gap-4">
               {ABOUT_VALUES.map((v) => (
@@ -454,7 +454,6 @@ function Contact({ copy }: { copy: ContentCopy }) {
                 <p id="contact-form-note" className="mt-4 text-sm leading-relaxed text-ink-400">
                   This form will open a support ticket that you can follow from your client area. It is switched off until the support desk is live, so please use email or live chat for now.
                 </p>
-                <Pending className="mt-5">[PLACEHOLDER - contact form goes live with the support desk]</Pending>
                 <div className="mt-9">
                   <div className="label mb-3">Or find it in the FAQ</div>
                   <div className="flex flex-wrap gap-2">

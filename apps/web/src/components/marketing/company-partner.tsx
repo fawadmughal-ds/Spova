@@ -34,10 +34,10 @@ const PLANS: { name: string; tag: string; body: string; bars: number[]; lead?: b
 ];
 
 const QUESTIONS = [
-  { q: 'Who can apply?', a: 'Anyone with an audience that is interested in trading can apply: site owners, educators, community leaders and introducers. Each application is reviewed before approval.', pending: '[PLACEHOLDER - eligibility criteria and restricted countries]' },
-  { q: 'How are referrals tracked?', a: 'Each partner has a unique referral link. A client who registers after following it is attributed to that partner.', pending: '[PLACEHOLDER - attribution window and tracking method]' },
-  { q: 'When and how are payouts made?', a: 'Payout timing, minimum amounts and payment methods are part of the partner agreement.', pending: '[PLACEHOLDER - payout schedule and methods]' },
-  { q: 'Does it cost anything to join?', a: 'Any cost or condition attached to the programme will be stated in the partner agreement.', pending: '[PLACEHOLDER - confirm that joining is free of charge]' },
+  { q: 'Who can apply?', a: 'Anyone with an audience that is interested in trading can apply: site owners, educators, community leaders and introducers. Each application is reviewed before approval.' },
+  { q: 'How are referrals tracked?', a: 'Each partner has a unique referral link. A client who registers after following it is attributed to that partner.' },
+  { q: 'When and how are payouts made?', a: 'Payout timing, minimum amounts and payment methods are part of the partner agreement.' },
+  { q: 'Does it cost anything to join?', a: 'Any cost or condition attached to the programme will be stated in the partner agreement.' },
 ];
 
 // referral paths: your link fans out to three visitors, who converge on one payout
@@ -152,7 +152,6 @@ export function PartnerPage() {
             eyebrow="02 — What partners get"
             title="The tools to *do it properly*"
             sub="What the programme is designed to give you from day one."
-            action={<Pending>[PLACEHOLDER - partner portal, materials and reporting to be confirmed by the client]</Pending>}
           />
           <Reveal variant="stagger" step={80} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {BENEFITS.map((b) => (
@@ -202,7 +201,6 @@ export function PartnerPage() {
               <p className="mt-6 flex-1 text-sm leading-relaxed text-ink-300">{p.body}</p>
               <div className="mt-6 border-t border-white/[0.07] pt-5">
                 <div className="label mb-2.5">Commission terms</div>
-                <Pending>[PLACEHOLDER - {p.name} rates and qualifying conditions]</Pending>
               </div>
             </div>
           ))}

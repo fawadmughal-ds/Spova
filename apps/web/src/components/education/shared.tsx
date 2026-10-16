@@ -103,7 +103,6 @@ export function FeedPage({
         lead={
           <>
             <p>{lead}</p>
-            <Pending className="mt-5">[PLACEHOLDER - content feed / provider to be connected]</Pending>
           </>
         }
         actions={

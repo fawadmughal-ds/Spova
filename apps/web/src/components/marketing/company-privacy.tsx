@@ -9,7 +9,7 @@ import { PolicyToc } from '@/components/marketing/company-toc';
 import { CtaBand } from '@/components/marketing/cta-band';
 
 const vars = (v: Record<string, string | number>) => v as CSSProperties;
-const LEGAL_NOTE = '[PLACEHOLDER - legal text to be approved by the client]';
+const LEGAL_NOTE = '';
 
 /** The cookies the application sets today (see apps/api auth cookies). */
 const COOKIES = [
@@ -131,7 +131,6 @@ export function PrivacyPage() {
           <p className="max-w-3xl text-sm leading-relaxed text-ink-300">
             This page summarises how the platform handles data. It is a working draft: the binding Privacy Policy will be the version approved by the client&apos;s legal team.
           </p>
-          <Pending>[PLACEHOLDER - effective date and version]</Pending>
         </Reveal>
 
         <div className="grid gap-10 lg:grid-cols-[250px_1fr] lg:gap-16">
@@ -140,7 +139,7 @@ export function PrivacyPage() {
           </aside>
 
           <article className="min-w-0 max-w-3xl">
-            <Section id="overview" title="Overview" note="[PLACEHOLDER - legal entity acting as data controller, and governing law]">
+            <Section id="overview" title="Overview">
               <p>
                 To give you a trading account we need to know who you are, how to reach you and what happens on your account. We collect that information, use it to run the service and keep it secure.
               </p>
@@ -173,7 +172,7 @@ export function PrivacyPage() {
               />
             </Section>
 
-            <Section id="cookies" title="Cookies" note="[PLACEHOLDER - cookie policy wording to be approved by the client; update this table if analytics or marketing tools are added]">
+            <Section id="cookies" title="Cookies">
               <p>
                 A cookie is a small file a website stores in your browser. This site sets two, both strictly necessary: without them you could not stay signed in. They are marked httpOnly, which means scripts running in the page cannot read
                 them.
@@ -213,7 +212,7 @@ export function PrivacyPage() {
               <p>You can delete or block cookies in your browser settings. If you block these two, the public pages still work but you will not be able to log in.</p>
             </Section>
 
-            <Section id="sharing" title="Sharing" note="[PLACEHOLDER - list of processors and recipients, and any transfers abroad, to be approved by the client]">
+            <Section id="sharing" title="Sharing">
               <p>Personal data is shared only where the service needs it or the law requires it. The kinds of recipient this typically involves are:</p>
               <Bullets
                 items={[
@@ -225,14 +224,14 @@ export function PrivacyPage() {
               />
             </Section>
 
-            <Section id="retention" title="Retention" note="[PLACEHOLDER - retention periods per data category, to be approved by the client]">
+            <Section id="retention" title="Retention">
               <p>Data is kept for as long as your account is open and, after that, for the period financial services rules require.</p>
               <p>
                 One thing is true by design: the record of money movements on an account and the log of back-office actions are append-only. Entries can be added but not edited or deleted, which is what makes your statement reliable.
               </p>
             </Section>
 
-            <Section id="your-rights" title="Your rights" note="[PLACEHOLDER - rights available by jurisdiction and how requests are handled, to be approved by the client]">
+            <Section id="your-rights" title="Your rights">
               <Bullets
                 items={[
                   ['See and correct', 'Your personal details are visible in your profile and most can be edited there.'],

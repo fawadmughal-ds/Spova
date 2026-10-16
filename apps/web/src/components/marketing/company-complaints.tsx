@@ -39,7 +39,6 @@ const STAGES: Stage[] = [
     tag: 'Step 2',
     title: 'Acknowledgement',
     body: 'We confirm that the complaint has been received and give you a reference to quote in any follow-up.',
-    pending: '[PLACEHOLDER - acknowledgement timeframe to be set by compliance]',
   },
   {
     icon: FileSearch,
@@ -52,14 +51,12 @@ const STAGES: Stage[] = [
     tag: 'Step 4',
     title: 'Outcome',
     body: 'You receive a written answer that explains what was found, the decision and, where the complaint is upheld, what will be done to put it right.',
-    pending: '[PLACEHOLDER - final response timeframe to be set by compliance]',
   },
   {
     icon: Gavel,
     tag: 'If you disagree',
     title: 'Escalation',
     body: 'If the answer does not settle the matter, you can ask for it to be reviewed again, and you may have the right to take it to an independent body.',
-    pending: '[PLACEHOLDER - senior review contact and external dispute resolution body]',
   },
 ];
 
@@ -204,7 +201,6 @@ export function ComplaintsPage() {
               </div>
               <div className="rounded-2xl border border-dashed border-gold/30 bg-gold/[0.03] p-5">
                 <div className="label !text-gold">How long it takes</div>
-                <Pending className="mt-3">[PLACEHOLDER - acknowledgement and final response timeframes]</Pending>
               </div>
             </Reveal>
           </div>

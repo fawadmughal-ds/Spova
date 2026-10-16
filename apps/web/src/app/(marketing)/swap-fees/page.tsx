@@ -165,7 +165,6 @@ export default async function SwapFeesPage() {
                 </span>
               </Spotlight>
             ))}
-            <Pending>[PLACEHOLDER - confirm whether the Wednesday triple applies to non-FX instruments]</Pending>
           </Reveal>
         </div>
       </section>
