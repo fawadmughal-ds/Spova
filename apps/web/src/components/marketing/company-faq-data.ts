@@ -217,7 +217,7 @@ export const FAQ_TOPICS: FaqTopic[] = [
     items: [
       {
         q: 'Are you regulated?',
-        a: 'Regulatory and legal entity details will be published on this site once confirmed.',
+        a: 'Zerventa is an online CFD broker offering forex, indices, commodities, shares, crypto and metals. CFDs are complex, leveraged products that can lose money rapidly, and the service is available only where local law permits trading.',
         pending: '[PLACEHOLDER - regulator, licence and entity details to be supplied by the client]',
       },
       {

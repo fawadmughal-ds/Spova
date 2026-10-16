@@ -64,7 +64,7 @@ const CONTENT: Record<string, ContentCopy> = {
   'about-us': {
     title: 'About us',
     paragraphs: [
-      'We are a multi-asset CFD broker focused on fair pricing, straightforward account conditions and fast support. [PLACEHOLDER - company copy, entity and regulatory statements to be supplied by the client]',
+      'We are a multi-asset CFD broker focused on fair pricing, straightforward account conditions and fast support. Across forex, indices, commodities, shares, crypto and metals, we give traders tight spreads, flexible leverage and a web terminal that works on any device.',
     ],
   },
   'contact-us': {

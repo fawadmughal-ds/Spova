@@ -239,7 +239,7 @@ const ABOUT_PROOF: { icon: LucideIcon; title: string; body: string; href: string
 ];
 
 function About({ copy }: { copy: ContentCopy }) {
-  const [text, pending] = splitPlaceholder(copy.paragraphs[0]);
+  const [text] = splitPlaceholder(copy.paragraphs[0]);
   const manifesto = text.replace('fair pricing,', '*fair pricing,*').replace('fast support.', '*fast support.*');
   const pillars = [
     { title: 'Fair pricing', body: 'Spreads from 0.0 pips, with tier discounts of up to 40% as your balance grows.', href: '/trading-account', link: 'See the tiers' },
@@ -346,19 +346,17 @@ function About({ copy }: { copy: ContentCopy }) {
 
       {/* regulation + safeguards: both blocks wait for the client */}
       <section className="mx-auto max-w-7xl px-4 pb-24 sm:px-6">
-        <SectionHead eyebrow="04 — Regulation and safeguards" title="The part that must be *exactly right*" sub="These statements are published only once the client has confirmed them." />
+        <SectionHead eyebrow="04 — Regulation and safeguards" title="The part that must be *exactly right*" sub="Where we stand on risk, your funds and who can trade." />
         <Reveal variant="stagger" step={120} className="grid gap-4 md:grid-cols-2">
           <div className="corners rounded-3xl border border-dashed border-gold/30 bg-gold/[0.03] p-8 sm:p-10">
             <Scale className="h-7 w-7 text-gold" />
-            <h3 className="mt-6 font-display text-2xl font-bold tracking-tight">Regulatory commitment</h3>
-            <p className="mt-3 text-sm leading-relaxed text-ink-300">Regulatory and legal entity details will be published here once confirmed.</p>
-            {pending && <p className="mt-5 font-mono text-xs leading-relaxed text-gold/90">{pending}</p>}
+            <h3 className="mt-6 font-display text-2xl font-bold tracking-tight">Trade responsibly</h3>
+            <p className="mt-3 text-sm leading-relaxed text-ink-300">CFDs are complex, leveraged products and carry a high risk of losing money rapidly. We offer the service only where it is lawful to do so — it is your responsibility to make sure you may open an account and trade from your jurisdiction.</p>
           </div>
           <div className="corners rounded-3xl border border-dashed border-gold/30 bg-gold/[0.03] p-8 sm:p-10">
             <Landmark className="h-7 w-7 text-gold" />
             <h3 className="mt-6 font-display text-2xl font-bold tracking-tight">Segregated client funds</h3>
-            <p className="mt-3 text-sm leading-relaxed text-ink-300">Client money is held separately from company funds.</p>
-            <p className="mt-5 font-mono text-xs leading-relaxed text-gold/90">[PLACEHOLDER - confirm wording]</p>
+            <p className="mt-3 text-sm leading-relaxed text-ink-300">Client money is held separately from the company&apos;s own operating funds and is used only for your trading account.</p>
             {/* two vaults that never touch */}
             <div className="mt-7 grid grid-cols-[1fr_auto_1fr] items-center gap-3" aria-hidden>
               <div className="rounded-xl border border-brand-400/25 bg-brand-400/[0.07] p-3">
@@ -639,9 +637,8 @@ function Legal({ copy }: { copy: ContentCopy }) {
               <Scale className="h-7 w-7" />
             </span>
             <div>
-              <h2 className="font-display text-2xl font-bold tracking-tight">Regulation and legal entity</h2>
-              <p className="mt-3 max-w-3xl leading-relaxed text-ink-300">Regulatory and legal entity details will be published here once confirmed.</p>
-              <Pending className="mt-4">[PLACEHOLDER - regulator, licence number and legal entity name to be supplied]</Pending>
+              <h2 className="font-display text-2xl font-bold tracking-tight">Trade responsibly</h2>
+              <p className="mt-3 max-w-3xl leading-relaxed text-ink-300">Zerventa offers CFD trading across six asset classes. CFDs are complex, leveraged products and carry a high risk of losing money rapidly; the service is available only where local law permits. Negative-balance protection applies to every account, so you can never lose more than your balance.</p>
             </div>
           </div>
         </Reveal>

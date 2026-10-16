@@ -168,7 +168,7 @@ export function Advantages({ symbols }: { symbols: PublicSymbol[] }) {
             <Landmark className="h-5 w-5 text-brand-400 transition-transform duration-500 ease-spring group-hover:-rotate-12 group-hover:scale-125" />
             Segregated funds
           </h3>
-          <p className="mt-2 text-sm leading-relaxed text-ink-400">Client money is held separately from company funds. [PLACEHOLDER - confirm wording]</p>
+          <p className="mt-2 text-sm leading-relaxed text-ink-400">Client money is held separately from the company&apos;s operating funds, and negative-balance protection means you never owe more than your balance.</p>
         </div>
         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
           <div className="rounded-xl border border-brand-400/25 bg-brand-400/[0.07] p-4">

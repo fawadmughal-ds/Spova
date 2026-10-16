@@ -39,11 +39,7 @@ export function PageHero({ eyebrow, title, lead, actions, children, wide }: { ey
 }
 
 /** Marks copy the client still has to supply; the marker text itself is kept verbatim. */
-export function Pending({ children, className }: { children: ReactNode; className?: string }) {
-  return (
-    <span className={cn('inline-flex items-start gap-2 rounded-lg border border-dashed border-gold/40 bg-gold/[0.06] px-3 py-1.5 font-mono text-[11px] leading-relaxed text-gold', className)}>
-      <span className="live-dot mt-1.5 !h-1.5 !w-1.5 shrink-0" />
-      {children}
-    </span>
-  );
+/** Internal "to be confirmed" placeholder notes are hidden from the public site. */
+export function Pending(_props: { children?: ReactNode; className?: string }) {
+  return null;
 }
