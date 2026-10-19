@@ -35,7 +35,7 @@ async function register(s: Session, tag: string) {
     employmentStatus: 'employed',
     annualIncome: '50k_100k',
     netWorth: '50k_250k',
-    expectedDeposit: '1k_10k',
+    expectedDeposit: '1k_5k', jobRole: 'finance', usCitizen: 'no', pep: 'no',
     tradingExperience: '1_3y',
     tradingObjective: 'speculation',
     tcAccepted: true,
@@ -332,7 +332,7 @@ describe('phase 2: kyc -> live account -> payments -> tickets', () => {
     assert.equal(pub.data.registrationOpen, false);
     const order = await client.json('POST', `/me/accounts/${demoAccountId}/orders`, { symbol: 'EURUSD', side: 'buy', type: 'market', lots: '0.01' });
     assert.equal(order.data.code, 'trading_halted', JSON.stringify(order.data));
-    const reg = await new Session().json('POST', '/auth/register', { email: `e2e+closed.${Date.now()}@zerventa.local`, password: 'E2e!Passw0rd', firstName: 'E2e', lastName: 'Closed', phone: '+971501234567', dob: '1990-01-01', countryCode: 'AE', address: '12 Marina Walk', city: 'Dubai', zip: '00000', sourceOfFunds: 'salary', employmentStatus: 'employed', annualIncome: '50k_100k', netWorth: '50k_250k', expectedDeposit: '1k_10k', tradingExperience: '1_3y', tradingObjective: 'speculation', tcAccepted: true, riskAccepted: true });
+    const reg = await new Session().json('POST', '/auth/register', { email: `e2e+closed.${Date.now()}@zerventa.local`, password: 'E2e!Passw0rd', firstName: 'E2e', lastName: 'Closed', phone: '+971501234567', dob: '1990-01-01', countryCode: 'AE', address: '12 Marina Walk', city: 'Dubai', zip: '00000', sourceOfFunds: 'salary', employmentStatus: 'employed', annualIncome: '50k_100k', netWorth: '50k_250k', expectedDeposit: '1k_5k', jobRole: 'finance', usCitizen: 'no', pep: 'no', tradingExperience: '1_3y', tradingObjective: 'speculation', tcAccepted: true, riskAccepted: true });
     assert.equal(reg.data.code, 'registration_closed');
     const restored = await admin.json('PUT', '/admin/platform', { ...platform.data, tradingHalt: { ...platform.data.tradingHalt, enabled: false }, registrationOpen: true });
     assert.equal(restored.status, 200);

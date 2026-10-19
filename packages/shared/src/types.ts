@@ -60,11 +60,15 @@ export interface ProfileDto {
   /** suitability / KYC questionnaire answers captured at sign-up (null for accounts created before it existed) */
   sourceOfFunds: string | null;
   employmentStatus: string | null;
+  jobRole: string | null;
+  jobRoleOther: string | null;
   annualIncome: string | null;
   netWorth: string | null;
   expectedDeposit: string | null;
   tradingExperience: string | null;
   tradingObjective: string | null;
+  usCitizen: string | null;
+  pep: string | null;
 }
 
 /** One timestamped agent comment on a client's file. */

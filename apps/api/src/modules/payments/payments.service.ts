@@ -384,7 +384,7 @@ export class PaymentsService {
       this.prisma.paymentRequest.count({ where }),
       this.prisma.paymentRequest.findMany({
         where,
-        orderBy: [{ status: 'asc' }, { createdAt: 'asc' }],
+        orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
         skip: (q.page - 1) * q.limit,
         take: q.limit,
         include: { account: true, user: { select: { id: true, email: true, profile: { select: { firstName: true, lastName: true } } } } },

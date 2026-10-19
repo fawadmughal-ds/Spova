@@ -238,11 +238,14 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
                 {[
                   ['Source of funds', sl('sourceOfFunds', u.profile.sourceOfFunds)],
                   ['Employment', sl('employmentStatus', u.profile.employmentStatus)],
+                  ['Job role', u.profile.jobRole === 'other' && u.profile.jobRoleOther ? u.profile.jobRoleOther : sl('jobRole', u.profile.jobRole)],
                   ['Annual income', sl('annualIncome', u.profile.annualIncome)],
                   ['Net worth', sl('netWorth', u.profile.netWorth)],
-                  ['Expected deposit', sl('expectedDeposit', u.profile.expectedDeposit)],
+                  ['Expected deposit (12m)', sl('expectedDeposit', u.profile.expectedDeposit)],
                   ['Experience', sl('tradingExperience', u.profile.tradingExperience)],
                   ['Objective', sl('tradingObjective', u.profile.tradingObjective)],
+                  ['US citizen / tax resident', sl('usCitizen', u.profile.usCitizen)],
+                  ['Politically exposed (PEP)', sl('pep', u.profile.pep)],
                 ].map(([k, v]) => (
                   <div key={k as string}>
                     <dt className="text-[11px] uppercase tracking-wider text-ink-500">{k}</dt>

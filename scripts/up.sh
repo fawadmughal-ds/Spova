@@ -47,7 +47,7 @@ curl -fsS localhost:4000/health/ready && echo
 echo
 echo "web    http://localhost:3000"
 echo "api    http://localhost:4000/health/ready"
-echo "admin  admin@xyz.local / Admin@12345   -> http://localhost:3000/admin"
-echo "client client@xyz.local / Client@12345 -> http://localhost:3000/app"
+echo "admin  admin@zerventa.local / Admin@12345   -> http://localhost:3000/admin"
+echo "client client@zerventa.local / Client@12345 -> http://localhost:3000/app"
 echo "trade  http://localhost:3000/trade   (worker streams Binance crypto + synthetic FX; log in .logs/worker.log)"
 echo "logs   tail -f .logs/api.log .logs/web.log .logs/worker.log   (password-reset emails print in api.log)"

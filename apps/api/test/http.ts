@@ -65,7 +65,7 @@ export async function register(s: Session, tag: string) {
     employmentStatus: 'employed',
     annualIncome: '50k_100k',
     netWorth: '50k_250k',
-    expectedDeposit: '1k_10k',
+    expectedDeposit: '1k_5k', jobRole: 'finance', usCitizen: 'no', pep: 'no',
     tradingExperience: '1_3y',
     tradingObjective: 'speculation',
     tcAccepted: true,

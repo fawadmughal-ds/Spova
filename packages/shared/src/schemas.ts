@@ -26,9 +26,11 @@ export const SOURCE_OF_FUNDS = ['salary', 'savings', 'investments', 'business', 
 export const EMPLOYMENT_STATUS = ['employed', 'self_employed', 'unemployed', 'retired', 'student'] as const;
 export const INCOME_BRACKETS = ['under_25k', '25k_50k', '50k_100k', '100k_250k', 'over_250k'] as const;
 export const NET_WORTH_BRACKETS = ['under_50k', '50k_250k', '250k_1m', 'over_1m'] as const;
-export const DEPOSIT_BRACKETS = ['under_1k', '1k_10k', '10k_50k', 'over_50k'] as const;
+export const DEPOSIT_BRACKETS = ['under_1k', '1k_5k', '5k_20k', 'over_20k'] as const;
 export const TRADING_EXPERIENCE = ['none', 'under_1y', '1_3y', 'over_3y'] as const;
 export const TRADING_OBJECTIVE = ['speculation', 'hedging', 'income', 'long_term'] as const;
+export const JOB_ROLES = ['finance', 'government', 'teaching', 'business', 'technology', 'healthcare', 'other'] as const;
+export const YES_NO = ['yes', 'no'] as const;
 
 /** Human labels for each answer — used on the signup form and in the admin client view. */
 export const SUITABILITY_LABELS = {
@@ -36,20 +38,27 @@ export const SUITABILITY_LABELS = {
   employmentStatus: { employed: 'Employed', self_employed: 'Self-employed', unemployed: 'Unemployed', retired: 'Retired', student: 'Student' },
   annualIncome: { under_25k: 'Under $25,000', '25k_50k': '$25,000 – $50,000', '50k_100k': '$50,000 – $100,000', '100k_250k': '$100,000 – $250,000', over_250k: 'Over $250,000' },
   netWorth: { under_50k: 'Under $50,000', '50k_250k': '$50,000 – $250,000', '250k_1m': '$250,000 – $1M', over_1m: 'Over $1M' },
-  expectedDeposit: { under_1k: 'Under $1,000', '1k_10k': '$1,000 – $10,000', '10k_50k': '$10,000 – $50,000', over_50k: 'Over $50,000' },
+  expectedDeposit: { under_1k: 'Under $1,000', '1k_5k': '$1,000 – $5,000', '5k_20k': '$5,000 – $20,000', over_20k: 'Over $20,000' },
   tradingExperience: { none: 'No experience', under_1y: 'Less than 1 year', '1_3y': '1 – 3 years', over_3y: 'Over 3 years' },
   tradingObjective: { speculation: 'Speculation / capital growth', hedging: 'Hedging', income: 'Regular income', long_term: 'Long-term investment' },
+  jobRole: { finance: 'Finance', government: 'Government-related', teaching: 'Teaching / education', business: 'Business / self-employed', technology: 'Technology', healthcare: 'Healthcare', other: 'Other' },
+  usCitizen: { yes: 'Yes', no: 'No' },
+  pep: { yes: 'Yes', no: 'No' },
 } as const;
 
 /** The suitability questions as zod fields, reused by registerSchema and the profile update. */
 const suitabilityShape = {
   sourceOfFunds: z.enum(SOURCE_OF_FUNDS),
   employmentStatus: z.enum(EMPLOYMENT_STATUS),
+  jobRole: z.enum(JOB_ROLES),
+  jobRoleOther: z.string().trim().max(80).optional(),
   annualIncome: z.enum(INCOME_BRACKETS),
   netWorth: z.enum(NET_WORTH_BRACKETS),
   expectedDeposit: z.enum(DEPOSIT_BRACKETS),
   tradingExperience: z.enum(TRADING_EXPERIENCE),
   tradingObjective: z.enum(TRADING_OBJECTIVE),
+  usCitizen: z.enum(YES_NO),
+  pep: z.enum(YES_NO),
 };
 export const suitabilitySchema = z.object(suitabilityShape);
 export type SuitabilityInput = z.infer<typeof suitabilitySchema>;

@@ -96,11 +96,15 @@ export default function RegisterPage() {
           <div className="grid gap-3 sm:grid-cols-2">
             <QSelect label="Source of funds" field="sourceOfFunds" options={SUITABILITY_LABELS.sourceOfFunds} />
             <QSelect label="Employment status" field="employmentStatus" options={SUITABILITY_LABELS.employmentStatus} />
+            <QSelect label="Job role" field="jobRole" options={SUITABILITY_LABELS.jobRole} />
+            {f.values.jobRole === 'other' && <Input label="Please specify your job role" {...f.bind('jobRoleOther')} />}
             <QSelect label="Annual income" field="annualIncome" options={SUITABILITY_LABELS.annualIncome} />
             <QSelect label="Estimated net worth" field="netWorth" options={SUITABILITY_LABELS.netWorth} />
-            <QSelect label="Expected deposit" field="expectedDeposit" options={SUITABILITY_LABELS.expectedDeposit} />
+            <QSelect label="Expected deposit (next 12 months)" field="expectedDeposit" options={SUITABILITY_LABELS.expectedDeposit} />
             <QSelect label="Trading experience" field="tradingExperience" options={SUITABILITY_LABELS.tradingExperience} />
             <QSelect label="Trading objective" field="tradingObjective" options={SUITABILITY_LABELS.tradingObjective} />
+            <QSelect label="Are you a US citizen or US tax resident?" field="usCitizen" options={SUITABILITY_LABELS.usCitizen} />
+            <QSelect label="Politically exposed person (PEP)?" field="pep" options={SUITABILITY_LABELS.pep} />
           </div>
 
           <Step n="05">Security</Step>

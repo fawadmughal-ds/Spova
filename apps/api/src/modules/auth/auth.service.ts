@@ -64,11 +64,15 @@ export class AuthService {
               zip: input.zip || null,
               sourceOfFunds: input.sourceOfFunds,
               employmentStatus: input.employmentStatus,
+              jobRole: input.jobRole,
+              jobRoleOther: input.jobRole === 'other' ? (input.jobRoleOther ?? null) : null,
               annualIncome: input.annualIncome,
               netWorth: input.netWorth,
               expectedDeposit: input.expectedDeposit,
               tradingExperience: input.tradingExperience,
               tradingObjective: input.tradingObjective,
+              usCitizen: input.usCitizen,
+              pep: input.pep,
             },
           },
         },
@@ -305,11 +309,15 @@ export class AuthService {
       notifCalls: boolean;
       sourceOfFunds: string | null;
       employmentStatus: string | null;
+      jobRole: string | null;
+      jobRoleOther: string | null;
       annualIncome: string | null;
       netWorth: string | null;
       expectedDeposit: string | null;
       tradingExperience: string | null;
       tradingObjective: string | null;
+      usCitizen: string | null;
+      pep: string | null;
     } | null;
   }): Promise<MeDto> {
     const groups = user.role === 'client' ? await this.prisma.kycDocument.findMany({ where: { userId: user.id, status: { not: 'rejected' } }, select: { group: true }, distinct: ['group'] }) : [];
@@ -346,11 +354,15 @@ export class AuthService {
             notifCalls: user.profile.notifCalls,
             sourceOfFunds: user.profile.sourceOfFunds,
             employmentStatus: user.profile.employmentStatus,
+            jobRole: user.profile.jobRole,
+            jobRoleOther: user.profile.jobRoleOther,
             annualIncome: user.profile.annualIncome,
             netWorth: user.profile.netWorth,
             expectedDeposit: user.profile.expectedDeposit,
             tradingExperience: user.profile.tradingExperience,
             tradingObjective: user.profile.tradingObjective,
+            usCitizen: user.profile.usCitizen,
+            pep: user.profile.pep,
           }
         : null,
     };
