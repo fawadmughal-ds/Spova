@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useCallback, useEffect, useState } from 'react';
+import { use, useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Lock, Unlock, Mail } from 'lucide-react';
 import type { AccountDto, AdminUserDetailDto } from '@spova/shared';
@@ -43,6 +43,10 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
   const [ledgerVersion, setLedgerVersion] = useState(0);
   const [busy, setBusy] = useState(false);
   const [section, setSection] = useState<Section>('kyc');
+  const [activityFocus, setActivityFocus] = useState({ kind: '', n: 0 });
+  const accountsRef = useRef<HTMLDivElement>(null);
+  const activityRef = useRef<HTMLDivElement>(null);
+  const complianceRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
     const d = await get<AdminUserDetailDto>(`/admin/users/${id}`);
@@ -94,6 +98,36 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
     );
 
   const account = u.accounts.find((a) => a.id === selected) ?? u.accounts[0];
+
+  // Clicking a KPI takes the admin to this client's live detail: trade/money KPIs filter the activity
+  // timeline to that event kind, balance/equity jump to the accounts table, and the queue KPIs open the
+  // matching compliance tab. A short defer lets the filter/tab apply before we scroll.
+  const scrollTo = (ref: React.RefObject<HTMLDivElement | null>) => ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const focusActivity = (kind: string) => {
+    setActivityFocus((f) => ({ kind, n: f.n + 1 }));
+    setTimeout(() => scrollTo(activityRef), 60);
+  };
+  const showCompliance = (s: Section) => {
+    setSection(s);
+    setTimeout(() => scrollTo(complianceRef), 60);
+  };
+  const KPI_ACTIONS: Record<string, () => void> = {
+    'Open trades': () => focusActivity('trade_open'),
+    'Closed trades': () => focusActivity('trade_close'),
+    'Volume (lots)': () => focusActivity('trade_close'),
+    'Realized P/L': () => focusActivity('trade_close'),
+    Balance: () => scrollTo(accountsRef),
+    Equity: () => scrollTo(accountsRef),
+    'In market (margin)': () => focusActivity('trade_open'),
+    'Available to withdraw': () => scrollTo(accountsRef),
+    'Floating P/L': () => focusActivity('trade_open'),
+    'Margin level': () => scrollTo(accountsRef),
+    Deposits: () => focusActivity('deposit'),
+    Withdrawals: () => focusActivity('withdraw'),
+    'Manual credits': () => focusActivity('credit'),
+    'Pending payments': () => showCompliance('payments'),
+    'Open tickets': () => showCompliance('tickets'),
+  };
 
   return (
     <>
@@ -202,15 +236,28 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
             ['Pending payments', String(u.stats.pendingPayments), u.stats.pendingPayments > 0],
             ['Open tickets', String(u.stats.openTickets), u.stats.openTickets > 0],
           ] as [string, string, boolean][]
-          ); })().map(([label, value, hot]) => (
-          <div key={label} className="rounded-xl border border-white/5 bg-white/[0.02] px-4 py-3">
+          ); })().map(([label, value, hot]) => {
+          const act: (() => void) | undefined = KPI_ACTIONS[label];
+          const clickable = Boolean(act);
+          return (
+          <button
+            key={label}
+            type="button"
+            onClick={act}
+            disabled={!clickable}
+            className={cn(
+              'rounded-xl border border-white/5 bg-white/[0.02] px-4 py-3 text-left transition-colors',
+              clickable ? 'cursor-pointer hover:border-brand-400/40 hover:bg-brand-500/[0.06]' : 'cursor-default',
+            )}
+          >
             <div className="text-[11px] uppercase tracking-wider text-ink-500">{label}</div>
             <div className={cn('mt-1 text-lg font-semibold tabular', hot ? 'text-brand-300' : 'text-white')}>{value}</div>
-          </div>
-        ))}
+          </button>
+          );
+        })}
       </div>
 
-      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 xl:grid-cols-3">
+      <div ref={accountsRef} className="grid grid-cols-[minmax(0,1fr)] gap-6 scroll-mt-24 xl:grid-cols-3">
         {/* profile */}
         <Card title="Profile">
           <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
@@ -331,14 +378,14 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
       </div>
 
       {/* complete activity timeline for this client (logins, trades, deposits, withdrawals, admin money moves…) */}
-      <section className="mt-6">
+      <section ref={activityRef} className="mt-6 scroll-mt-24">
         <Card title="Activity — everything this client has done">
-          <ActivityFeed userId={u.id} />
+          <ActivityFeed userId={u.id} focus={activityFocus} />
         </Card>
       </section>
 
       {/* compliance + support for this client; same components as the queues, narrowed to one user */}
-      <section className="mt-6">
+      <section ref={complianceRef} className="mt-6 scroll-mt-24">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h2 className="flex items-center gap-2 text-sm font-semibold text-ink-100">
             <span className="h-3.5 w-0.5 rounded-full bg-gradient-to-b from-brand-300 to-brand-600" />

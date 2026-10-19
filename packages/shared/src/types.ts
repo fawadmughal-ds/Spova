@@ -357,6 +357,8 @@ export interface DepositChannelDto {
   qr: string | null;
   /** `upi`: the amount is appended to the URI client-side (`am=`), so the app pre-fills it */
   qrKind: 'upi' | 'address' | 'link' | null;
+  /** an admin-uploaded QR image (data-URL); when set, clients see this instead of the auto-generated QR */
+  qrImageUrl: string | null;
   note: string;
   /** a payment slip / screenshot must be attached to the request */
   proofRequired: boolean;

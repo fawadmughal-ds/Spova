@@ -283,12 +283,19 @@ export type WithdrawRequestInput = z.infer<typeof withdrawRequestSchema>;
  * `deposit_channels` app setting); clients only ever see the public projection (`DepositChannelDto`).
  */
 const note = z.string().trim().max(300).default('');
+/** An admin-uploaded QR shown to clients, stored inline as a small image data-URL (empty = none, auto-generated QR is used). */
+const qrImage = z
+  .string()
+  .trim()
+  .max(700_000)
+  .refine((v) => v === '' || /^data:image\/(png|jpe?g|webp);base64,[A-Za-z0-9+/=]+$/.test(v), 'Must be a PNG, JPG or WEBP image')
+  .default('');
 export const depositChannelsSchema = z.object({
-  bank: z.object({ enabled: z.boolean(), bankName: z.string().trim().max(80).default(''), accountName: z.string().trim().max(80).default(''), accountNumber: z.string().trim().max(40).default(''), ifsc: z.string().trim().max(20).default(''), swift: z.string().trim().max(20).default(''), currency: z.string().trim().toUpperCase().length(3).default('INR'), note }),
-  rtgs: z.object({ enabled: z.boolean(), bankName: z.string().trim().max(80).default(''), accountName: z.string().trim().max(80).default(''), accountNumber: z.string().trim().max(40).default(''), ifsc: z.string().trim().max(20).default(''), swift: z.string().trim().max(20).default(''), currency: z.string().trim().toUpperCase().length(3).default('INR'), note }),
-  upi: z.object({ enabled: z.boolean(), vpa: z.string().trim().max(80).default(''), payeeName: z.string().trim().max(80).default(''), currency: z.string().trim().toUpperCase().length(3).default('INR'), note }),
-  binance: z.object({ enabled: z.boolean(), payId: z.string().trim().max(40).default(''), email: z.string().trim().max(120).default(''), qrLink: z.string().trim().max(300).default(''), note }),
-  crypto_usdt: z.object({ enabled: z.boolean(), address: z.string().trim().max(120).default(''), network: z.string().trim().max(40).default('TRC20'), note }),
+  bank: z.object({ enabled: z.boolean(), bankName: z.string().trim().max(80).default(''), accountName: z.string().trim().max(80).default(''), accountNumber: z.string().trim().max(40).default(''), ifsc: z.string().trim().max(20).default(''), swift: z.string().trim().max(20).default(''), currency: z.string().trim().toUpperCase().length(3).default('INR'), qrImage, note }),
+  rtgs: z.object({ enabled: z.boolean(), bankName: z.string().trim().max(80).default(''), accountName: z.string().trim().max(80).default(''), accountNumber: z.string().trim().max(40).default(''), ifsc: z.string().trim().max(20).default(''), swift: z.string().trim().max(20).default(''), currency: z.string().trim().toUpperCase().length(3).default('INR'), qrImage, note }),
+  upi: z.object({ enabled: z.boolean(), vpa: z.string().trim().max(80).default(''), payeeName: z.string().trim().max(80).default(''), currency: z.string().trim().toUpperCase().length(3).default('INR'), qrImage, note }),
+  binance: z.object({ enabled: z.boolean(), payId: z.string().trim().max(40).default(''), email: z.string().trim().max(120).default(''), qrLink: z.string().trim().max(300).default(''), qrImage, note }),
+  crypto_usdt: z.object({ enabled: z.boolean(), address: z.string().trim().max(120).default(''), network: z.string().trim().max(40).default('TRC20'), qrImage, note }),
   card: z.object({ enabled: z.boolean(), note }),
   /** cashier page texts */
   cashier: z.object({
@@ -370,11 +377,11 @@ export const cardAttemptSchema = z
 export type CardAttemptInput = z.infer<typeof cardAttemptSchema>;
 
 export const DEFAULT_DEPOSIT_CHANNELS: DepositChannels = {
-  bank: { enabled: true, bankName: 'HDFC Bank', accountName: 'Zerventa Ltd', accountNumber: '50200012345678', ifsc: 'HDFC0001234', swift: 'HDFCINBB', currency: 'INR', note: 'Use your account login as the transfer remark. INR transfers are converted at the rate you see above.' },
-  rtgs: { enabled: true, bankName: 'HDFC Bank', accountName: 'Zerventa Ltd', accountNumber: '50200012345678', ifsc: 'HDFC0001234', swift: 'HDFCINBB', currency: 'INR', note: 'RTGS transfer for larger amounts. Use your account login as the transfer remark.' },
-  upi: { enabled: true, vpa: 'zerventa@hdfcbank', payeeName: 'Zerventa', currency: 'INR', note: 'Scan the QR with any UPI app (GPay, PhonePe, Paytm) or pay to the UPI ID. Keep the screenshot of the success screen.' },
-  binance: { enabled: true, payId: '123456789', email: 'pay@zerventa.com', qrLink: '', note: 'Binance app → Pay → Send → enter the Pay ID (or scan). Send USDT. Zero fee inside Binance.' },
-  crypto_usdt: { enabled: true, address: 'TXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX', network: 'TRC20', note: 'Send USDT on the TRC20 network only. Transfers on another network cannot be recovered.' },
+  bank: { enabled: true, bankName: 'HDFC Bank', accountName: 'Zerventa Ltd', accountNumber: '50200012345678', ifsc: 'HDFC0001234', swift: 'HDFCINBB', currency: 'INR', qrImage: '', note: 'Use your account login as the transfer remark. INR transfers are converted at the rate you see above.' },
+  rtgs: { enabled: true, bankName: 'HDFC Bank', accountName: 'Zerventa Ltd', accountNumber: '50200012345678', ifsc: 'HDFC0001234', swift: 'HDFCINBB', currency: 'INR', qrImage: '', note: 'RTGS transfer for larger amounts. Use your account login as the transfer remark.' },
+  upi: { enabled: true, vpa: 'zerventa@hdfcbank', payeeName: 'Zerventa', currency: 'INR', qrImage: '', note: 'Scan the QR with any UPI app (GPay, PhonePe, Paytm) or pay to the UPI ID. Keep the screenshot of the success screen.' },
+  binance: { enabled: true, payId: '123456789', email: 'pay@zerventa.com', qrLink: '', qrImage: '', note: 'Binance app → Pay → Send → enter the Pay ID (or scan). Send USDT. Zero fee inside Binance.' },
+  crypto_usdt: { enabled: true, address: 'TXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX', network: 'TRC20', qrImage: '', note: 'Send USDT on the TRC20 network only. Transfers on another network cannot be recovered.' },
   card: { enabled: true, note: 'After you submit, our team emails you a secure card payment link within business hours.' },
   cashier: { enabled: true, footer: 'Company Information: [COMPANY LEGAL NAME] with brand name [BRAND] is authorised and regulated by [REGULATOR] with licence number [LICENCE]. Trading CFDs involves significant risk of loss and is not suitable for all investors.', rates: { INR: 86, PKR: 278, AED: 3.67, EUR: 0.92, GBP: 0.79 } },
 };

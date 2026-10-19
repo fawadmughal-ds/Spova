@@ -51,8 +51,9 @@ const META: Record<string, { icon: typeof LogIn; color: string }> = {
   deposit_link: { icon: Link2, color: '#22c55e' },
 };
 
-/** The full activity timeline. Pass `userId` to scope it to one client. Filters by kind, free-text search and date range. */
-export function ActivityFeed({ userId, initialKind = '' }: { userId?: string; initialKind?: string }) {
+/** The full activity timeline. Pass `userId` to scope it to one client. Filters by kind, free-text search and date range.
+ *  `focus` lets a parent drive the kind filter after mount (e.g. clicking a KPI card) — bump `n` to re-apply. */
+export function ActivityFeed({ userId, initialKind = '', focus }: { userId?: string; initialKind?: string; focus?: { kind: string; n: number } }) {
   const [kind, setKind] = useState(initialKind);
   const [q, setQ] = useState('');
   const [from, setFrom] = useState('');
@@ -80,6 +81,16 @@ export function ActivityFeed({ userId, initialKind = '' }: { userId?: string; in
 
   // reset to page 1 whenever a filter changes
   useEffect(() => setPage(1), [kind, q, from, to]);
+
+  // a parent (e.g. a clicked KPI) drives the kind filter; clearing other filters so the focused set shows alone
+  useEffect(() => {
+    if (!focus) return;
+    setKind(focus.kind);
+    setQ('');
+    setFrom('');
+    setTo('');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focus?.n]);
 
   const pages = data ? Math.max(1, Math.ceil(data.total / data.limit)) : 1;
 

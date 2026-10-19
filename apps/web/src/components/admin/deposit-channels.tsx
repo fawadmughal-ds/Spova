@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { ChevronDown, Landmark, Save } from 'lucide-react';
+import { useEffect, useRef, useState, type ChangeEvent } from 'react';
+import { ChevronDown, Landmark, QrCode, Save, Upload, X } from 'lucide-react';
 import { DEFAULT_DEPOSIT_CHANNELS, depositChannelsSchema, type DepositChannels } from '@spova/shared';
 import { get, put } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -45,6 +45,59 @@ const FIELDS: Record<Key, { name: string; label: string; placeholder?: string }[
   ],
   card: [],
 };
+
+const QR_MAX_BYTES = 400 * 1024;
+const QR_MIME = ['image/png', 'image/jpeg', 'image/webp'];
+
+/** Upload a QR image for a payment channel. Stored inline (data-URL) with the channel; clients see it instead of the auto-generated QR. */
+function QrUpload({ value, onChange }: { value: string; onChange: (dataUrl: string) => void }) {
+  const input = useRef<HTMLInputElement>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  const pick = (e: ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0] ?? null;
+    e.target.value = '';
+    if (!f) return;
+    if (!QR_MIME.includes(f.type)) return setErr('Only PNG, JPG or WEBP images.');
+    if (f.size > QR_MAX_BYTES) return setErr('Image is too large — keep it under 400 KB.');
+    setErr(null);
+    const reader = new FileReader();
+    reader.onload = () => onChange(String(reader.result || ''));
+    reader.onerror = () => setErr('Could not read that file.');
+    reader.readAsDataURL(f);
+  };
+
+  return (
+    <div className="mt-3">
+      <input ref={input} type="file" accept={QR_MIME.join(',')} className="sr-only" tabIndex={-1} onChange={pick} />
+      <div className="flex items-center gap-3">
+        <span className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-white/[0.03] text-ink-500">
+          {value ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={value} alt="QR preview" className="h-full w-full object-contain p-1" />
+          ) : (
+            <QrCode className="h-6 w-6" />
+          )}
+        </span>
+        <div className="min-w-0">
+          <div className="text-sm font-medium text-white">Payment QR image</div>
+          <p className="text-xs text-ink-400">{value ? 'Shown to clients on this method.' : 'Upload your own QR (UPI / Binance / wallet) — PNG, JPG or WEBP, under 400 KB.'}</p>
+          <div className="mt-1.5 flex items-center gap-3">
+            <button type="button" onClick={() => input.current?.click()} className="inline-flex items-center gap-1.5 text-xs font-medium text-brand-300 link-underline">
+              <Upload className="h-3.5 w-3.5" /> {value ? 'Replace' : 'Upload QR'}
+            </button>
+            {value && (
+              <button type="button" onClick={() => onChange('')} className="inline-flex items-center gap-1 text-xs text-ink-400 hover:text-down">
+                <X className="h-3.5 w-3.5" /> Remove
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+      {err && <p className="mt-2 text-xs text-down">{err}</p>}
+    </div>
+  );
+}
 
 /** Back-office editor for where clients send deposits. Saved values show on the client's deposit form immediately. */
 export function DepositChannelsEditor({ className }: { className?: string }) {
@@ -119,6 +172,12 @@ export function DepositChannelsEditor({ className }: { className?: string }) {
                       />
                     ))}
                   </div>
+                  {k !== 'card' && (
+                    <QrUpload
+                      value={(cfg[k] as unknown as { qrImage?: string }).qrImage ?? ''}
+                      onChange={(dataUrl) => patch(k, { qrImage: dataUrl } as Partial<DepositChannels[typeof k]>)}
+                    />
+                  )}
                   <Textarea className="mt-3" label="Note shown to the client" name={`${k}-note`} rows={2} value={cfg[k].note} onChange={(e) => patch(k, { note: e.target.value } as Partial<DepositChannels[typeof k]>)} />
                 </div>
               ))}

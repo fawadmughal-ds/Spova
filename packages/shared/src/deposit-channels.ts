@@ -17,6 +17,7 @@ export function depositChannelPublic(id: string, cfg: DepositChannels, brand: st
         ].filter((f) => f.value),
         qr: null,
         qrKind: null,
+        qrImageUrl: c.qrImage || null,
         note: c.note,
         proofRequired: true,
         currency: c.currency || 'INR',
@@ -35,6 +36,7 @@ export function depositChannelPublic(id: string, cfg: DepositChannels, brand: st
         ].filter((f) => f.value),
         qr: null,
         qrKind: null,
+        qrImageUrl: c.qrImage || null,
         note: c.note,
         proofRequired: true,
         currency: c.currency || 'INR',
@@ -51,6 +53,7 @@ export function depositChannelPublic(id: string, cfg: DepositChannels, brand: st
         ].filter((f) => f.value),
         qr: c.vpa ? `upi://pay?pa=${encodeURIComponent(c.vpa)}&pn=${pn}&cu=INR` : null,
         qrKind: 'upi',
+        qrImageUrl: c.qrImage || null,
         note: c.note,
         proofRequired: true,
         currency: c.currency || 'INR',
@@ -66,6 +69,7 @@ export function depositChannelPublic(id: string, cfg: DepositChannels, brand: st
         ].filter((f) => f.value),
         qr: c.qrLink || (c.payId ? c.payId : null),
         qrKind: c.qrLink ? 'link' : 'address',
+        qrImageUrl: c.qrImage || null,
         note: c.note,
         proofRequired: true,
         currency: 'USDT',
@@ -82,13 +86,14 @@ export function depositChannelPublic(id: string, cfg: DepositChannels, brand: st
         ].filter((f) => f.value),
         qr: c.address || null,
         qrKind: 'address',
+        qrImageUrl: c.qrImage || null,
         note: c.note,
         proofRequired: true,
         currency: 'USDT',
       };
     }
     case 'card':
-      return { title: 'Credit or Debit Card', fields: [], qr: null, qrKind: null, note: cfg.card.note, proofRequired: false, currency: 'USD' };
+      return { title: 'Credit or Debit Card', fields: [], qr: null, qrKind: null, qrImageUrl: null, note: cfg.card.note, proofRequired: false, currency: 'USD' };
     default:
       return undefined;
   }

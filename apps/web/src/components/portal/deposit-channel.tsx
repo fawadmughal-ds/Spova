@@ -41,7 +41,8 @@ export function PayToPanel({ channel, amount, className }: { channel: DepositCha
   const payload = qrPayload(channel, amount);
   const [png, setPng] = useState<string | null>(null);
   useEffect(() => {
-    if (!payload) {
+    // An admin-uploaded QR takes precedence; skip generating one.
+    if (!payload || channel.qrImageUrl) {
       setPng(null);
       return;
     }
@@ -52,7 +53,9 @@ export function PayToPanel({ channel, amount, className }: { channel: DepositCha
     return () => {
       live = false;
     };
-  }, [payload]);
+  }, [payload, channel.qrImageUrl]);
+
+  const qrSrc = channel.qrImageUrl ?? png;
 
   return (
     <div className={cn('animate-page-in rounded-2xl border border-brand-400/25 bg-brand-400/[0.04] p-4 sm:p-5', className)}>
@@ -72,11 +75,11 @@ export function PayToPanel({ channel, amount, className }: { channel: DepositCha
           ) : null}
           {channel.note && <p className="mt-3 text-xs leading-relaxed text-ink-300">{channel.note}</p>}
         </div>
-        {png && (
+        {qrSrc && (
           <div className="flex shrink-0 flex-col items-center gap-2 self-start">
             <div className="rounded-2xl border border-white/10 bg-white p-2 shadow-sm">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={png} alt="Payment QR code" width={176} height={176} />
+              <img src={qrSrc} alt="Payment QR code" width={176} height={176} className="h-44 w-44 object-contain" />
             </div>
             <span className="inline-flex items-center gap-1 text-[11px] text-ink-400">
               <QrCode className="h-3 w-3" /> {channel.qrKind === 'upi' ? 'Scan with any UPI app' : channel.qrKind === 'link' ? 'Scan in the Binance app' : 'Scan with your wallet app'}
