@@ -281,6 +281,8 @@ function ManualForm({ method, label, accounts, fx, onCreated, onHistory }: { met
   const channel = method.deposit;
   const acctRate = accounts.find((a) => a.id === account)?.usdRate;
   const charged = chargedLine(amount, channel?.currency ?? 'USD', fx, acctRate ? Number(acctRate) : undefined);
+  // USD -> channel-currency rate for the scannable QR amount (UPI is INR, so ₹ = USD × rate); 1 means no conversion.
+  const qrRate = channel?.currency && channel.currency !== 'USD' ? (acctRate ? Number(acctRate) : fx[channel.currency]) || 1 : 1;
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -332,7 +334,7 @@ function ManualForm({ method, label, accounts, fx, onCreated, onHistory }: { met
           Send <strong className="text-white">{fmtMoney(req.amount)} {req.currency}</strong>
           {charged ? <> ({charged})</> : null} to the details below, then attach the receipt.
         </p>
-        <PayToPanel channel={channel} amount={req.amount} className="mt-5" />
+        <PayToPanel channel={channel} amount={req.amount} rate={qrRate} className="mt-5" />
         <div className="mt-5">
           <ProofPicker file={proof} required={!!channel.proofRequired} error={proofErr} onChange={(f) => (setProof(f), setProofErr(undefined))} />
         </div>

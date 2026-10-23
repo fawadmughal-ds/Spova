@@ -7,10 +7,12 @@ import { KYC_MAX_BYTES, KYC_MIME_TYPES, type DepositChannelDto } from '@spova/sh
 import { cn } from '@/lib/utils';
 import { fmtBytes } from './upload-zone';
 
-/** QR payload for a channel; UPI gets the amount appended so the app pre-fills it. */
-export function qrPayload(ch: DepositChannelDto, amount: string): string | null {
+/** QR payload for a channel; UPI gets the amount appended so the app pre-fills it.
+ *  `rate` converts the USD amount into the channel currency (UPI is INR), so a $200 deposit
+ *  pre-fills ₹(200 × rate), not ₹200. Defaults to 1 (no conversion). */
+export function qrPayload(ch: DepositChannelDto, amount: string, rate = 1): string | null {
   if (!ch.qr) return null;
-  if (ch.qrKind === 'upi' && amount && Number(amount) > 0) return `${ch.qr}&am=${Number(amount).toFixed(2)}`;
+  if (ch.qrKind === 'upi' && amount && Number(amount) > 0) return `${ch.qr}&am=${(Number(amount) * (rate || 1)).toFixed(2)}`;
   return ch.qr;
 }
 
@@ -37,8 +39,8 @@ function CopyButton({ value }: { value: string }) {
 }
 
 /** "Pay to" details of the chosen deposit method: fields with copy buttons, a scannable QR and the admin's note. */
-export function PayToPanel({ channel, amount, className }: { channel: DepositChannelDto; amount: string; className?: string }) {
-  const payload = qrPayload(channel, amount);
+export function PayToPanel({ channel, amount, rate = 1, className }: { channel: DepositChannelDto; amount: string; rate?: number; className?: string }) {
+  const payload = qrPayload(channel, amount, rate);
   const [png, setPng] = useState<string | null>(null);
   useEffect(() => {
     // An admin-uploaded QR takes precedence; skip generating one.
