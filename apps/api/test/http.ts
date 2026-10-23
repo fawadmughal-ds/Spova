@@ -48,6 +48,26 @@ export class Session {
 
 export const created = (status: number) => [200, 201].includes(status);
 
+/** The onboarding answers a client supplies after sign-up (DOB, country, address + suitability). */
+export const ONBOARDING = {
+  dob: '1990-01-01',
+  countryCode: 'AE',
+  address: '12 Marina Walk',
+  city: 'Dubai',
+  zip: '00000',
+  sourceOfFunds: 'salary',
+  employmentStatus: 'employed',
+  annualIncome: '50k_100k',
+  netWorth: '50k_250k',
+  expectedDeposit: '1k_5k',
+  jobRole: 'finance',
+  usCitizen: 'no',
+  pep: 'no',
+  tradingExperience: '1_3y',
+  tradingObjective: 'speculation',
+};
+
+/** Sign up (minimal fields) and complete the required onboarding, leaving `s` logged in with a full profile. */
 export async function register(s: Session, tag: string) {
   const email = `e2e+${tag}.${Date.now()}.${Math.random().toString(36).slice(2, 7)}@zerventa.local`;
   const r = await s.json('POST', '/auth/register', {
@@ -56,23 +76,13 @@ export async function register(s: Session, tag: string) {
     firstName: 'E2e',
     lastName: tag,
     phone: '+971501234567',
-    dob: '1990-01-01',
-    countryCode: 'AE',
-    address: '12 Marina Walk',
-    city: 'Dubai',
-    zip: '00000',
-    sourceOfFunds: 'salary',
-    employmentStatus: 'employed',
-    annualIncome: '50k_100k',
-    netWorth: '50k_250k',
-    expectedDeposit: '1k_5k', jobRole: 'finance', usCitizen: 'no', pep: 'no',
-    tradingExperience: '1_3y',
-    tradingObjective: 'speculation',
     tcAccepted: true,
     riskAccepted: true,
   });
   assert.ok(created(r.status), `register: ${JSON.stringify(r.data)}`);
-  return { email, me: r.data };
+  const ob = await s.json('POST', '/me/onboarding', ONBOARDING);
+  assert.ok(created(ob.status), `onboarding: ${JSON.stringify(ob.data)}`);
+  return { email, me: ob.data };
 }
 
 export async function adminLogin(s: Session) {

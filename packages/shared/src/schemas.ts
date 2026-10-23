@@ -63,6 +63,23 @@ const suitabilityShape = {
 export const suitabilitySchema = z.object(suitabilityShape);
 export type SuitabilityInput = z.infer<typeof suitabilitySchema>;
 
+/** Date of birth with an 18+ check; collected in onboarding, not at sign-up. */
+export const dobSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD')
+  .refine((v) => {
+    const d = new Date(v);
+    if (Number.isNaN(d.getTime())) return false;
+    const eighteen = new Date();
+    eighteen.setFullYear(eighteen.getFullYear() - 18);
+    return d <= eighteen;
+  }, 'You must be at least 18');
+
+/**
+ * Sign-up now asks only for the essentials. Date of birth, country, the residential address and the
+ * suitability questionnaire are gathered in a required onboarding step the first time the client
+ * reaches the dashboard (see `onboardingSchema`).
+ */
 export const registerSchema = z.object({
   email: emailSchema,
   password: passwordSchema,
@@ -72,26 +89,21 @@ export const registerSchema = z.object({
     .string()
     .trim()
     .regex(/^\+?[1-9]\d{6,14}$/, 'Phone must be in international format, e.g. +971501234567'),
-  countryCode: z.string().trim().length(2).toUpperCase(),
-  dob: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD')
-    .refine((v) => {
-      const d = new Date(v);
-      if (Number.isNaN(d.getTime())) return false;
-      const eighteen = new Date();
-      eighteen.setFullYear(eighteen.getFullYear() - 18);
-      return d <= eighteen;
-    }, 'You must be at least 18'),
-  // residential address is required at sign-up (zip optional — not every country uses one)
-  address: z.string().trim().min(3, 'Enter your residential address').max(200),
-  city: z.string().trim().min(1, 'Enter your city').max(80),
-  zip: z.string().trim().max(20).optional(),
-  ...suitabilityShape,
   tcAccepted: z.literal(true, { errorMap: () => ({ message: 'You must accept the terms' }) }),
   riskAccepted: z.literal(true, { errorMap: () => ({ message: 'You must accept the risk disclosure' }) }),
 });
 export type RegisterInput = z.infer<typeof registerSchema>;
+
+/** Required post-sign-up onboarding: date of birth, country, residential address + the suitability questionnaire. */
+export const onboardingSchema = z.object({
+  dob: dobSchema,
+  countryCode: z.string().trim().length(2).toUpperCase(),
+  address: z.string().trim().min(3, 'Enter your residential address').max(200),
+  city: z.string().trim().min(1, 'Enter your city').max(80),
+  zip: z.string().trim().max(20).optional(),
+  ...suitabilityShape,
+});
+export type OnboardingInput = z.infer<typeof onboardingSchema>;
 
 /** Admin adds a timestamped comment to a client's file (agent call notes). */
 export const clientNoteSchema = z.object({ body: z.string().trim().min(1, 'Write a comment').max(2000) });

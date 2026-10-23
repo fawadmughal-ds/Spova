@@ -29,24 +29,33 @@ describe('client CRM: suitability, address, notes & call log', () => {
     assert.deepEqual(d.data.comments, []);
   });
 
-  it('refuses sign-up without a residential address', async () => {
-    const r = await new Session().json('POST', '/auth/register', {
+  it('refuses onboarding without a residential address', async () => {
+    const s = new Session();
+    const reg = await s.json('POST', '/auth/register', {
       email: `crm.bad.${Date.now()}@zerventa.local`,
       password: 'E2e!Passw0rd',
       firstName: 'No',
       lastName: 'Address',
       phone: '+971501234567',
+      tcAccepted: true,
+      riskAccepted: true,
+    });
+    assert.ok(created(reg.status), JSON.stringify(reg.data));
+    const r = await s.json('POST', '/me/onboarding', {
       dob: '1990-01-01',
       countryCode: 'AE',
+      city: 'Dubai',
       sourceOfFunds: 'salary',
       employmentStatus: 'employed',
       annualIncome: '50k_100k',
       netWorth: '50k_250k',
-      expectedDeposit: '1k_5k', jobRole: 'finance', usCitizen: 'no', pep: 'no',
+      expectedDeposit: '1k_5k',
+      jobRole: 'finance',
+      usCitizen: 'no',
+      pep: 'no',
       tradingExperience: '1_3y',
       tradingObjective: 'speculation',
-      tcAccepted: true,
-      riskAccepted: true,
+      // address intentionally omitted
     });
     assert.equal(r.status, 400);
   });

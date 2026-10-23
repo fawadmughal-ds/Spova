@@ -24,6 +24,7 @@ import { StatementView } from '@/components/portal/statement-view';
 import { HelpView } from '@/components/portal/help-view';
 import { ProfileView } from '@/components/portal/profile-view';
 import { DashboardView } from '@/components/portal/dashboard-view';
+import { OnboardingGate } from '@/components/portal/onboarding-gate';
 import { KycDeadlineBanner } from '@/components/kyc-deadline-banner';
 import { useT, type StringKey } from '@/components/trade/i18n';
 import { InfoPanel, MarketPanel, QuickTrade } from '@/components/trade/market-panel';
@@ -623,10 +624,17 @@ export default function TradePage() {
           </div>
         }
       >
-        <Terminal />
+        <DashboardOrOnboarding />
       </Suspense>
     </RequireAuth>
   );
+}
+
+/** First dashboard entry: clients who haven't finished onboarding see the required profile gate instead of the terminal. */
+function DashboardOrOnboarding() {
+  const { me } = useAuth();
+  if (me && me.profileComplete === false) return <OnboardingGate />;
+  return <Terminal />;
 }
 
 const PANEL_LABEL: Record<RailPanel, string> = { dashboard: 'Dashboard', deposit: 'Deposit', accounts: 'Trading accounts', payments: 'Payments', documents: 'Documents', statement: 'Statement', help: 'Help', profile: 'Profile' };

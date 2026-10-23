@@ -18,33 +18,6 @@ function upload(group: string, docType: string, bytes: Buffer, mime: string, nam
   return fd;
 }
 
-async function register(s: Session, tag: string) {
-  const email = `e2e+${tag}.${Date.now()}.${Math.random().toString(36).slice(2, 7)}@zerventa.local`;
-  const r = await s.json('POST', '/auth/register', {
-    email,
-    password: 'E2e!Passw0rd',
-    firstName: 'E2e',
-    lastName: tag,
-    phone: '+971501234567',
-    dob: '1990-01-01',
-    countryCode: 'AE',
-    address: '12 Marina Walk',
-    city: 'Dubai',
-    zip: '00000',
-    sourceOfFunds: 'salary',
-    employmentStatus: 'employed',
-    annualIncome: '50k_100k',
-    netWorth: '50k_250k',
-    expectedDeposit: '1k_5k', jobRole: 'finance', usCitizen: 'no', pep: 'no',
-    tradingExperience: '1_3y',
-    tradingObjective: 'speculation',
-    tcAccepted: true,
-    riskAccepted: true,
-  });
-  assert.equal(r.status, 201, `register: ${JSON.stringify(r.data)}`);
-  return { email, me: r.data };
-}
-
 const client = new Session();
 const other = new Session();
 const admin = new Session();

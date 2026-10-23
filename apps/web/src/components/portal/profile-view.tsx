@@ -99,7 +99,7 @@ function PersonalForm({ profile }: { profile: ProfileDto }) {
     lastName: profile.lastName,
     phone: profile.phone,
     dob: profile.dob ?? undefined,
-    countryCode: profile.countryCode,
+    countryCode: profile.countryCode ?? '',
     city: profile.city ?? '',
     address: profile.address ?? '',
     zip: profile.zip ?? '',

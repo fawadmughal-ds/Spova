@@ -1,5 +1,5 @@
-import { Body, Controller, Get, Patch } from '@nestjs/common';
-import { changePasswordSchema, notificationPrefsSchema, updateProfileSchema, type UpdateProfileInput } from '@spova/shared';
+import { Body, Controller, Get, Patch, Post } from '@nestjs/common';
+import { changePasswordSchema, notificationPrefsSchema, onboardingSchema, updateProfileSchema, type OnboardingInput, type UpdateProfileInput } from '@spova/shared';
 import { z } from 'zod';
 import { PrismaService } from '../../infra/prisma.service';
 import { AuthService } from '../auth/auth.service';
@@ -38,6 +38,33 @@ export class MeController {
     });
     const me = await this.auth.me(user.id);
     return me.profile;
+  }
+
+  /** Required onboarding completed on first dashboard entry: DOB, country, address + the suitability questionnaire. */
+  @Post('onboarding')
+  async onboarding(@CurrentUser() user: AuthUser, @Body(new ZodPipe(onboardingSchema)) body: OnboardingInput) {
+    await this.prisma.userProfile.update({
+      where: { userId: user.id },
+      data: {
+        dob: new Date(body.dob),
+        countryCode: body.countryCode,
+        address: body.address,
+        city: body.city,
+        zip: body.zip || null,
+        sourceOfFunds: body.sourceOfFunds,
+        employmentStatus: body.employmentStatus,
+        jobRole: body.jobRole,
+        jobRoleOther: body.jobRole === 'other' ? (body.jobRoleOther ?? null) : null,
+        annualIncome: body.annualIncome,
+        netWorth: body.netWorth,
+        expectedDeposit: body.expectedDeposit,
+        tradingExperience: body.tradingExperience,
+        tradingObjective: body.tradingObjective,
+        usCitizen: body.usCitizen,
+        pep: body.pep,
+      },
+    });
+    return this.auth.me(user.id);
   }
 
   @Get('notification-prefs')

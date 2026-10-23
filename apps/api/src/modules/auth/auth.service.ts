@@ -52,27 +52,13 @@ export class AuthService {
           lastLoginAt: now,
           lastLoginIp: meta.ip,
           // sign-up opens a DEMO account; the 15-day document window starts when the client opens a LIVE account
+          // Minimal sign-up: only name, phone. DOB, country, address and the suitability
+          // questionnaire are captured in the required onboarding step on first dashboard entry.
           profile: {
             create: {
               firstName: input.firstName,
               lastName: input.lastName,
               phone: input.phone,
-              dob: new Date(input.dob),
-              countryCode: input.countryCode,
-              address: input.address,
-              city: input.city,
-              zip: input.zip || null,
-              sourceOfFunds: input.sourceOfFunds,
-              employmentStatus: input.employmentStatus,
-              jobRole: input.jobRole,
-              jobRoleOther: input.jobRole === 'other' ? (input.jobRoleOther ?? null) : null,
-              annualIncome: input.annualIncome,
-              netWorth: input.netWorth,
-              expectedDeposit: input.expectedDeposit,
-              tradingExperience: input.tradingExperience,
-              tradingObjective: input.tradingObjective,
-              usCitizen: input.usCitizen,
-              pep: input.pep,
             },
           },
         },
@@ -298,7 +284,7 @@ export class AuthService {
       lastName: string;
       phone: string;
       dob: Date | null;
-      countryCode: string;
+      countryCode: string | null;
       city: string | null;
       address: string | null;
       zip: string | null;
@@ -337,6 +323,24 @@ export class AuthService {
         frozen: !!user.kycFrozenAt,
       },
       emailVerified: !!user.emailVerifiedAt,
+      // Onboarding is done once DOB, country, address and every suitability answer are on file.
+      profileComplete: !!(
+        user.profile &&
+        user.profile.dob &&
+        user.profile.countryCode &&
+        user.profile.address &&
+        user.profile.city &&
+        user.profile.sourceOfFunds &&
+        user.profile.employmentStatus &&
+        user.profile.jobRole &&
+        user.profile.annualIncome &&
+        user.profile.netWorth &&
+        user.profile.expectedDeposit &&
+        user.profile.tradingExperience &&
+        user.profile.tradingObjective &&
+        user.profile.usCitizen &&
+        user.profile.pep
+      ),
       profile: user.profile
         ? {
             firstName: user.profile.firstName,

@@ -4,14 +4,13 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowRight } from 'lucide-react';
-import { registerSchema, SUITABILITY_LABELS, type MeDto, type RegisterInput } from '@spova/shared';
+import { registerSchema, type MeDto, type RegisterInput } from '@spova/shared';
 import { usePlatform } from '@/lib/platform';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useForm } from '@/lib/use-form';
-import { COUNTRIES } from '@/lib/countries';
 import { Reveal } from '@/components/motion';
-import { Alert, Button, Input, Select } from '@/components/ui';
+import { Alert, Button, Input } from '@/components/ui';
 import { AuthHeading, CheckRow, PasswordStrength, PasswordToggle } from '@/components/auth/parts';
 
 function Step({ n, children }: { n: string; children: string }) {
@@ -29,18 +28,7 @@ export default function RegisterPage() {
   const router = useRouter();
   const { setMe } = useAuth();
   const [show, setShow] = useState(false);
-  const f = useForm<RegisterInput>(registerSchema, { countryCode: 'AE' });
-
-  const QSelect = ({ label, field, options }: { label: string; field: keyof RegisterInput; options: Record<string, string> }) => (
-    <Select label={label} {...f.bind(field)}>
-      <option value="">Select…</option>
-      {Object.entries(options).map(([v, l]) => (
-        <option key={v} value={v}>
-          {l}
-        </option>
-      ))}
-    </Select>
-  );
+  const f = useForm<RegisterInput>(registerSchema, {});
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,16 +56,6 @@ export default function RegisterPage() {
             <Input label="First name" autoComplete="given-name" {...f.bind('firstName')} />
             <Input label="Last name" autoComplete="family-name" {...f.bind('lastName')} />
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <Input label="Date of birth" type="date" {...f.bind('dob')} />
-            <Select label="Country of residence" {...f.bind('countryCode')}>
-              {COUNTRIES.map(([code, name]) => (
-                <option key={code} value={code}>
-                  {name}
-                </option>
-              ))}
-            </Select>
-          </div>
 
           <Step n="02">Contact</Step>
           <div className="grid gap-3 sm:grid-cols-2">
@@ -85,29 +63,7 @@ export default function RegisterPage() {
             <Input label="Phone" type="tel" placeholder="+971501234567" autoComplete="tel" {...f.bind('phone')} />
           </div>
 
-          <Step n="03">Residential address</Step>
-          <Input label="Address" autoComplete="street-address" {...f.bind('address')} />
-          <div className="grid grid-cols-2 gap-3">
-            <Input label="City" autoComplete="address-level2" {...f.bind('city')} />
-            <Input label="ZIP / Postal code (optional)" autoComplete="postal-code" {...f.bind('zip')} />
-          </div>
-
-          <Step n="04">Your trading profile</Step>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <QSelect label="Source of funds" field="sourceOfFunds" options={SUITABILITY_LABELS.sourceOfFunds} />
-            <QSelect label="Employment status" field="employmentStatus" options={SUITABILITY_LABELS.employmentStatus} />
-            <QSelect label="Job role" field="jobRole" options={SUITABILITY_LABELS.jobRole} />
-            {f.values.jobRole === 'other' && <Input label="Please specify your job role" {...f.bind('jobRoleOther')} />}
-            <QSelect label="Annual income" field="annualIncome" options={SUITABILITY_LABELS.annualIncome} />
-            <QSelect label="Estimated net worth" field="netWorth" options={SUITABILITY_LABELS.netWorth} />
-            <QSelect label="Expected deposit (next 12 months)" field="expectedDeposit" options={SUITABILITY_LABELS.expectedDeposit} />
-            <QSelect label="Trading experience" field="tradingExperience" options={SUITABILITY_LABELS.tradingExperience} />
-            <QSelect label="Trading objective" field="tradingObjective" options={SUITABILITY_LABELS.tradingObjective} />
-            <QSelect label="Are you a US citizen or US tax resident?" field="usCitizen" options={SUITABILITY_LABELS.usCitizen} />
-            <QSelect label="Politically exposed person (PEP)?" field="pep" options={SUITABILITY_LABELS.pep} />
-          </div>
-
-          <Step n="05">Security</Step>
+          <Step n="03">Security</Step>
           <Input
             label="Password"
             type={show ? 'text' : 'password'}
@@ -129,6 +85,10 @@ export default function RegisterPage() {
               I have read the Risk Disclosure and understand CFDs can lose money rapidly due to leverage.
             </CheckRow>
           </div>
+
+          <p className="text-xs leading-relaxed text-ink-500">
+            We&apos;ll ask a few more questions — your address and a short suitability questionnaire — right after you sign in, to set up your account.
+          </p>
 
           <Button type="submit" size="lg" className="group w-full rounded-2xl" loading={f.submitting}>
             Create account <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />

@@ -214,7 +214,7 @@ model UserProfile {
   lastName    String   @map("last_name")
   phone       String
   dob         DateTime? @db.Date
-  countryCode String   @map("country_code") @db.Char(2)
+  countryCode String?  @map("country_code") @db.Char(2)
   city        String?
   address     String?
   zip         String?

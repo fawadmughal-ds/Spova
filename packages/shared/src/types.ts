@@ -40,6 +40,8 @@ export interface MeDto {
     frozen: boolean;
   };
   emailVerified: boolean;
+  /** false until the client finishes the required onboarding (DOB, country, address + suitability questionnaire) */
+  profileComplete: boolean;
   profile: ProfileDto | null;
 }
 
@@ -48,7 +50,7 @@ export interface ProfileDto {
   lastName: string;
   phone: string;
   dob: string | null;
-  countryCode: string;
+  countryCode: string | null;
   city: string | null;
   address: string | null;
   zip: string | null;
