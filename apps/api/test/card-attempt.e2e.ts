@@ -19,10 +19,9 @@ describe('card deposit attempts (test mode, no gateway)', () => {
   before(async () => {
     await resetRateLimits();
     await register(client, 'card');
-    // sign-up opens a DEMO account; card deposits need a LIVE account
-    const live = await client.json('POST', '/me/accounts', { type: 'live' });
-    assert.ok(created(live.status), JSON.stringify(live.data));
-    liveAccountId = live.data.id;
+    // sign-up opens the LIVE account that card deposits need
+    const accounts = await client.json('GET', '/me/accounts');
+    liveAccountId = accounts.data.live[0].id;
   });
 
   const attempt = (body: unknown) => client.json('POST', '/me/payments/card/attempt', body);

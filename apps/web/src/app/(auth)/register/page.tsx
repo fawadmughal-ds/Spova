@@ -41,7 +41,7 @@ export default function RegisterPage() {
 
   return (
     <>
-      <AuthHeading eyebrow="Two minutes" title="Open *your account*" sub="Free demo with $10,000 virtual funds. Takes two minutes." />
+      <AuthHeading eyebrow="Two minutes" title="Open *your account*" sub="Open your live trading account in two minutes." />
       {!platform.registrationOpen && (
         <div role="alert" className="mt-6 rounded-xl border border-gold/30 bg-gold/[0.08] px-4 py-3 text-sm text-ink-100">
           <strong>New registrations are paused.</strong> Please try again later or contact support. Existing clients can still sign in.

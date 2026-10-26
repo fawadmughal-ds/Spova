@@ -49,7 +49,7 @@ describe('admin account ops + dashboard KPIs', () => {
   });
 
   it('the demo self-serve limit is 5', async () => {
-    // sign-up made 1 demo; keep opening until the server rejects
+    // sign-up opens a live account (no demo); keep opening demos until the server rejects at the limit
     let lastCode = 0;
     for (let i = 0; i < 8; i++) {
       const r = await client.json('POST', '/me/accounts', { type: 'demo' });

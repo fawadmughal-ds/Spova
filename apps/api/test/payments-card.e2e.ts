@@ -85,9 +85,9 @@ describe('card deposits via the gateway webhook', { skip: enabled ? false : 'STR
     const cfg = await admin.json<any>('GET', '/admin/payments/channels');
     await admin.json('PUT', '/admin/payments/channels', { ...cfg.data, card: { ...cfg.data.card, enabled: true } });
     await register(client, 'card');
-    // sign-up opens a demo; open a live account (needed for card deposits)
-    const live = await client.json<{ id: string }>('POST', '/me/accounts', { type: 'live' });
-    liveAccountId = live.data.id;
+    // sign-up opens the LIVE account that card deposits need
+    const accounts = await client.json<{ live: { id: string }[] }>('GET', '/me/accounts');
+    liveAccountId = accounts.data.live[0].id;
   });
   after(async () => {
     await resetRateLimits();

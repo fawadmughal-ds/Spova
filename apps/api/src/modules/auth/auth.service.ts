@@ -42,7 +42,7 @@ export class AuthService {
     const passwordHash = await argon2.hash(input.password, { type: argon2.argon2id });
     const now = new Date();
 
-    const { user, demo } = await this.prisma.$transaction(async (tx) => {
+    const { user, account } = await this.prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
         data: {
           email: input.email,
@@ -51,9 +51,10 @@ export class AuthService {
           riskAcceptedAt: now,
           lastLoginAt: now,
           lastLoginIp: meta.ip,
-          // sign-up opens a DEMO account; the 15-day document window starts when the client opens a LIVE account
           // Minimal sign-up: only name, phone. DOB, country, address and the suitability
           // questionnaire are captured in the required onboarding step on first dashboard entry.
+          // sign-up opens a LIVE account; the 15-day window to upload KYC documents starts now.
+          kycDeadlineAt: new Date(Date.now() + 15 * 86_400_000),
           profile: {
             create: {
               firstName: input.firstName,
@@ -64,12 +65,12 @@ export class AuthService {
         },
         include: { profile: true },
       });
-      // sign-up opens a DEMO account (reference flow); the client opens a live account later with a 15-day KYC window
-      const demo = await this.accounts.createInTx(tx, user.id, 'demo');
-      return { user, demo };
+      // sign-up opens a LIVE account (no demo); the client lands on it on first login.
+      const account = await this.accounts.createInTx(tx, user.id, 'live');
+      return { user, account };
     });
 
-    void this.mail.welcome(user.email, input.firstName, demo.loginCode).catch((e) => this.log.warn(e.message));
+    void this.mail.welcome(user.email, input.firstName, account.loginCode).catch((e) => this.log.warn(e.message));
 
     if (user.role === 'client' && user.profile?.notifEmail !== false) void this.mail.login(user.email, user.profile?.firstName ?? '', new Date(), meta.ip).catch((e) => this.log.warn(e.message));
 

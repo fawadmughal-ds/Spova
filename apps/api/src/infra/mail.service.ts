@@ -134,15 +134,15 @@ ${heading}${opts.bodyHtml}${cta}
     return this.send({
       to,
       subject: o.subject || `Welcome to ${brand}`,
-      text: `Hi ${firstName},\n\nYour ${brand} demo account (login ${loginCode}) is ready with $10,000 to practice. When you are ready, open a live account from your client area; you then have 15 days to upload your documents.\n\nLog in: ${login}\n\nTrading CFDs involves significant risk of loss.`,
+      text: `Hi ${firstName},\n\nYour ${brand} live trading account (login ${loginCode}) is open. Upload your documents within 15 days to keep it active, then make your first deposit from your client area.\n\nLog in: ${login}\n\nTrading CFDs involves significant risk of loss.`,
       html: this.wrap({
         preheader: `Your ${brand} account is ready — login ${loginCode}.`,
         heading: `Welcome to ${brand}, ${firstName}`,
         bodyHtml:
           (o.intro ? this.p(esc(o.intro)) : '') +
-          this.p('Your demo account is ready with <b>$10,000</b> to practice, no deposit needed.') +
-          this.kvTable([{ label: 'Demo account login', value: String(loginCode) }]) +
-          this.p('When you are ready to trade for real, open a live account from your client area. You then have <b>15 days</b> to upload your documents.'),
+          this.p('Your <b>live trading account</b> is open and ready.') +
+          this.kvTable([{ label: 'Account login', value: String(loginCode) }]) +
+          this.p('Upload your verification documents within <b>15 days</b> to keep the account active, then make your first deposit from your client area.'),
         cta: { label: 'Log in to your account', url: login },
       }),
     });

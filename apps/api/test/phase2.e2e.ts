@@ -33,12 +33,12 @@ describe('phase 2: kyc -> live account -> payments -> tickets', () => {
     clientId = a.me.id;
     await register(other, 'other');
     await adminLogin(admin);
-    // sign-up opens a DEMO account; opening a LIVE account starts the 15-day KYC window
+    // sign-up now opens a LIVE account (and starts the 15-day KYC window); open a demo too for the demo-specific checks
     const accounts = await client.json('GET', '/me/accounts');
-    demoAccountId = accounts.data.demo[0].id;
-    const live = await client.json('POST', '/me/accounts', { type: 'live' });
-    assert.ok([200, 201].includes(live.status), JSON.stringify(live.data));
-    liveAccountId = live.data.id;
+    liveAccountId = accounts.data.live[0].id;
+    const demo = await client.json('POST', '/me/accounts', { type: 'demo' });
+    assert.ok([200, 201].includes(demo.status), JSON.stringify(demo.data));
+    demoAccountId = demo.data.id;
   });
 
   // ---------------------------------------------------------------- KYC
