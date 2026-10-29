@@ -10,6 +10,10 @@ import { OG_IMAGE, OG_IMAGE_H, OG_IMAGE_W, SITE_DESCRIPTION, SITE_URL, SOCIALS }
 const META_PIXEL_IDS = ['1482472313703037', '1652620199639918', '2310634303122421'];
 const META_PIXEL = `!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');${META_PIXEL_IDS.map((id) => `fbq('init','${id}');`).join('')}fbq('track','PageView');`;
 
+/** Google Analytics 4 (gtag.js). */
+const GA_ID = 'G-PGLXSB62L5';
+const GA_INIT = `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${GA_ID}');`;
+
 const body = Geist({ subsets: ['latin'], variable: '--ff-body', display: 'swap' });
 const display = Bricolage_Grotesque({ subsets: ['latin'], variable: '--ff-display', display: 'swap' });
 const serif = Instrument_Serif({ subsets: ['latin'], weight: '400', style: ['normal', 'italic'], variable: '--ff-serif', display: 'swap' });
@@ -78,6 +82,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="min-h-screen">
         {/* structured data for search engines */}
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD) }} />
+        {/* Google Analytics (gtag.js) */}
+        <Script id="ga-src" src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`} strategy="afterInteractive" />
+        <Script id="ga-init" strategy="afterInteractive">{GA_INIT}</Script>
         {/* Meta Pixel */}
         <Script id="meta-pixel" strategy="afterInteractive">{META_PIXEL}</Script>
         <noscript>
